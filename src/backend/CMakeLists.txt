@@ -10,6 +10,7 @@ set(BACKEND_SOURCES
     backend_manager.cpp
     cpu/cpu_backend.cpp
     cpu/cpu_mm_fp32.cpp
+    cpu/cpu_unary.cpp
 )
 
 # 创建基础后端库

@@ -15,6 +15,7 @@
 - 🆕 **V1.20.01新增**：TSR二进制张量格式传输支持
 - 🆕 **V1.20.01新增**：完整张量通信API（send_tensor, fetch_tensor, wait_for_tensor）
 - 🆕 **V1.20.01新增**：多种通信模式（同步/异步）支持
+- 🆕 **V1.25.1新增**：简化计算API（calculate方法），代码量减少67%-83%
 - ✅ **V1.19.02特性**：原子操作机制，避免读写冲突
 - ✅ **V1.19.02特性**：智能轮询频率，兼顾功耗与效率
 - ✅ **V1.19.02特性**："阅后即焚"响应文件管理
@@ -153,6 +154,8 @@ if (session.new_response()) {
 
 #### **3. 张量通信API（V1.20.01新增）**
 
+**传统方式（手动发送张量）：**
+
 ```cpp
 // 发送张量到Python
 Tensor tensor_a = Tensor::randn(Shape(1024, 1024));
@@ -167,6 +170,31 @@ session.send_request("matmul input_a input_b");
 // 等待并接收计算结果
 Tensor result = session.wait_for_tensor(10000);
 ```
+
+**🆕 新版简化方式（V1.25.1新增）：**
+
+```cpp
+// 使用calculate方法，一步完成
+Tensor a = Tensor::randn(Shape(1024, 1024), 42);
+Tensor b = Tensor::randn(Shape(1024, 1024), 42);
+
+// 单张量计算
+Tensor relu_result = session.calculate("relu", a);
+
+// 双张量计算（矩阵乘法）
+Tensor matmul_result = session.calculate("matmul", a, b);
+
+// 三张量计算（线性变换）
+Tensor linear_result = session.calculate("linear", a, weight_tensor, bias_tensor);
+```
+
+**API对比：**
+
+| 操作 | 传统方式 | 新版方式 | 代码行数 |
+|------|----------|----------|----------|
+| 矩阵乘法 | 4行（send+send+fetch+wait） | 1行（calculate） | 75%减少 |
+| 张量激活 | 3行（send+fetch+wait） | 1行（calculate） | 67%减少 |
+| 线性变换 | 6行（send×3+fetch+wait） | 1行（calculate） | 83%减少 |
 
 ---
 
@@ -798,11 +826,32 @@ std::string fetch_response(const std::string& msg, uint32_t timeout_ms = 10000) 
 
 #### **张量通信API**
 
+**传统张量API：**
+
 ```cpp
 void send_tensor(const Tensor& tensor, const std::string& tag) const
 Tensor fetch_tensor(const std::string& msg, uint32_t timeout_ms = 10000) const
 Tensor wait_for_tensor(uint32_t timeout_ms = 10000) const
 ```
+
+**🆕 简化计算API（V1.25.1新增）：**
+
+```cpp
+// 单张量计算（如激活函数）
+Tensor calculate(const std::string& msg, const Tensor& tensor_a, uint32_t timeout_ms = 10000) const
+
+// 双张量计算（如矩阵乘法、加法、乘法）
+Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, uint32_t timeout_ms = 10000) const
+
+// 三张量计算（如线性变换）
+Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, const Tensor& tensor_c, uint32_t timeout_ms = 10000) const
+```
+
+**calculate方法特性：**
+- 自动处理张量传输和计算指令
+- 支持超时控制
+- 内置错误处理
+- 显著简化代码结构
 
 #### **会话管理API**
 

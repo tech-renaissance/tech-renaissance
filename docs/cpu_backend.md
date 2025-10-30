@@ -4,8 +4,8 @@
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.23.1
-**更新日期**: 2025-10-30
+**版本**: V1.25.1
+**更新日期**: 2025-10-31
 **作者**: 技术觉醒团队
 
 ## 设计理念
@@ -505,6 +505,300 @@ void cpu_performance_benchmark() {
 }
 ```
 
+### 单目运算操作（V1.25.1新增）
+
+CPU后端提供了9种单目运算，每种都包含非原地和原地两个版本，支持FP32和INT8数据类型。
+
+#### `Tensor zeros_like(const Tensor& input) const`
+
+创建与输入张量相同形状的全零张量。
+
+**参数**：
+- `input` - 输入张量
+
+**返回值**：
+- `Tensor` - 全零张量，形状和类型与输入相同
+
+**实现特点**：
+- 使用`std::memset`高效填充，性能优异
+- 支持FP32和INT8数据类型
+- 内存对齐优化
+
+**示例**：
+```cpp
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+backend->fill(input, 5.0f);
+Tensor zeros = backend->zeros_like(input);  // 所有元素为0.0f
+```
+
+#### `Tensor ones_like(const Tensor& input) const`
+
+创建与输入张量相同形状的全1张量。
+
+**参数**：
+- `input` - 输入张量
+
+**返回值**：
+- `Tensor` - 全1张量，形状和类型与输入相同
+
+**示例**：
+```cpp
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+Tensor ones = backend->ones_like(input);  // 所有元素为1.0f
+```
+
+#### `Tensor relu(const Tensor& input) const`
+
+执行ReLU激活函数：max(0, x)。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - ReLU激活后的张量
+
+**示例**：
+```cpp
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+backend->fill(input, -2.0f);
+Tensor result = backend->relu(input);  // 负数变为0，正数保持不变
+```
+
+#### `Tensor sign(const Tensor& input) const`
+
+执行符号函数：x>0返回1，x<0返回-1，x=0返回0。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 符号函数结果张量
+
+**示例**：
+```cpp
+Tensor result = backend->sign(input);  // 每个元素为-1, 0, 或1
+```
+
+#### `Tensor square(const Tensor& input) const`
+
+执行平方运算：x²。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 平方结果张量
+
+**示例**：
+```cpp
+Tensor result = backend->square(input);  // 每个元素平方
+```
+
+#### `Tensor sqrt(const Tensor& input) const`
+
+执行平方根运算：√x。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32，必须非负）
+
+**返回值**：
+- `Tensor` - 平方根结果张量
+
+**异常**：
+- `TRException` - 当输入包含负数时抛出（可配置）
+
+**示例**：
+```cpp
+Tensor result = backend->sqrt(input);  // 每个元素平方根
+```
+
+#### `Tensor abs(const Tensor& input) const`
+
+执行绝对值运算：|x|。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 绝对值结果张量
+
+**示例**：
+```cpp
+Tensor result = backend->abs(input);  // 每个元素绝对值
+```
+
+#### `Tensor negative(const Tensor& input) const`
+
+执行相反数运算：-x。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 相反数结果张量
+
+**示例**：
+```cpp
+Tensor result = backend->negative(input);  // 每个元素取负
+```
+
+#### `Tensor reciprocal(const Tensor& input) const`
+
+执行倒数运算：1/x。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 倒数结果张量
+
+**异常**：
+- `TRException` - 当输入包含0时抛出（可配置）
+
+**示例**：
+```cpp
+Tensor result = backend->reciprocal(input);  // 每个元素倒数
+```
+
+### 原地单目运算操作（V1.25.1新增）
+
+原地运算直接修改输入张量，避免内存分配，性能更高。
+
+#### `void zeros_inplace(Tensor& input) const`
+
+原地将张量所有元素设置为0。
+
+**参数**：
+- `input` - 要修改的张量
+
+**实现特点**：
+- 使用`std::memset`高效填充，性能优异
+- 无额外内存分配
+
+**示例**：
+```cpp
+backend->zeros_inplace(input);  // input直接变为全0
+```
+
+#### `void ones_inplace(Tensor& input) const`
+
+原地将张量所有元素设置为1。
+
+**参数**：
+- `input` - 要修改的张量
+
+**示例**：
+```cpp
+backend->ones_inplace(input);  // input直接变为全1
+```
+
+#### `void relu_inplace(Tensor& input) const`
+
+原地执行ReLU激活函数。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->relu_inplace(input);  // 负数原地变为0
+```
+
+#### `void sign_inplace(Tensor& input) const`
+
+原地执行符号函数。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->sign_inplace(input);  // 原地计算符号
+```
+
+#### `void square_inplace(Tensor& input) const`
+
+原地执行平方运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->square_inplace(input);  // 原地平方
+```
+
+#### `void sqrt_inplace(Tensor& input) const`
+
+原地执行平方根运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32，必须非负）
+
+**示例**：
+```cpp
+backend->sqrt_inplace(input);  // 原地平方根
+```
+
+#### `void abs_inplace(Tensor& input) const`
+
+原地执行绝对值运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->abs_inplace(input);  // 原地绝对值
+```
+
+#### `void negative_inplace(Tensor& input) const`
+
+原地执行相反数运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->negative_inplace(input);  // 原地取负
+```
+
+#### `void reciprocal_inplace(Tensor& input) const`
+
+原地执行倒数运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->reciprocal_inplace(input);  // 原地倒数
+```
+
+### NaN检查配置（V1.25.1新增）
+
+单目运算支持3种NaN检查模式，通过编译时宏`TR_ENABLE_NAN_CHECK`配置：
+
+```cpp
+// 检查模式配置
+#define TR_ENABLE_NAN_CHECK 0  // 不检查，直接计算（产生NaN/inf）
+#define TR_ENABLE_NAN_CHECK 1  // 检查并报错（默认模式）
+#define TR_ENABLE_NAN_CHECK 2  // 检查并替换（sqrt负数→0，倒数零→1/eps）
+```
+
+**eps常量**：
+```cpp
+constexpr float TR_EPS = 1e-10f;  // 用于处理除零等特殊情况
+```
+
+### 性能优化特点（V1.25.1）
+
+1. **memset优化**：`zeros_like`和`zeros_inplace`使用`std::memset`，比循环快数倍
+2. **内存对齐**：所有操作都基于64字节对齐的内存，优化SIMD访问
+3. **原地运算**：避免额外内存分配，提升性能
+4. **编译时优化**：支持编译器自动向量化
+
 ### 大规模数据处理
 
 ```cpp
@@ -525,6 +819,40 @@ void large_scale_computation() {
     backend->add(result, a, b);
 
     std::cout << "Large-scale computation completed!" << std::endl;
+}
+```
+
+### 单目运算示例（V1.25.1新增）
+
+```cpp
+#include "tech_renaissance.h"
+using namespace tr;
+
+void unary_operations_example() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 创建测试张量
+    Shape shape(2, 3, 4, 5);
+    Tensor input(shape, DType::FP32, tr::CPU);
+    cpu_backend->fill(input, 2.5f);
+
+    // 非原地运算
+    Tensor zeros = cpu_backend->zeros_like(input);
+    Tensor ones = cpu_backend->ones_like(input);
+    Tensor relu_result = cpu_backend->relu(input);
+    Tensor square_result = cpu_backend->square(input);
+    Tensor sqrt_result = cpu_backend->sqrt(input);  // 输入必须非负
+    Tensor abs_result = cpu_backend->abs(input);
+    Tensor negative_result = cpu_backend->negative(input);
+    Tensor sign_result = cpu_backend->sign(input);
+    Tensor reciprocal_result = cpu_backend->reciprocal(input);
+
+    // 原地运算（性能更高）
+    Tensor inplace_tensor = Tensor::randn(shape, 42);
+    cpu_backend->relu_inplace(inplace_tensor);      // 直接修改原张量
+    cpu_backend->square_inplace(inplace_tensor);    // 链式原地运算
+
+    std::cout << "Unary operations completed successfully!" << std::endl;
 }
 ```
 
@@ -716,8 +1044,14 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 
 ## 版本信息
 
-- **版本**：V1.23.1
-- **更新日期**：2025-10-30
+- **版本**：V1.25.1
+- **更新日期**：2025-10-31
 - **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen优化、跨后端转换、高性能矩阵乘法
+- **主要特性**：行主序存储、Eigen优化、跨后端转换、高性能矩阵乘法、9种单目运算（18个API）、静默模式支持
+- **性能优化**：memset零填充优化、原地运算支持、NaN检查配置
+- **新增功能**：
+  - 单目运算：zeros_like, ones_like, relu, sign, square, sqrt, abs, negative, reciprocal
+  - 原地版本：zeros_inplace, ones_inplace, relu_inplace, sign_inplace, square_inplace, sqrt_inplace, abs_inplace, negative_inplace, reciprocal_inplace
+  - 静默模式：Python服务器DEBUG_MODE配置
+  - NaN检查：3种可配置的NaN处理模式
 - **依赖库**：Eigen3（可选）、标准C++库

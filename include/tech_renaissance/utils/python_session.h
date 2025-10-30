@@ -41,7 +41,7 @@ public:
     PythonSession(const std::string& script_path = "default", const std::string& session_id = "default", bool quiet_mode = false);
     ~PythonSession();
 
-    void start();           // 启动Python脚本
+    void start(int warmup_time = 300);           // 启动Python脚本，启动后默认等待300ms
     bool is_alive();        // 检查Python是否仍在运行
     void terminate();       // 强制终止
     void join();            // 等待
@@ -57,6 +57,9 @@ public:
     std::string fetch_response(const std::string& msg, uint32_t timeout_ms = 10000) const;  // 发送请求并等待响应
     void send_tensor(const Tensor& tensor, const std::string& tag) const;
     Tensor fetch_tensor(const std::string& msg, uint32_t timeout_ms = 10000) const;
+    Tensor calculate(const std::string& msg, const Tensor& tensor_a, uint32_t timeout_ms = 10000) const;
+    Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, uint32_t timeout_ms = 10000) const;
+    Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, const Tensor& tensor_c, uint32_t timeout_ms = 10000) const;
     Tensor wait_for_tensor(uint32_t timeout_ms = 10000) const;
     std::string session_dir() const {return session_dir_;}
 

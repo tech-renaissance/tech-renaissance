@@ -1,5 +1,4 @@
 #include "tech_renaissance.h"
-#include <chrono>
 
 using namespace tr;
 
@@ -77,15 +76,12 @@ int main() {
 #ifdef TR_BUILD_PYTHON_SESSION
     {
         // 增加PyTorch结果验证
-        PythonSession session("default", "verify", true);
-        session.start();
+        PythonSession ps("default", "verify", true);
+        ps.start();
 
-        // 等待进程启动
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        session.send_tensor(cpu_a, "a");
-        session.send_tensor(cpu_b, "b");
-        Tensor pytorch_result = session.fetch_tensor(R"({"cmd": "matmul", "params": "a,b"})", 10000);
-        session.please_exit();
+        Tensor pytorch_result = ps.calculate("matmul", cpu_a, cpu_b);
+
+        ps.please_exit();
 
         double mean_abs_err_pytorch = cpu_backend->get_mean_abs_err(pytorch_result, cuda_result_on_cpu);
         double mean_rel_err_pytorch = cpu_backend->get_mean_rel_err(pytorch_result, cuda_result_on_cpu);
