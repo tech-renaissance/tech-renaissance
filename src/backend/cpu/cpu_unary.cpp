@@ -406,6 +406,40 @@ Tensor CpuBackend::reciprocal(const Tensor& input) const {
     return result;
 }
 
+Tensor CpuBackend::round(const Tensor& input) const {
+    validate_same_device(input.device());
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::round] Only FP32 tensors are supported");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(input.shape(), input.dtype(), tr::CPU);
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = input.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen的round函数
+    result_vec = input_vec.array().round().matrix();
+#else
+    // 朴素实现
+    // 四舍五入运算
+    for (size_t i = 0; i < num_elements; ++i) {
+        result_data[i] = std::round(input_data[i]);
+    }
+#endif
+
+    return result;
+}
+
 // ===== 原地运算函数 =====
 
 void CpuBackend::zeros_inplace(Tensor& input) const {
@@ -640,6 +674,30 @@ void CpuBackend::reciprocal_inplace(Tensor& input) const {
             data[i] = 1.0f / data[i];
         }
     }
+}
+
+void CpuBackend::round_inplace(Tensor& input) const {
+    validate_same_device(input.device());
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::round_inplace] Only FP32 tensors are supported");
+    }
+
+    float* data = static_cast<float*>(input.data_ptr());
+    size_t num_elements = input.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.array().round().matrix();
+#else
+    // 朴素实现
+    // 四舍五入运算
+    for (size_t i = 0; i < num_elements; ++i) {
+        data[i] = std::round(data[i]);
+    }
+#endif
 }
 
 // ===== 指定输出张量的运算函数 =====
@@ -1056,6 +1114,44 @@ void CpuBackend::reciprocal_into(const Tensor& input, Tensor& output) const {
         } else {
             output_data[i] = 1.0f / input_data[i];
         }
+    }
+#endif
+}
+
+void CpuBackend::round_into(const Tensor& input, Tensor& output) const {
+    validate_same_device(input.device());
+    validate_same_device(output.device());
+
+    if (input.dtype() != DType::FP32 || output.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::round_into] Only FP32 tensors are supported");
+    }
+
+#if TR_ENABLE_INTO_FUNC_SHAPE_CHECK == 1
+    if (input.shape() != output.shape()) {
+        throw TRException("[CpuBackend::round_into] Shape mismatch: input shape " +
+                         input.shape().to_string() + " != output shape " +
+                         output.shape().to_string());
+    }
+#endif
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* output_data = static_cast<float*>(output.data_ptr());
+
+    size_t num_elements = input.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+
+    // 使用Eigen的round函数
+    output_vec = input_vec.array().round().matrix();
+#else
+    // 朴素实现
+    // 四舍五入运算
+    for (size_t i = 0; i < num_elements; ++i) {
+        output_data[i] = std::round(input_data[i]);
     }
 #endif
 }

@@ -82,6 +82,12 @@ int main() {
             [](CpuBackend& backend, const Tensor& input) { return backend.reciprocal(input); },
             [](CpuBackend& backend, Tensor& input) { backend.reciprocal_inplace(input); },
             [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.reciprocal_into(input, output); }
+        },
+        {
+            "round", "round",
+            [](CpuBackend& backend, const Tensor& input) { return backend.round(input); },
+            [](CpuBackend& backend, Tensor& input) { backend.round_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.round_into(input, output); }
         }
     };
 

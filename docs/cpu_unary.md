@@ -2,9 +2,9 @@
 
 ## 概述
 
-本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括9种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
+本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括10种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
 
-**版本**: V1.26.3
+**版本**: V1.26.5
 **更新日期**: 2025-10-31
 **作者**: 技术觉醒团队
 
@@ -29,6 +29,7 @@
 | 7 | 绝对值 | `abs` | `abs_inplace` | `abs_into` | |x| |
 | 8 | 相反数 | `negative` | `negative_inplace` | `negative_into` | -x |
 | 9 | 倒数 | `reciprocal` | `reciprocal_inplace` | `reciprocal_into` | 1/x |
+| 10 | 四舍五入 | `round` | `round_inplace` | `round_into` | round(x) |
 
 ## 数据类型支持
 
@@ -489,6 +490,68 @@ backend->reciprocal_inplace(input);  // 原地倒数
 backend->reciprocal_into(input, output);  // 每个元素倒数
 ```
 
+### 10. 四舍五入运算
+
+#### `Tensor round(const Tensor& input) const`
+
+执行四舍五入运算：round(x)。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 四舍五入结果张量
+
+**实现特点**：
+- 使用Eigen的`array().round()`优化
+- 每个元素进行标准四舍五入
+- 向量化操作
+
+**数学含义**：
+- 正数：向上取整（2.3 → 2.0, 2.7 → 3.0）
+- 负数：向下取整（-2.3 → -2.0, -2.7 → -3.0）
+- 0.5边界：向最接近的偶数取整（2.5 → 2.0, 3.5 → 4.0）
+
+```cpp
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+input = Tensor::uniform(input.shape(), -10.0f, 10.0f, 42);
+Tensor result = backend->round(input);  // 每个元素四舍五入到最近的整数
+```
+
+#### `void round_inplace(Tensor& input) const`
+
+原地执行四舍五入运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+
+```cpp
+backend->round_inplace(input);  // 原地四舍五入
+```
+
+#### `void round_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的四舍五入结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**实现特点**：
+- 使用Eigen的`array().round()`优化
+- 标准四舍五入算法，与PyTorch的torch.round()完全一致
+- 向量化操作，高性能处理
+
+```cpp
+backend->round_into(input, output);  // 每个元素四舍五入
+```
+
+**使用场景**：
+- 浮点数到整数的无损转换
+- 量化前预处理
+- 数值精度控制
+- 与PyTorch兼容的数值处理
+
 ## 使用示例
 
 ### 基础单目运算
@@ -513,6 +576,7 @@ void basic_unary_operations() {
     Tensor abs_result = cpu_backend->abs(input);
     Tensor negative_result = cpu_backend->negative(input);
     Tensor sign_result = cpu_backend->sign(input);
+    Tensor round_result = cpu_backend->round(input);  // 新增：四舍五入
 
     // 2. 原地运算（直接修改原张量，性能最高）
     Tensor inplace_tensor = Tensor::uniform(shape, -1.0f, 1.0f, 42);
@@ -524,8 +588,9 @@ void basic_unary_operations() {
     cpu_backend->relu_into(input, output);        // 覆盖output的内容
     // 可以继续使用同一个output张量进行多次运算
     cpu_backend->square_into(input, output);      // 再次覆盖
+    cpu_backend->round_into(input, output);       // 新增：四舍五入覆盖
 
-    std::cout << "All 27 unary operations completed successfully!" << std::endl;
+    std::cout << "All 30 unary operations completed successfully!" << std::endl;
 }
 ```
 
@@ -551,7 +616,7 @@ void eigen_optimization_example() {
 #endif
 
     // 所有单目运算都会自动选择最优实现
-    // Eigen优化适用于：relu, sign, square, abs, negative（直接向量化）
+    // Eigen优化适用于：relu, sign, square, abs, negative, round（直接向量化）
     // 智能优化适用于：sqrt, reciprocal（检查NaN/Inf后选择实现）
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -562,11 +627,12 @@ void eigen_optimization_example() {
     Tensor result3 = cpu_backend->abs(input);         // 向量化|x|
     Tensor result4 = cpu_backend->negative(input);   // 向量化-x
     Tensor result5 = cpu_backend->sign(input);        // 向量化signum(x)
+    Tensor result6 = cpu_backend->round(input);       // 向量化round(x)
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
-    std::cout << "5 vectorized operations completed in " << duration.count() << " microseconds" << std::endl;
+    std::cout << "6 vectorized operations completed in " << duration.count() << " microseconds" << std::endl;
 
     // 原地运算（零拷贝，直接在原内存上操作）
     Tensor inplace_tensor = Tensor::randn(large_shape, 42);
@@ -656,6 +722,7 @@ void unary_operations_benchmark() {
 - **relu操作**：Eigen优化比朴素实现快3-5倍
 - **square操作**：Eigen优化比朴素实现快4-6倍
 - **abs操作**：Eigen优化比朴素实现快3-4倍
+- **round操作**：Eigen优化比朴素实现快3-4倍
 - **sqrt/reciprocal**：智能选择，在安全数据上快2-3倍
 
 ### 编译优化建议
@@ -719,7 +786,7 @@ try {
 
 ### 测试统计
 
-- **总测试数量**：27个测试（9个函数 × 3种模式）
+- **总测试数量**：30个测试（10个函数 × 3种模式）
 - **测试通过率**：100%
 - **测试范围**：覆盖所有功能路径和错误情况
 

@@ -47,6 +47,7 @@ if(MSVC)
 endif()
 
 # 全局编译选项
+option(TR_USE_EIGEN "Enable Eigen for CPU optimizations (default: ON)" ON)
 option(TR_USE_PROTOBUF "Use protobuf for serialization/ONNX" OFF)
 option(TR_USE_ONNX "Enable ONNX export (requires protobuf)" OFF)
 
@@ -59,6 +60,31 @@ endif()
 
 if(TR_USE_PROTOBUF)
     find_package(Protobuf CONFIG REQUIRED)
+endif()
+
+# 全局Eigen配置
+if(TR_USE_EIGEN)
+    # 设置Eigen库根目录
+    set(EIGEN_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Eigen")
+
+    # 检查Eigen库是否存在
+    if(EXISTS "${EIGEN_ROOT_DIR}/Dense")
+        set(EIGEN_FOUND TRUE)
+        set(EIGEN_INCLUDE_DIR "${EIGEN_ROOT_DIR}")
+
+        # 添加全局包含目录和定义
+        include_directories(${EIGEN_INCLUDE_DIR})
+        add_compile_definitions(TR_USE_EIGEN)
+
+        message(STATUS "Eigen found: ${EIGEN_ROOT_DIR}")
+        message(STATUS "Eigen optimizations: ENABLED for CPU backend")
+    else()
+        message(STATUS "Eigen not found at: ${EIGEN_ROOT_DIR}")
+        message(STATUS "Eigen optimizations: DISABLED, using naive implementations")
+        set(TR_USE_EIGEN OFF)
+    endif()
+else()
+    message(STATUS "Eigen optimizations: DISABLED by user")
 endif()
 
 # 尝试启用CUDA支持

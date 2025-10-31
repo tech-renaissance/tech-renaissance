@@ -75,6 +75,7 @@ public:
     Tensor abs(const Tensor& input) const;
     Tensor negative(const Tensor& input) const;
     Tensor reciprocal(const Tensor& input) const;
+    Tensor round(const Tensor& input) const;
 
     // 原地运算
     void zeros_inplace(Tensor& input) const;
@@ -86,6 +87,7 @@ public:
     void abs_inplace(Tensor& input) const;
     void negative_inplace(Tensor& input) const;
     void reciprocal_inplace(Tensor& input) const;
+    void round_inplace(Tensor& input) const;
 
     // 指定输出张量的运算（V1.26.3新增）
     void zeros_into(const Tensor& input, Tensor& output) const;
@@ -97,6 +99,7 @@ public:
     void abs_into(const Tensor& input, Tensor& output) const;
     void negative_into(const Tensor& input, Tensor& output) const;
     void reciprocal_into(const Tensor& input, Tensor& output) const;
+    void round_into(const Tensor& input, Tensor& output) const;
 
 private:
     void validate_same_device(const Device& device) const;

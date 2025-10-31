@@ -25,21 +25,13 @@ target_include_directories(backend
         $<INSTALL_INTERFACE:include>
 )
 
-# 检查是否启用Eigen
-option(TR_USE_EIGEN "Enable Eigen for CPU optimizations" ON)
+# 检查是否启用Eigen（已在根CMakeLists.txt中全局配置）
 if(TR_USE_EIGEN)
-    # 手动查找Eigen库（与测试配置保持一致）
-    set(EIGEN_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/Eigen")
-    if(EXISTS "${EIGEN_ROOT_DIR}/Dense")
-        set(EIGEN_FOUND TRUE)
-        set(EIGEN_INCLUDE_DIR "${EIGEN_ROOT_DIR}")
-        target_include_directories(backend PUBLIC ${EIGEN_INCLUDE_DIR})
-        target_compile_definitions(backend PUBLIC TR_USE_EIGEN)
-        message(STATUS "Eigen found: CPU optimizations enabled")
-    else()
-        message(STATUS "Eigen not found: Using naive CPU implementations")
-        set(TR_USE_EIGEN OFF)
-    endif()
+    # 添加Eigen包含目录（已由全局配置处理）
+    target_include_directories(backend PUBLIC ${EIGEN_INCLUDE_DIR})
+    message(STATUS "Eigen optimizations: ENABLED for backend (global config)")
+else()
+    message(STATUS "Eigen optimizations: DISABLED for backend (global config)")
 endif()
 
 # 链接数据模块

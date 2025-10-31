@@ -210,6 +210,22 @@ class SimpleHelloServer(TechRenaissanceServer):
                 except Exception as e:
                     print(f"[ERROR] reciprocal computation failed: {e}")
                     self.write_response('', 'invalid')
+        elif command.lower() == 'round':      # 四舍五入
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing round command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for round")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for round, shape: {tensor.shape}")
+                    result = torch.round(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] round computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] round result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] round computation failed: {e}")
+                    self.write_response('', 'invalid')
         else:
             print(f"[ERROR] Unknown command: {command}")
             self.debug_message(f'[Python] Invalid command: {command}')
