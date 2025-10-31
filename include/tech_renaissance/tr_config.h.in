@@ -1,0 +1,56 @@
+/**
+ * @file tr_config.h
+ * @brief 技术觉醒框架配置头文件
+ * @details 由CMake自动生成的配置文件，包含编译时选项定义
+ * @version 1.00.00
+ * @date 2025-10-23
+ * @author 技术觉醒团队
+ * @note 依赖项: CMake generated configuration
+ * @note 所属系列: config
+ */
+
+#pragma once
+
+// 编译时配置选项
+#cmakedefine TR_USE_SPDLOG
+#cmakedefine TR_USE_PROTOBUF
+#cmakedefine TR_USE_ONNX
+
+// 版本信息
+#define TR_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define TR_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define TR_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define TR_VERSION "@PROJECT_VERSION@"
+
+// 平台信息
+#define TR_PLATFORM_NAME "@CMAKE_SYSTEM_NAME@"
+#define TR_CXX_COMPILER_ID "@CMAKE_CXX_COMPILER_ID@"
+
+// 构建信息
+#define TR_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+#cmakedefine TR_DEBUG_MODE
+
+// 日志配置
+#ifndef TR_USE_SPDLOG
+#define TR_USE_BUILTIN_LOGGER
+#endif
+
+// 功能开关
+#ifndef TR_USE_ONNX
+#cmakedefine TR_USE_ONNX
+#endif
+
+// 内存对齐
+#define TR_MEMORY_ALIGNMENT 64
+
+// 最大张量维度（内部统一为4维）
+#define TR_MAX_TENSOR_DIMS 4
+
+// 默认批处理大小
+#define TR_DEFAULT_BATCH_SIZE 32
+
+// 最大通道数限制
+#define TR_MAX_CHANNELS 2048
+
+// 支持的卷积核尺寸
+#define TR_SUPPORTED_KERNEL_SIZES {1, 3, 5, 7}

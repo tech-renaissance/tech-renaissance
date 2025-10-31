@@ -1,0 +1,178 @@
+/**
+ * @file backend.h
+ * @brief 后端抽象基类
+ * @details 定义所有后端必须实现的接口（已优化，避免循环依赖）
+ * @version 1.01.00
+ * @date 2025-10-26
+ * @author 技术觉醒团队
+ * @note 依赖项: device.h, dtype.h
+ * @note 所属系列: backend
+ */
+
+#pragma once
+
+#include "tech_renaissance/data/device.h"
+#include "tech_renaissance/data/dtype.h"
+#include <memory>
+#include <cstddef>
+
+namespace tr {
+
+// ########## 关键修改 ##########
+// 不包含 "tech_renaissance/data/tensor.h"
+// 仅使用前向声明，彻底解耦
+class Tensor;
+
+/**
+ * @brief 后端抽象基类
+ */
+class Backend {
+public:
+    virtual ~Backend() = default;
+
+    // ===== 内存管理接口 =====
+
+    /**
+     * @brief 分配内存
+     * @param size 字节数
+     * @return 数据持有者（智能指针）
+     * @note 删除器会自动调用deallocate
+     */
+    virtual std::shared_ptr<void> allocate(size_t size) = 0;
+
+    /**
+     * @brief 释放内存
+     * @param ptr 内存指针
+     */
+    virtual void deallocate(void* ptr) = 0;
+
+    /**
+     * @brief 从智能指针获取原始指针
+     * @param holder 数据持有者
+     * @return 原始指针
+     */
+    virtual void* get_data_ptr(const std::shared_ptr<void>& holder) = 0;
+
+    /**
+     * @brief 内存拷贝
+     * @param dst 目标指针
+     * @param src 源指针
+     * @param size 字节数
+     * @param dst_device 目标设备
+     * @param src_device 源设备
+     */
+    virtual void copy(void* dst, const void* src, size_t size,
+                     const Device& dst_device, const Device& src_device) const = 0;
+
+    // ===== 填充操作 =====
+
+    /**
+     * @brief 填充张量（FP32）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill(Tensor& dst, float value) = 0;
+
+    /**
+     * @brief 填充张量（INT8）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill(Tensor& dst, int8_t value) = 0;
+
+    // ===== 基本运算 =====
+
+    /**
+     * @brief 张量加法
+     * @param result 结果张量
+     * @param a 输入张量A
+     * @param b 输入张量B
+     */
+    virtual void add(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+
+    /**
+     * @brief 张量乘法
+     * @param result 结果张量
+     * @param a 输入张量A
+     * @param b 输入张量B
+     */
+    virtual void mul(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+
+    /**
+     * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N)
+     * @param result 结果张量，形状应为(M,N,1,1)
+     * @param a 输入张量A，形状应为(M,K,1,1)
+     * @param b 输入张量B，形状应为(N,K,1,1)
+     * @note 仅支持FP32数据类型
+     */
+    virtual void mm(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+
+    // ===== 设备转换方法 =====
+
+    /**
+     * @brief 通用设备转换方法
+     * @param tensor 输入张量
+     * @param device 目标设备
+     * @return 转换后的张量
+     */
+    virtual Tensor to(const Tensor& tensor, const Device& device) const = 0;
+
+    /**
+     * @brief 将张量转换到CPU设备
+     * @param tensor 输入张量
+     * @return CPU设备上的张量
+     */
+    virtual Tensor to_cpu(const Tensor& tensor) const = 0;
+
+    /**
+     * @brief 从CPU设备转换张量到当前后端设备
+     * @param tensor CPU设备上的张量
+     * @return 当前后端设备上的张量
+     */
+    virtual Tensor from_cpu(const Tensor& tensor) const = 0;
+
+    // ===== 辅助方法 =====
+
+    /**
+     * @brief 获取后端名称
+     * @return 后端名称
+     */
+    virtual std::string name() const = 0;
+
+    /**
+     * @brief 获取后端设备
+     * @return 设备标识
+     */
+    virtual Device device() const = 0;
+
+    // ===== 数据访问 =====
+
+    /**
+     * @brief 获取标量张量的数据（float版本）
+     * @param tensor 标量张量
+     * @return 标量值
+     * @throws std::runtime_error 如果不是标量张量或读取失败
+     */
+    virtual float get_scalar_float(const Tensor& tensor) = 0;
+
+    /**
+     * @brief 获取标量张量的数据（int32_t版本）
+     * @param tensor 标量张量
+     * @return 标量值
+     * @throws std::runtime_error 如果不是标量张量或读取失败
+     */
+    virtual int32_t get_scalar_int32(const Tensor& tensor) = 0;
+
+    /**
+     * @brief 获取标量张量的数据（int8_t版本）
+     * @param tensor 标量张量
+     * @return 标量值
+     * @throws std::runtime_error 如果不是标量张量或读取失败
+     */
+    virtual int8_t get_scalar_int8(const Tensor& tensor) = 0;
+
+protected:
+    Backend() = default;
+};
+
+} // namespace tr

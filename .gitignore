@@ -1,0 +1,45 @@
+# Prompt
+INFO.md
+API.md
+tech_renaissance_prompt.md
+AI_EXP.md
+
+# AI
+.claude
+
+# IDE
+.idea
+
+# Exe
+*.exe
+*.out
+
+# Obj
+*.o
+*.obj
+*.pyc
+
+# Editors
+.vscode/
+*.code-workspace
+*.swp
+
+# Git
+.git/
+
+# Build
+build*/
+cmake*/
+
+# Third-Party
+third_party/
+
+# LICENSE
+LICENSE
+
+null
+null*
+null*/
+MNIST/
+
+workspace/
