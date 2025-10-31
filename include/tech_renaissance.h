@@ -30,6 +30,7 @@
 #include "tech_renaissance/backend/cuda/cuda_backend.h"
 #include "tech_renaissance/utils/logger.h"
 #include "tech_renaissance/utils/tr_exception.h"
+#include "tech_renaissance/utils/profiler.h"
 #ifdef TR_BUILD_PYTHON_SESSION
 #include "tech_renaissance/utils/python_session.h"
 #endif

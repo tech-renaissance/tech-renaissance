@@ -7,6 +7,7 @@ option(TR_BUILD_PYTHON_SESSION "Enable Python session integration" ON)
 set(UTILS_SOURCES
     tr_exception.cpp
     logger.cpp
+    profiler.cpp
 )
 
 # 添加PythonSession源文件（如果启用）

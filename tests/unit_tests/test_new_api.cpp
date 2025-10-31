@@ -28,7 +28,6 @@ int main() {
 
     // ===== 性能测试 =====
 
-    const int M = 1024, K = 2048, N = 512;
     const int iterations = 100;
     const int warmup_iterations = 10;
 
@@ -40,25 +39,23 @@ int main() {
     // 同步CUDA设备确保预热完成
     cuda_backend->synchronize();
 
-    // 性能测试
-    auto start_time = std::chrono::high_resolution_clock::now();
+    // 性能测试 - 使用简化的Profiler API
+    Profiler profiler;
+    profiler.set_iterations(iterations);
+    profiler.describe_operation("mm", cuda_a.shape(), cuda_b.shape());
 
+    profiler.start();
     for (int i = 0; i < iterations; ++i) {
         cuda_backend->mm(cuda_result, cuda_a, cuda_b);
     }
 
     // 确保所有CUDA计算完成后再停止计时
     cuda_backend->synchronize();
+    profiler.stop();
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-    double avg_time_ms = duration.count() / 1000.0 / iterations;
-
-    // 计算GFLOPS
-    double flops = 2.0 * M * N * K;  // 矩阵乘法的浮点运算次数
-    double gflops = flops / (avg_time_ms * 1e6);
-
-    std::cout << "Performance: " << std::fixed << std::setprecision(2) << gflops << " GFLOPS" << std::endl;
+    // 直接获取性能结果
+    std::cout << "Performance: " << std::fixed << std::setprecision(2)
+              << profiler.get_performance() << " GFLOPS" << std::endl;
 
     // 结果一致性
     Tensor cuda_result_on_cpu = cuda_backend->to_cpu(cuda_result);
