@@ -307,62 +307,15 @@ backend->fill(b, 3.0f);
 backend->mul(result, a, b);  // 结果: [6.0, 6.0, 6.0, 6.0, 6.0, 6.0]
 ```
 
-### 矩阵乘法操作（V1.23.1核心实现）
+### 矩阵乘法操作
 
-#### `void mm(Tensor& result, const Tensor& tensor_a, const Tensor& tensor_b) override`
+CPU后端提供高性能的矩阵乘法功能，支持行主序存储格式和Eigen优化。详细的矩阵乘法API、性能基准测试和跨后端示例请参考 [矩阵乘法 API 文档](cpu_mm_fp32.md)。
 
-执行CPU张量的矩阵乘法运算：result = a × b。使用行主序存储格式，支持Eigen优化。
-
-**参数**：
-- `result` - 结果CPU张量（行主序存储）
-- `tensor_a` - 第一个操作数CPU张量（行主序存储）
-- `tensor_b` - 第二个操作数CPU张量（行主序存储）
-
-**异常**：
-- `TRException` - 当张量形状、数据类型或设备不匹配时抛出
-
-**关键实现**：
-```cpp
-void CpuBackend::mm(Tensor& result, const Tensor& tensor_a, const Tensor& tensor_b) {
-    // CPU张量使用行主序存储
-    const float* a_data = static_cast<const float*>(tensor_a.data_ptr());
-    const float* b_data = static_cast<const float*>(tensor_b.data_ptr());
-    float* result_data = static_cast<float*>(result.data_ptr());
-
-    int32_t M = tensor_a.height();  // 行数
-    int32_t K = tensor_a.width();   // 列数
-    int32_t N = tensor_b.width();   // B的列数
-
-#ifdef TR_USE_EIGEN
-    // 使用Eigen优化的实现（行主序）
-    Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-        eigen_a(a_data, M, K);
-    Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-        eigen_b(b_data, K, N);
-    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
-        eigen_result(result_data, M, N);
-
-    eigen_result.noalias() = eigen_a * eigen_b;
-#else
-    // 朴素实现（行主序矩阵乘法）
-    for (int32_t i = 0; i < M; ++i) {
-        for (int32_t j = 0; j < N; ++j) {
-            float sum = 0.0f;
-            for (int32_t k = 0; k < K; ++k) {
-                sum += a_data[i * K + k] * b_data[k * N + j];
-            }
-            result_data[i * N + j] = sum;
-        }
-    }
-#endif
-}
-```
-
-**性能特征**：
-- **Eigen优化**：自动SIMD向量化，多线程并行计算
-- **内存布局**：行主序存储，与C/C++数组访问方式一致
-- **线程安全**：Eigen自动配置OpenMP多线程
-- **精度保证**：与CUDA后端结果在行主序下完全一致
+**主要功能**：
+- 高性能行主序矩阵乘法：`mm(result, a, b)`
+- Eigen优化和朴素实现双重支持
+- 自动SIMD向量化和多线程并行计算
+- 跨后端一致性保证
 
 ### 设备信息
 
@@ -393,40 +346,31 @@ std::cout << "Backend name: " << backend->name() << std::endl;  // "CpuBackend"
 
 ## 使用示例
 
-### 跨后端矩阵乘法（V1.23.1推荐用法）
+### 跨后端操作示例
 
 ```cpp
 #include "tech_renaissance.h"
 using namespace tr;
 
-void cross_backend_matrix_multiplication() {
+void cross_backend_example() {
     try {
-        // 获取后端实例（V1.23.1新API）
+        // 获取后端实例
         auto cpu_backend = BackendManager::get_cpu_backend();
         auto cuda_backend = BackendManager::get_cuda_backend();
 
-        // 创建CPU随机张量（行主序存储）
+        // 创建CPU张量
         Tensor cpu_a = Tensor::randn(Shape(1024, 2048), 42);
         Tensor cpu_b = Tensor::randn(Shape(2048, 512), 42);
-
-        // CPU矩阵乘法（行主序计算）
         Tensor cpu_result = Tensor::empty(Shape(1024, 512), DType::FP32, tr::CPU);
-        cpu_backend->mm(cpu_result, cpu_a, cpu_b);
 
-        // 转换到CUDA（自动转换为列主序）
+        // 执行基本运算
+        cpu_backend->add(cpu_result, cpu_a, cpu_b);
+
+        // 转换到其他后端进行计算
         Tensor cuda_a = cuda_backend->from_cpu(cpu_a);  // 行主序 → 列主序
-        Tensor cuda_b = cuda_backend->from_cpu(cpu_b);
-        Tensor cuda_result = Tensor::empty(Shape(1024, 512), DType::FP32, tr::CUDA[0]);
+        Tensor cuda_result_cpu = cuda_backend->to_cpu(cuda_a);  // 列主序 → 行主序
 
-        // CUDA矩阵乘法（列主序计算）
-        cuda_backend->mm(cuda_result, cuda_a, cuda_b);
-
-        // 转换回CPU（自动转换回行主序）
-        Tensor cuda_result_cpu = cuda_backend->to_cpu(cuda_result);  // 列主序 → 行主序
-
-        // 结果验证：CPU和CUDA结果在行主序下应该一致
-        bool is_close = cpu_backend->is_close(cpu_result, cuda_result_cpu, 1e-4f);
-        std::cout << "Results are close: " << (is_close ? "YES" : "NO") << std::endl;
+        std::cout << "Cross-backend operation completed!" << std::endl;
 
     } catch (const TRException& e) {
         std::cerr << "CPU error: " << e.what() << std::endl;
@@ -465,507 +409,72 @@ void basic_cpu_operations() {
 }
 ```
 
-### 高性能矩阵乘法基准测试
+### 性能测试示例
 
 ```cpp
-void cpu_performance_benchmark() {
+void cpu_performance_example() {
     auto cpu_backend = BackendManager::get_cpu_backend();
 
-    // 创建测试矩阵
-    const int32_t M = 1024, K = 2048, N = 512;
-    Tensor cpu_a = Tensor::randn(Shape(M, K), 42);
-    Tensor cpu_b = Tensor::randn(Shape(K, N), 42);
-    Tensor cpu_result = Tensor::empty(Shape(M, N), DType::FP32, tr::CPU);
+    // 创建测试张量
+    const int32_t size = 1000;
+    Shape shape(size, size);
+    Tensor a(shape, DType::FP32, tr::CPU);
+    Tensor b(shape, DType::FP32, tr::CPU);
+    Tensor result(shape, DType::FP32, tr::CPU);
 
-    // 预热
-    for (int i = 0; i < 10; ++i) {
-        cpu_backend->mm(cpu_result, cpu_a, cpu_b);
-    }
+    // 生成随机数据
+    a = Tensor::randn(shape, 42);
+    b = Tensor::randn(shape, 123);
 
     // 性能测试
     const int iterations = 100;
     auto start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < iterations; ++i) {
-        cpu_backend->mm(cpu_result, cpu_a, cpu_b);
+        cpu_backend->add(result, a, b);  // 基本运算性能测试
     }
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    // 计算GFLOPS
-    double flops = 2.0 * M * K * N;  // 矩阵乘法的浮点运算次数
     double avg_time_ms = duration.count() / 1000.0 / iterations;
-    double gflops = flops / (avg_time_ms * 1e6);
-
-    std::cout << "CPU GEMM Performance:" << std::endl;
-    std::cout << "  Matrix size: " << M << "x" << K << " x " << K << "x" << N << std::endl;
+    std::cout << "CPU Performance Test:" << std::endl;
+    std::cout << "  Tensor size: " << size << "x" << size << std::endl;
     std::cout << "  Average time: " << avg_time_ms << " ms" << std::endl;
-    std::cout << "  GFLOPS: " << gflops << std::endl;
 }
 ```
 
-### 单目运算操作（V1.25.1新增，V1.26.3完善）
-
-CPU后端提供了9种单目运算，每种都包含**非原地**、**原地**和**指定输出张量**三个版本，支持FP32和INT8数据类型，提供完整的运算模式覆盖。
-
-#### `Tensor zeros_like(const Tensor& input) const`
-
-创建与输入张量相同形状的全零张量。
-
-**参数**：
-- `input` - 输入张量
-
-**返回值**：
-- `Tensor` - 全零张量，形状和类型与输入相同
-
-**实现特点**：
-- 使用`std::memset`高效填充，性能优异
-- 支持FP32和INT8数据类型
-- 内存对齐优化
-
-**示例**：
-```cpp
-Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
-backend->fill(input, 5.0f);
-Tensor zeros = backend->zeros_like(input);  // 所有元素为0.0f
-```
-
-#### `Tensor ones_like(const Tensor& input) const`
-
-创建与输入张量相同形状的全1张量。
-
-**参数**：
-- `input` - 输入张量
-
-**返回值**：
-- `Tensor` - 全1张量，形状和类型与输入相同
-
-**示例**：
-```cpp
-Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
-Tensor ones = backend->ones_like(input);  // 所有元素为1.0f
-```
-
-#### `Tensor relu(const Tensor& input) const`
-
-执行ReLU激活函数：max(0, x)。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - ReLU激活后的张量
-
-**示例**：
-```cpp
-Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
-backend->fill(input, -2.0f);
-Tensor result = backend->relu(input);  // 负数变为0，正数保持不变
-```
-
-#### `Tensor sign(const Tensor& input) const`
-
-执行符号函数：x>0返回1，x<0返回-1，x=0返回0。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 符号函数结果张量
-
-**示例**：
-```cpp
-Tensor result = backend->sign(input);  // 每个元素为-1, 0, 或1
-```
-
-#### `Tensor square(const Tensor& input) const`
-
-执行平方运算：x²。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 平方结果张量
-
-**示例**：
-```cpp
-Tensor result = backend->square(input);  // 每个元素平方
-```
-
-#### `Tensor sqrt(const Tensor& input) const`
-
-执行平方根运算：√x。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32，必须非负）
-
-**返回值**：
-- `Tensor` - 平方根结果张量
-
-**异常**：
-- `TRException` - 当输入包含负数时抛出（可配置）
-
-**示例**：
-```cpp
-Tensor result = backend->sqrt(input);  // 每个元素平方根
-```
-
-#### `Tensor abs(const Tensor& input) const`
-
-执行绝对值运算：|x|。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 绝对值结果张量
-
-**示例**：
-```cpp
-Tensor result = backend->abs(input);  // 每个元素绝对值
-```
-
-#### `Tensor negative(const Tensor& input) const`
-
-执行相反数运算：-x。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 相反数结果张量
-
-**示例**：
-```cpp
-Tensor result = backend->negative(input);  // 每个元素取负
-```
-
-#### `Tensor reciprocal(const Tensor& input) const`
-
-执行倒数运算：1/x。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 倒数结果张量
-
-**异常**：
-- `TRException` - 当输入包含0时抛出（可配置）
-
-**示例**：
-```cpp
-Tensor result = backend->reciprocal(input);  // 每个元素倒数
-```
-
-### 原地单目运算操作（V1.25.1新增）
-
-原地运算直接修改输入张量，避免内存分配，性能更高。
-
-#### `void zeros_inplace(Tensor& input) const`
-
-原地将张量所有元素设置为0。
-
-**参数**：
-- `input` - 要修改的张量
-
-**实现特点**：
-- 使用`std::memset`高效填充，性能优异
-- 无额外内存分配
-
-**示例**：
-```cpp
-backend->zeros_inplace(input);  // input直接变为全0
-```
-
-#### `void ones_inplace(Tensor& input) const`
-
-原地将张量所有元素设置为1。
-
-**参数**：
-- `input` - 要修改的张量
-
-**示例**：
-```cpp
-backend->ones_inplace(input);  // input直接变为全1
-```
-
-#### `void relu_inplace(Tensor& input) const`
-
-原地执行ReLU激活函数。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->relu_inplace(input);  // 负数原地变为0
-```
-
-#### `void sign_inplace(Tensor& input) const`
-
-原地执行符号函数。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->sign_inplace(input);  // 原地计算符号
-```
-
-#### `void square_inplace(Tensor& input) const`
-
-原地执行平方运算。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->square_inplace(input);  // 原地平方
-```
-
-#### `void sqrt_inplace(Tensor& input) const`
-
-原地执行平方根运算。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32，必须非负）
-
-**示例**：
-```cpp
-backend->sqrt_inplace(input);  // 原地平方根
-```
-
-#### `void abs_inplace(Tensor& input) const`
-
-原地执行绝对值运算。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->abs_inplace(input);  // 原地绝对值
-```
-
-#### `void negative_inplace(Tensor& input) const`
-
-原地执行相反数运算。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->negative_inplace(input);  // 原地取负
-```
-
-#### `void reciprocal_inplace(Tensor& input) const`
-
-原地执行倒数运算。
-
-**参数**：
-- `input` - 要修改的张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->reciprocal_inplace(input);  // 原地倒数
-```
-
-### 指定输出张量的单目运算操作（V1.26.3新增）
-
-指定输出张量的运算将结果写入用户提供的输出张量，支持覆盖测试，提供更灵活的内存控制。
-
-#### `void zeros_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的清零结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量
-- `output` - 输出张量，形状和类型必须与输入一致
-
-**异常**：
-- `TRException` - 当张量形状、数据类型或设备不匹配时抛出（可通过`TR_ENABLE_INTO_FUNC_SHAPE_CHECK`配置）
-
-**实现特点**：
-- 使用`std::memset`高效填充
-- 支持形状检查宏控制
-- 默认开启形状和类型验证
-
-**示例**：
-```cpp
-Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
-Tensor output(Shape(2, 3), DType::FP32, tr::CPU);
-backend->zeros_into(input, output);  // output变为全0
-```
-
-#### `void ones_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的置一结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量
-- `output` - 输出张量，形状和类型必须与输入一致
-
-**示例**：
-```cpp
-backend->ones_into(input, output);  // output变为全1
-```
-
-#### `void relu_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的ReLU激活结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->relu_into(input, output);  // 负数变为0，正数保持不变
-```
-
-#### `void sign_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的符号函数结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->sign_into(input, output);  // 每个元素为-1, 0, 或1
-```
-
-#### `void square_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的平方结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->square_into(input, output);  // 每个元素平方
-```
-
-#### `void sqrt_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的平方根结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32，必须非负）
-- `output` - 输出张量（仅支持FP32）
-
-**异常**：
-- `TRException` - 当输入包含负数时抛出（继承NaN检查配置）
-
-**示例**：
-```cpp
-backend->sqrt_into(input, output);  // 每个元素平方根
-```
-
-#### `void abs_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的绝对值结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->abs_into(input, output);  // 每个元素绝对值
-```
-
-#### `void negative_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的相反数结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**示例**：
-```cpp
-backend->negative_into(input, output);  // 每个元素取负
-```
-
-#### `void reciprocal_into(const Tensor& input, Tensor& output) const`
-
-将输入张量的倒数结果写入指定的输出张量。
-
-**参数**：
-- `input` - 输入张量（仅支持FP32）
-- `output` - 输出张量（仅支持FP32）
-
-**异常**：
-- `TRException` - 当输入包含0时抛出（继承NaN检查配置）
-
-**示例**：
-```cpp
-backend->reciprocal_into(input, output);  // 每个元素倒数
-```
-
-### 形状检查配置（V1.26.3新增）
-
-指定输出张量的运算支持形状检查控制，通过编译时宏`TR_ENABLE_INTO_FUNC_SHAPE_CHECK`配置：
-
-```cpp
-// 形状检查配置
-#define TR_ENABLE_INTO_FUNC_SHAPE_CHECK 0  // 不检查，直接计算
-#define TR_ENABLE_INTO_FUNC_SHAPE_CHECK 1  // 检查并报错（默认模式）
-```
-
-**错误信息示例**：
-```cpp
-// 形状不匹配
-"[CpuBackend::relu_into] Shape mismatch: input shape [2,3,4] != output shape [2,3,5]"
-
-// 类型不匹配
-"[CpuBackend::zeros_into] Dtype mismatch: input dtype 0 != output dtype 1"
-```
-
-### NaN检查配置（V1.25.1新增）
-
-单目运算支持3种NaN检查模式，通过编译时宏`TR_ENABLE_NAN_CHECK`配置：
-
-```cpp
-// 检查模式配置
-#define TR_ENABLE_NAN_CHECK 0  // 不检查，直接计算（产生NaN/inf）
-#define TR_ENABLE_NAN_CHECK 1  // 检查并报错（默认模式）
-#define TR_ENABLE_NAN_CHECK 2  // 检查并替换（sqrt负数→0，倒数零→1/eps）
-```
-
-**eps常量**：
-```cpp
-constexpr float TR_EPS = 1e-10f;  // 用于处理除零等特殊情况
-```
-
-### 性能优化特点（V1.25.1）
-
-1. **memset优化**：`zeros_like`和`zeros_inplace`使用`std::memset`，比循环快数倍
-2. **内存对齐**：所有操作都基于64字节对齐的内存，优化SIMD访问
-3. **原地运算**：避免额外内存分配，提升性能
-4. **编译时优化**：支持编译器自动向量化
-
-### 大规模数据处理
+### 单目运算操作
+
+CPU后端提供了完整的单目运算功能，包括9种运算的27个API变体。详细的单目运算API、使用示例和性能优化请参考 [单目运算 API 文档](cpu_unary.md)。
+
+**主要功能**：
+- **9种运算**：zeros, ones, relu, sign, square, sqrt, abs, negative, reciprocal
+- **3种模式**：非原地运算（返回新张量）、原地运算（修改输入张量）、指定输出张量运算
+- **Eigen优化**：SIMD向量化加速，支持智能降级到朴素实现
+- **内存安全**：64字节对齐，完善的异常处理机制
+- **灵活配置**：NaN检查、形状验证等编译时配置选项
+
+**数据类型支持**：
+- FP32：全部9种运算完全支持
+- INT8：仅支持zeros和ones运算
+
+**配置宏**：
+- `TR_USE_EIGEN`：启用Eigen优化
+- `TR_ENABLE_NAN_CHECK`：NaN检查模式配置
+- `TR_ENABLE_INTO_FUNC_SHAPE_CHECK`：形状检查配置
+
+### 大规模数据处理示例
 
 ```cpp
 void large_scale_computation() {
-    auto backend = std::make_shared<tr::CpuBackend>();
+    auto backend = BackendManager::get_cpu_backend();
 
     // 创建大型张量（1000x1000）
-    tr::Shape shape(1000, 1000);
-    tr::Tensor a(shape, tr::DType::FP32, tr::CPU);
-    tr::Tensor b(shape, tr::DType::FP32, tr::CPU);
-    tr::Tensor result(shape, tr::DType::FP32, tr::CPU);
+    Shape shape(1000, 1000);
+    Tensor a(shape, DType::FP32, tr::CPU);
+    Tensor b(shape, DType::FP32, tr::CPU);
+    Tensor result(shape, DType::FP32, tr::CPU);
 
     // 填充数据
     backend->fill(a, 1.0f);
@@ -978,54 +487,11 @@ void large_scale_computation() {
 }
 ```
 
-### 单目运算示例（V1.26.3完善）
-
-```cpp
-#include "tech_renaissance.h"
-using namespace tr;
-
-void unary_operations_example() {
-    auto cpu_backend = BackendManager::get_cpu_backend();
-
-    // 创建测试张量
-    Shape shape(2, 3, 4, 5);
-    Tensor input(shape, DType::FP32, tr::CPU);
-    cpu_backend->fill(input, 2.5f);
-
-    // 1. 非原地运算（创建新张量）
-    Tensor zeros = cpu_backend->zeros_like(input);
-    Tensor ones = cpu_backend->ones_like(input);
-    Tensor relu_result = cpu_backend->relu(input);
-    Tensor square_result = cpu_backend->square(input);
-    Tensor sqrt_result = cpu_backend->sqrt(input);
-    Tensor abs_result = cpu_backend->abs(input);
-    Tensor negative_result = cpu_backend->negative(input);
-    Tensor sign_result = cpu_backend->sign(input);
-    Tensor reciprocal_result = cpu_backend->reciprocal(input);
-
-    // 2. 原地运算（直接修改原张量，性能最高）
-    Tensor inplace_tensor = Tensor::uniform(shape, -1.0f, 1.0f, 42);
-    cpu_backend->relu_inplace(inplace_tensor);     // 负数变为0
-    cpu_backend->square_inplace(inplace_tensor);   // 继续原地运算
-
-    // 3. 指定输出张量运算（灵活内存控制，支持覆盖测试）
-    Tensor output = Tensor::uniform(shape, -100.0f, 100.0f, 123);  // 随机初始化
-    cpu_backend->relu_into(input, output);        // 覆盖output的内容
-    // 可以继续使用同一个output张量进行多次运算
-    cpu_backend->square_into(input, output);      // 再次覆盖
-
-    std::cout << "All 27 unary operations completed successfully!" << std::endl;
-    std::cout << "Non-inplace: 9 functions" << std::endl;
-    std::cout << "Inplace:     9 functions" << std::endl;
-    std::cout << "Into:        9 functions" << std::endl;
-}
-```
-
 ### 内存管理示例
 
 ```cpp
 void memory_management_example() {
-    auto backend = std::make_shared<tr::CpuBackend>();
+    auto backend = BackendManager::get_cpu_backend();
 
     // 分配内存
     const size_t num_elements = 1000;
@@ -1045,22 +511,32 @@ void memory_management_example() {
 
 ## 性能优化建议
 
-### Eigen库使用
-- CpuBackend会自动使用Eigen库进行向量化计算
-- 确保编译时启用适当的优化标志（如-O2, -O3）
-- 在支持的平台启用AVX/SSE指令集优化
+### Eigen库优化
+- **自动优化选择**：CpuBackend会自动选择Eigen优化版本或朴素实现
+- **零拷贝操作**：使用`Eigen::Map`直接操作张量数据，避免内存拷贝
+- **SIMD向量化**：Eigen自动使用SSE/AVX指令集进行向量化计算
+- **自动启用**：`TR_USE_EIGEN`宏会在找到Eigen库时自动设置
 
-### 多线程优化
-- Eigen库会自动使用OpenMP进行并行计算
-- 可以通过环境变量控制线程数：
-  ```bash
-  export OMP_NUM_THREADS=4  # Linux/macOS
-  set OMP_NUM_THREADS=4     # Windows
-  ```
+### 性能特点
+- **矩阵乘法**：Eigen优化比朴素实现快3-5倍（详见[矩阵乘法文档](cpu_mm_fp32.md)）
+- **单目运算**：SIMD向量化加速，支持智能降级（详见[单目运算文档](cpu_unary.md)）
+- **多线程支持**：Eigen自动使用OpenMP进行并行计算
+- **内存优化**：64字节对齐优化SIMD访问性能
 
-### 内存访问模式
-- 尽量使用连续内存布局，提高缓存命中率
-- 避免频繁的小块内存分配，可以预分配大块内存
+### 编译优化配置
+```cmake
+# 推荐配置（获得最佳性能）
+option(TR_USE_EIGEN ON)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /arch:AVX2")  # MSVC
+# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")  # GCC/Clang
+```
+
+### 多线程控制
+可以通过环境变量控制Eigen的OpenMP线程数：
+```bash
+export OMP_NUM_THREADS=4  # Linux/macOS
+set OMP_NUM_THREADS=4     # Windows
+```
 
 ## 编译配置
 
@@ -1068,6 +544,31 @@ void memory_management_example() {
 ```cmake
 option(TR_USE_EIGEN "Enable Eigen for CPU optimizations" ON)
 ```
+
+### Eigen库检测和配置
+CMake会自动检测系统中的Eigen库：
+
+1. **自动检测**：CMake会在以下位置查找Eigen库
+   - `third_party/Eigen`（项目内置推荐）
+   - 系统安装的Eigen库（通过`find_package(Eigen)`）
+
+2. **自动启用**：如果找到Eigen库，会自动设置：
+   - `TR_USE_EIGEN`编译宏
+   - Eigen头文件路径
+   - 编译器优化标志
+
+3. **手动配置**：如果需要手动指定Eigen路径：
+   ```cmake
+   set(EIGEN3_INCLUDE_DIR "/path/to/eigen/include")
+   find_package(Eigen3 REQUIRED)
+   ```
+
+### 编译时优化建议
+- **Release模式**：使用`-O3`或`/O2`优化级别
+- **向量化支持**：启用相应的指令集
+  - MSVC：`/arch:AVX2`（支持AVX2）
+  - GCC/Clang：`-march=native`（自动检测最优指令集）
+- **OpenMP支持**：Eigen会自动使用OpenMP进行并行计算
 
 ### 编译器优化
 - Release模式：启用`/O2`或`-O3`优化
@@ -1212,15 +713,21 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 - **版本**：V1.26.3
 - **更新日期**：2025-10-31
 - **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen优化、跨后端转换、高性能矩阵乘法、9种单目运算（27个API）、静默模式支持
-- **性能优化**：memset零填充优化、原地运算支持、NaN检查配置、指定输出张量运算
-- **新增功能**：
-  - 单目运算（三种模式）：
-    - 非原地版本：zeros_like, ones_like, relu, sign, square, sqrt, abs, negative, reciprocal
-    - 原地版本：zeros_inplace, ones_inplace, relu_inplace, sign_inplace, square_inplace, sqrt_inplace, abs_inplace, negative_inplace, reciprocal_inplace
-    - 指定输出张量版本：zeros_into, ones_into, relu_into, sign_into, square_into, sqrt_into, abs_into, negative_into, reciprocal_into
-  - 形状检查配置：TR_ENABLE_INTO_FUNC_SHAPE_CHECK宏控制
-  - 静默模式：Python服务器DEBUG_MODE配置
-  - NaN检查：3种可配置的NaN处理模式
-- **测试覆盖**：27个单目运算测试全部通过（9函数×3模式）
-- **依赖库**：Eigen3（可选）、标准C++库
+- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持
+- **架构特性**：
+  - **后端管理存储原则**：CPU使用行主序，与C/C++语言惯例一致
+  - **跨后端透明转换**：`from_cpu()`和`to_cpu()`自动处理格式转换
+  - **高性能计算**：Eigen库SIMD优化和多线程并行计算
+  - **内存安全**：64字节对齐优化，RAII智能指针管理
+- **核心功能**：
+  - **基础运算**：张量填充、逐元素运算、内存管理
+  - **矩阵乘法**：高性能GEMM实现（详见[矩阵乘法文档](cpu_mm_fp32.md)）
+  - **单目运算**：9种运算的27个API变体（详见[单目运算文档](cpu_unary.md)）
+  - **张量IO**：独有TSR格式导入导出功能
+  - **跨后端转换**：与其他后端的无缝数据转换
+- **性能优化**：
+  - **双重实现策略**：Eigen优化版本和朴素实现
+  - **SIMD向量化**：Eigen自动使用SSE/AVX指令集
+  - **零拷贝操作**：`Eigen::Map`避免内存拷贝
+  - **智能优化选择**：根据数据特性选择最优实现
+- **依赖库**：Eigen3（推荐启用以获得最佳性能）、标准C++库

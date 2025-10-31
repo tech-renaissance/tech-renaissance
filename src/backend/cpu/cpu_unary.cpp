@@ -16,6 +16,10 @@
 #include <cmath>
 #include <cstring>
 
+#ifdef TR_USE_EIGEN
+#include "Core"
+#endif
+
 // NaN检查宏配置
 #ifndef TR_ENABLE_NAN_CHECK
 #define TR_ENABLE_NAN_CHECK 1  // 默认检查并报错
@@ -53,7 +57,23 @@ Tensor CpuBackend::ones_like(const Tensor& input) const {
     // 创建与输入相同形状和类型的1张量
     Tensor result = Tensor::empty(input.shape(), input.dtype(), tr::CPU);
 
-    // 手动填充1值
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    if (result.dtype() == DType::FP32) {
+        float* data = static_cast<float*>(result.data_ptr());
+        size_t num_elements = result.numel();
+        using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1.0f);
+    } else if (result.dtype() == DType::INT8) {
+        int8_t* data = static_cast<int8_t*>(result.data_ptr());
+        size_t num_elements = result.numel();
+        using MatrixType = Eigen::Matrix<int8_t, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1);
+    }
+#else
+    // 朴素实现
     if (result.dtype() == DType::FP32) {
         float* data = static_cast<float*>(result.data_ptr());
         size_t num_elements = result.numel();
@@ -67,6 +87,7 @@ Tensor CpuBackend::ones_like(const Tensor& input) const {
             data[i] = 1;
         }
     }
+#endif
 
     return result;
 }
@@ -86,10 +107,19 @@ Tensor CpuBackend::relu(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = input_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现
     // ReLU: max(0, x)
     for (size_t i = 0; i < num_elements; ++i) {
         result_data[i] = (input_data[i] > 0.0f) ? input_data[i] : 0.0f;
     }
+#endif
 
     return result;
 }
@@ -109,6 +139,16 @@ Tensor CpuBackend::sign(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen的signum函数
+    result_vec = input_vec.array().sign().matrix();
+#else
+    // 朴素实现
     // Sign函数
     for (size_t i = 0; i < num_elements; ++i) {
         if (input_data[i] > 0.0f) {
@@ -119,6 +159,7 @@ Tensor CpuBackend::sign(const Tensor& input) const {
             result_data[i] = 0.0f;
         }
     }
+#endif
 
     return result;
 }
@@ -138,10 +179,19 @@ Tensor CpuBackend::square(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = input_vec.array().square().matrix();
+#else
+    // 朴素实现
     // 平方运算
     for (size_t i = 0; i < num_elements; ++i) {
         result_data[i] = input_data[i] * input_data[i];
     }
+#endif
 
     return result;
 }
@@ -161,6 +211,42 @@ Tensor CpuBackend::sqrt(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 检查负数并处理
+    bool has_negative = false;
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (input_data[i] < 0.0f) {
+            has_negative = true;
+            break;
+        }
+    }
+
+    if (has_negative) {
+        // 有负数，需要逐个处理
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (input_data[i] < 0.0f) {
+#if TR_ENABLE_NAN_CHECK == 0
+                result_data[i] = std::sqrt(input_data[i]);
+#elif TR_ENABLE_NAN_CHECK == 1
+                throw TRException("[CpuBackend::sqrt] Negative input encountered: " + std::to_string(input_data[i]));
+#else
+                result_data[i] = 0.0f;
+#endif
+            } else {
+                result_data[i] = std::sqrt(input_data[i]);
+            }
+        }
+    } else {
+        // 无负数，可以使用Eigen的sqrt
+        result_vec = input_vec.array().sqrt().matrix();
+    }
+#else
+    // 朴素实现
     // 平方根运算
     for (size_t i = 0; i < num_elements; ++i) {
         if (input_data[i] < 0.0f) {
@@ -178,6 +264,7 @@ Tensor CpuBackend::sqrt(const Tensor& input) const {
             result_data[i] = std::sqrt(input_data[i]);
         }
     }
+#endif
 
     return result;
 }
@@ -197,10 +284,19 @@ Tensor CpuBackend::abs(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = input_vec.array().abs().matrix();
+#else
+    // 朴素实现
     // 绝对值运算
     for (size_t i = 0; i < num_elements; ++i) {
         result_data[i] = (input_data[i] < 0.0f) ? -input_data[i] : input_data[i];
     }
+#endif
 
     return result;
 }
@@ -220,10 +316,19 @@ Tensor CpuBackend::negative(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = -input_vec;
+#else
+    // 朴素实现
     // 相反数运算
     for (size_t i = 0; i < num_elements; ++i) {
         result_data[i] = -input_data[i];
     }
+#endif
 
     return result;
 }
@@ -243,6 +348,42 @@ Tensor CpuBackend::reciprocal(const Tensor& input) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 检查零值并处理
+    bool has_zero = false;
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (std::abs(input_data[i]) < TR_EPS) {
+            has_zero = true;
+            break;
+        }
+    }
+
+    if (has_zero) {
+        // 有零值，需要逐个处理
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (std::abs(input_data[i]) < TR_EPS) {
+#if TR_ENABLE_NAN_CHECK == 0
+                result_data[i] = 1.0f / input_data[i];
+#elif TR_ENABLE_NAN_CHECK == 1
+                throw TRException("[CpuBackend::reciprocal] Division by zero encountered: " + std::to_string(input_data[i]));
+#else
+                result_data[i] = 1.0f / TR_EPS;
+#endif
+            } else {
+                result_data[i] = 1.0f / input_data[i];
+            }
+        }
+    } else {
+        // 无零值，可以使用Eigen的倒数运算
+        result_vec = input_vec.array().inverse().matrix();
+    }
+#else
+    // 朴素实现
     // 倒数运算
     for (size_t i = 0; i < num_elements; ++i) {
         if (std::abs(input_data[i]) < TR_EPS) {
@@ -260,6 +401,7 @@ Tensor CpuBackend::reciprocal(const Tensor& input) const {
             result_data[i] = 1.0f / input_data[i];
         }
     }
+#endif
 
     return result;
 }
@@ -278,6 +420,23 @@ void CpuBackend::zeros_inplace(Tensor& input) const {
 void CpuBackend::ones_inplace(Tensor& input) const {
     validate_same_device(input.device());
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    if (input.dtype() == DType::FP32) {
+        float* data = static_cast<float*>(input.data_ptr());
+        size_t num_elements = input.numel();
+        using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1.0f);
+    } else if (input.dtype() == DType::INT8) {
+        int8_t* data = static_cast<int8_t*>(input.data_ptr());
+        size_t num_elements = input.numel();
+        using MatrixType = Eigen::Matrix<int8_t, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1);
+    }
+#else
+    // 朴素实现
     // 手动填充1值（memset不适用于设置数值1，因为字节全1在不同数据类型中表示的值不同）
     if (input.dtype() == DType::FP32) {
         float* data = static_cast<float*>(input.data_ptr());
@@ -292,6 +451,7 @@ void CpuBackend::ones_inplace(Tensor& input) const {
             data[i] = 1;
         }
     }
+#endif
 }
 
 void CpuBackend::relu_inplace(Tensor& input) const {
@@ -304,12 +464,20 @@ void CpuBackend::relu_inplace(Tensor& input) const {
     float* data = static_cast<float*>(input.data_ptr());
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现
     // ReLU: max(0, x)
     for (size_t i = 0; i < num_elements; ++i) {
         if (data[i] < 0.0f) {
             data[i] = 0.0f;
         }
     }
+#endif
 }
 
 void CpuBackend::sign_inplace(Tensor& input) const {
@@ -322,6 +490,13 @@ void CpuBackend::sign_inplace(Tensor& input) const {
     float* data = static_cast<float*>(input.data_ptr());
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.array().sign().matrix();
+#else
+    // 朴素实现
     // Sign函数
     for (size_t i = 0; i < num_elements; ++i) {
         if (data[i] > 0.0f) {
@@ -332,6 +507,7 @@ void CpuBackend::sign_inplace(Tensor& input) const {
             data[i] = 0.0f;
         }
     }
+#endif
 }
 
 void CpuBackend::square_inplace(Tensor& input) const {
@@ -344,10 +520,18 @@ void CpuBackend::square_inplace(Tensor& input) const {
     float* data = static_cast<float*>(input.data_ptr());
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.array().square().matrix();
+#else
+    // 朴素实现
     // 平方运算
     for (size_t i = 0; i < num_elements; ++i) {
         data[i] = data[i] * data[i];
     }
+#endif
 }
 
 void CpuBackend::sqrt_inplace(Tensor& input) const {
@@ -389,12 +573,20 @@ void CpuBackend::abs_inplace(Tensor& input) const {
     float* data = static_cast<float*>(input.data_ptr());
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.array().abs().matrix();
+#else
+    // 朴素实现
     // 绝对值运算
     for (size_t i = 0; i < num_elements; ++i) {
         if (data[i] < 0.0f) {
             data[i] = -data[i];
         }
     }
+#endif
 }
 
 void CpuBackend::negative_inplace(Tensor& input) const {
@@ -407,10 +599,18 @@ void CpuBackend::negative_inplace(Tensor& input) const {
     float* data = static_cast<float*>(input.data_ptr());
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = -eigen_vec;
+#else
+    // 朴素实现
     // 相反数运算
     for (size_t i = 0; i < num_elements; ++i) {
         data[i] = -data[i];
     }
+#endif
 }
 
 void CpuBackend::reciprocal_inplace(Tensor& input) const {
@@ -486,6 +686,23 @@ void CpuBackend::ones_into(const Tensor& input, Tensor& output) const {
     }
 #endif
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    if (output.dtype() == DType::FP32) {
+        float* data = static_cast<float*>(output.data_ptr());
+        size_t num_elements = output.numel();
+        using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1.0f);
+    } else if (output.dtype() == DType::INT8) {
+        int8_t* data = static_cast<int8_t*>(output.data_ptr());
+        size_t num_elements = output.numel();
+        using MatrixType = Eigen::Matrix<int8_t, Eigen::Dynamic, 1>;
+        Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+        eigen_vec.setConstant(1);
+    }
+#else
+    // 朴素实现
     // 手动填充1值
     if (output.dtype() == DType::FP32) {
         float* data = static_cast<float*>(output.data_ptr());
@@ -500,6 +717,7 @@ void CpuBackend::ones_into(const Tensor& input, Tensor& output) const {
             data[i] = 1;
         }
     }
+#endif
 }
 
 void CpuBackend::relu_into(const Tensor& input, Tensor& output) const {
@@ -523,10 +741,19 @@ void CpuBackend::relu_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+    output_vec = input_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现
     // ReLU: max(0, x)
     for (size_t i = 0; i < num_elements; ++i) {
         output_data[i] = (input_data[i] > 0.0f) ? input_data[i] : 0.0f;
     }
+#endif
 }
 
 void CpuBackend::sign_into(const Tensor& input, Tensor& output) const {
@@ -550,6 +777,14 @@ void CpuBackend::sign_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+    output_vec = input_vec.array().sign().matrix();
+#else
+    // 朴素实现
     // Sign函数
     for (size_t i = 0; i < num_elements; ++i) {
         if (input_data[i] > 0.0f) {
@@ -560,6 +795,7 @@ void CpuBackend::sign_into(const Tensor& input, Tensor& output) const {
             output_data[i] = 0.0f;
         }
     }
+#endif
 }
 
 void CpuBackend::square_into(const Tensor& input, Tensor& output) const {
@@ -583,10 +819,19 @@ void CpuBackend::square_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+    output_vec = input_vec.array().square().matrix();
+#else
+    // 朴素实现
     // 平方运算
     for (size_t i = 0; i < num_elements; ++i) {
         output_data[i] = input_data[i] * input_data[i];
     }
+#endif
 }
 
 void CpuBackend::sqrt_into(const Tensor& input, Tensor& output) const {
@@ -610,6 +855,42 @@ void CpuBackend::sqrt_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+
+    // 检查负数并处理
+    bool has_negative = false;
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (input_data[i] < 0.0f) {
+            has_negative = true;
+            break;
+        }
+    }
+
+    if (has_negative) {
+        // 有负数，需要逐个处理
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (input_data[i] < 0.0f) {
+#if TR_ENABLE_NAN_CHECK == 0
+                output_data[i] = std::sqrt(input_data[i]);
+#elif TR_ENABLE_NAN_CHECK == 1
+                throw TRException("[CpuBackend::sqrt_into] Negative input encountered: " + std::to_string(input_data[i]));
+#else
+                output_data[i] = 0.0f;
+#endif
+            } else {
+                output_data[i] = std::sqrt(input_data[i]);
+            }
+        }
+    } else {
+        // 无负数，可以使用Eigen的sqrt
+        output_vec = input_vec.array().sqrt().matrix();
+    }
+#else
+    // 朴素实现
     // 平方根运算
     for (size_t i = 0; i < num_elements; ++i) {
         if (input_data[i] < 0.0f) {
@@ -627,6 +908,7 @@ void CpuBackend::sqrt_into(const Tensor& input, Tensor& output) const {
             output_data[i] = std::sqrt(input_data[i]);
         }
     }
+#endif
 }
 
 void CpuBackend::abs_into(const Tensor& input, Tensor& output) const {
@@ -650,10 +932,19 @@ void CpuBackend::abs_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+    output_vec = input_vec.array().abs().matrix();
+#else
+    // 朴素实现
     // 绝对值运算
     for (size_t i = 0; i < num_elements; ++i) {
         output_data[i] = (input_data[i] < 0.0f) ? -input_data[i] : input_data[i];
     }
+#endif
 }
 
 void CpuBackend::negative_into(const Tensor& input, Tensor& output) const {
@@ -677,10 +968,19 @@ void CpuBackend::negative_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+    output_vec = -input_vec;
+#else
+    // 朴素实现
     // 相反数运算
     for (size_t i = 0; i < num_elements; ++i) {
         output_data[i] = -input_data[i];
     }
+#endif
 }
 
 void CpuBackend::reciprocal_into(const Tensor& input, Tensor& output) const {
@@ -704,6 +1004,42 @@ void CpuBackend::reciprocal_into(const Tensor& input, Tensor& output) const {
 
     size_t num_elements = input.numel();
 
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> output_vec(output_data, num_elements);
+
+    // 检查零值并处理
+    bool has_zero = false;
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (std::abs(input_data[i]) < TR_EPS) {
+            has_zero = true;
+            break;
+        }
+    }
+
+    if (has_zero) {
+        // 有零值，需要逐个处理
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (std::abs(input_data[i]) < TR_EPS) {
+#if TR_ENABLE_NAN_CHECK == 0
+                output_data[i] = 1.0f / input_data[i];
+#elif TR_ENABLE_NAN_CHECK == 1
+                throw TRException("[CpuBackend::reciprocal_into] Division by zero encountered: " + std::to_string(input_data[i]));
+#else
+                output_data[i] = 1.0f / TR_EPS;
+#endif
+            } else {
+                output_data[i] = 1.0f / input_data[i];
+            }
+        }
+    } else {
+        // 无零值，可以使用Eigen的倒数运算
+        output_vec = input_vec.array().inverse().matrix();
+    }
+#else
+    // 朴素实现
     // 倒数运算
     for (size_t i = 0; i < num_elements; ++i) {
         if (std::abs(input_data[i]) < TR_EPS) {
@@ -721,6 +1057,7 @@ void CpuBackend::reciprocal_into(const Tensor& input, Tensor& output) const {
             output_data[i] = 1.0f / input_data[i];
         }
     }
+#endif
 }
 
 } // namespace tr
