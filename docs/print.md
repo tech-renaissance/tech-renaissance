@@ -45,7 +45,7 @@ if (dtype_ == DType::FP32) {
 
 ```cpp
 // 核心传输机制 (tensor.cpp:393)
-backend->copy(data, src_ptr, size, tr::CPU, this->device());
+backend->copy_data(data, src_ptr, size, tr::CPU, this->device());
 ```
 
 该方法通过Backend的统一接口，实现从任意设备到CPU的数据拷贝。
@@ -72,7 +72,7 @@ std::vector<float> cpu_data(numel());
 // 2. 跨设备数据拷贝
 auto backend = get_backend();  // 获取CUDA后端
 const void* cuda_ptr = data_ptr();  // CUDA设备指针
-backend->copy(cpu_data.data(), cuda_ptr, size, tr::CPU, this->device());
+backend->copy_data(cpu_data.data(), cuda_ptr, size, tr::CPU, this->device());
 
 // 3. CPU端格式化输出
 format_tensor_content(oss, precision);  // 使用cpu_data进行显示

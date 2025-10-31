@@ -88,8 +88,8 @@ void* CpuBackend::get_data_ptr(const std::shared_ptr<void>& holder) {
     return holder.get();
 }
 
-void CpuBackend::copy(void* dst, const void* src, size_t size,
-                     const Device& dst_device, const Device& src_device) const {
+void CpuBackend::copy_data(void* dst, const void* src, size_t size,
+                           const Device& dst_device, const Device& src_device) const {
     if (!dst || !src) {
         throw TRException("Null pointer in copy operation");
     }

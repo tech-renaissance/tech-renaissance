@@ -61,8 +61,8 @@ public:
      * @param dst_device 目标设备
      * @param src_device 源设备
      */
-    virtual void copy(void* dst, const void* src, size_t size,
-                     const Device& dst_device, const Device& src_device) const = 0;
+    virtual void copy_data(void* dst, const void* src, size_t size,
+                          const Device& dst_device, const Device& src_device) const = 0;
 
     // ===== 填充操作 =====
 

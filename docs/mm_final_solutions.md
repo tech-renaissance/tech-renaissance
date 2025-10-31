@@ -130,7 +130,7 @@ Tensor CudaBackend::from_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cuda_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cuda_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CUDA[device_id_], tr::CPU);
     }
 
@@ -160,7 +160,7 @@ Tensor CudaBackend::to_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cpu_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cpu_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CPU, tensor.device());
     }
 

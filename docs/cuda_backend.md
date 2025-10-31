@@ -51,7 +51,7 @@ Tensor CudaBackend::from_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cuda_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cuda_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CUDA[device_id_], tr::CPU);
     }
 
@@ -79,7 +79,7 @@ Tensor CudaBackend::to_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cpu_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cpu_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CPU, tensor.device());
     }
 
@@ -201,7 +201,7 @@ Tensor cuda_tensor = cuda_backend->from_cpu(cpu_tensor);
 - 智能指针析构时自动调用`cudaFree()`
 - GPU内存按后端特定格式（列主序）组织
 
-#### `void copy(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) override`
+#### `void copy_data(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) override`
 
 在GPU内存或GPU与其他设备间复制数据。
 

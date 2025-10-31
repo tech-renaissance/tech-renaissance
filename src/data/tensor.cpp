@@ -126,7 +126,7 @@ Tensor Tensor::to(const Device& device) const {
             result.storage_->set_data_ptr(dst_backend->get_data_ptr(holder), holder);
 
             // 由目标backend执行跨设备拷贝
-            dst_backend->copy(result.data_ptr(), data_ptr(), size_bytes, device, current_device);
+            dst_backend->copy_data(result.data_ptr(), data_ptr(), size_bytes, device, current_device);
         } catch (const std::exception& e) {
             throw TRException("[Tensor::to] Failed to copy Tensor to device: " + std::string(e.what()));
         }
@@ -158,7 +158,7 @@ Tensor Tensor::clone() const {
             size_t size = memory_size();
 
             // 在相同设备间拷贝数据
-            backend->copy(dst_ptr, src_ptr, size, current_device, current_device);
+            backend->copy_data(dst_ptr, src_ptr, size, current_device, current_device);
         } catch (const std::exception& e) {
             throw TRException("Failed to clone Tensor: " + std::string(e.what()));
         }
@@ -369,7 +369,7 @@ void Tensor::from_cpu_data(const void* data, size_t size) {
         void* dst_ptr = data_ptr();
 
         // 从CPU拷贝到目标设备
-        backend->copy(dst_ptr, data, size, this->device(), tr::CPU);
+        backend->copy_data(dst_ptr, data, size, this->device(), tr::CPU);
     } catch (const std::exception& e) {
         throw TRException("Failed to copy data from CPU: " + std::string(e.what()));
     }
@@ -396,7 +396,7 @@ void Tensor::to_cpu_data(void* data, size_t size) const {
         const void* src_ptr = data_ptr();
 
         // 从目标设备拷贝到CPU
-        backend->copy(data, src_ptr, size, tr::CPU, this->device());
+        backend->copy_data(data, src_ptr, size, tr::CPU, this->device());
     } catch (const std::exception& e) {
         throw TRException("Failed to copy data to CPU: " + std::string(e.what()));
     }

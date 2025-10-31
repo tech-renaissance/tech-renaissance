@@ -70,7 +70,7 @@ Tensor CudaBackend::from_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cuda_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cuda_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CUDA[device_id_], tr::CPU);
     }
 
@@ -98,7 +98,7 @@ Tensor CudaBackend::to_cpu(const Tensor& tensor) {
         }
     } else {
         // 非2D张量直接复制
-        copy(cpu_tensor.data_ptr(), tensor.data_ptr(),
+        copy_data(cpu_tensor.data_ptr(), tensor.data_ptr(),
              tensor.memory_size(), tr::CPU, tensor.device());
     }
 
@@ -231,8 +231,8 @@ public:
     // 内存管理接口
     virtual std::shared_ptr<void> allocate(size_t size) = 0;
     virtual void deallocate(void* ptr) = 0;
-    virtual void copy(void* dst, const void* src, size_t size,
-                     const Device& dst_device, const Device& src_device) = 0;
+    virtual void copy_data(void* dst, const void* src, size_t size,
+                       const Device& dst_device, const Device& src_device) = 0;
 
     // 跨后端转换接口
     virtual Tensor to(const Tensor& tensor, const Device& target_device) = 0;

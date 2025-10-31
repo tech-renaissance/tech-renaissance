@@ -97,7 +97,7 @@ auto memory = backend->allocate(1024);
 void* data_ptr = backend->get_data_ptr(memory);
 ```
 
-#### `virtual void copy(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) = 0`
+#### `virtual void copy_data(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) = 0`
 
 在设备间复制数据。
 
@@ -120,7 +120,7 @@ void* data_ptr = backend->get_data_ptr(memory);
 **示例：**
 ```cpp
 // 从CPU复制到CUDA
-backend->copy(gpu_ptr, cpu_ptr, size, tr::CUDA[0], tr::CPU);
+backend->copy_data(gpu_ptr, cpu_ptr, size, tr::CUDA[0], tr::CPU);
 ```
 
 ### 张量操作接口
@@ -593,8 +593,8 @@ public:
     std::shared_ptr<void> allocate(size_t size) override;
     void deallocate(void* ptr) override;
     void* get_data_ptr(const std::shared_ptr<void>& holder) override;
-    void copy(void* dst, const void* src, size_t size,
-             const Device& dst_device, const Device& src_device) const override;
+    void copy_data(void* dst, const void* src, size_t size,
+                   const Device& dst_device, const Device& src_device) const override;
 
     // 张量操作接口
     void fill(Tensor& dst, float value) override;

@@ -41,8 +41,8 @@ public:
     std::shared_ptr<void> allocate(size_t size) override;
     void deallocate(void* ptr) override;
     void* get_data_ptr(const std::shared_ptr<void>& holder) override;
-    void copy(void* dst, const void* src, size_t size,
-             const Device& dst_device, const Device& src_device) const override;
+    void copy_data(void* dst, const void* src, size_t size,
+                   const Device& dst_device, const Device& src_device) const override;
 
     // 填充操作
     void fill(Tensor& dst, float value) override;

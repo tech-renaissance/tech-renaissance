@@ -109,8 +109,8 @@ void* CudaBackend::get_data_ptr(const std::shared_ptr<void>& holder) {
     return holder.get();
 }
 
-void CudaBackend::copy(void* dst, const void* src, size_t size,
-                      const Device& dst_device, const Device& src_device) const {
+void CudaBackend::copy_data(void* dst, const void* src, size_t size,
+                            const Device& dst_device, const Device& src_device) const {
     set_device();
 
     cudaMemcpyKind kind;
@@ -460,8 +460,8 @@ Tensor CudaBackend::to_cpu(const Tensor& tensor) const {
     Tensor cpu_tensor = Tensor::empty(tensor.shape(), tensor.dtype(), tr::CPU);
 
     // 直接复制数据，保持行主序布局
-    copy(cpu_tensor.data_ptr(), tensor.data_ptr(),
-         tensor.memory_size(), tr::CPU, tensor.device());
+    copy_data(cpu_tensor.data_ptr(), tensor.data_ptr(),
+             tensor.memory_size(), tr::CPU, tensor.device());
 
     return cpu_tensor;
 }
@@ -481,8 +481,8 @@ Tensor CudaBackend::from_cpu(const Tensor& tensor) const {
     Tensor cuda_tensor = Tensor::empty(tensor.shape(), tensor.dtype(), cuda_device);
 
     // 直接复制数据，保持原始的行主序布局
-    copy(cuda_tensor.data_ptr(), tensor.data_ptr(),
-         cuda_tensor.memory_size(), cuda_device, tr::CPU);
+    copy_data(cuda_tensor.data_ptr(), tensor.data_ptr(),
+             cuda_tensor.memory_size(), cuda_device, tr::CPU);
 
     return cuda_tensor;
 }

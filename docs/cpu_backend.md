@@ -188,7 +188,7 @@ auto memory = backend->allocate(1024);
 float* ptr = static_cast<float*>(backend->get_data_ptr(memory));
 ```
 
-#### `void copy(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) override`
+#### `void copy_data(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) override`
 
 在CPU内存或CPU与其他设备间复制数据。
 
@@ -210,7 +210,7 @@ float* ptr = static_cast<float*>(backend->get_data_ptr(memory));
 **示例：**
 ```cpp
 // CPU内部复制
-backend->copy(dst_ptr, src_ptr, size, tr::CPU, tr::CPU);
+backend->copy_data(dst_ptr, src_ptr, size, tr::CPU, tr::CPU);
 ```
 
 ### 张量操作
