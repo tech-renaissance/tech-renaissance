@@ -4,7 +4,7 @@
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.25.1
+**版本**: V1.26.3
 **更新日期**: 2025-10-31
 **作者**: 技术觉醒团队
 
@@ -505,9 +505,9 @@ void cpu_performance_benchmark() {
 }
 ```
 
-### 单目运算操作（V1.25.1新增）
+### 单目运算操作（V1.25.1新增，V1.26.3完善）
 
-CPU后端提供了9种单目运算，每种都包含非原地和原地两个版本，支持FP32和INT8数据类型。
+CPU后端提供了9种单目运算，每种都包含**非原地**、**原地**和**指定输出张量**三个版本，支持FP32和INT8数据类型，提供完整的运算模式覆盖。
 
 #### `Tensor zeros_like(const Tensor& input) const`
 
@@ -776,6 +776,162 @@ backend->negative_inplace(input);  // 原地取负
 backend->reciprocal_inplace(input);  // 原地倒数
 ```
 
+### 指定输出张量的单目运算操作（V1.26.3新增）
+
+指定输出张量的运算将结果写入用户提供的输出张量，支持覆盖测试，提供更灵活的内存控制。
+
+#### `void zeros_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的清零结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量
+- `output` - 输出张量，形状和类型必须与输入一致
+
+**异常**：
+- `TRException` - 当张量形状、数据类型或设备不匹配时抛出（可通过`TR_ENABLE_INTO_FUNC_SHAPE_CHECK`配置）
+
+**实现特点**：
+- 使用`std::memset`高效填充
+- 支持形状检查宏控制
+- 默认开启形状和类型验证
+
+**示例**：
+```cpp
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+Tensor output(Shape(2, 3), DType::FP32, tr::CPU);
+backend->zeros_into(input, output);  // output变为全0
+```
+
+#### `void ones_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的置一结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量
+- `output` - 输出张量，形状和类型必须与输入一致
+
+**示例**：
+```cpp
+backend->ones_into(input, output);  // output变为全1
+```
+
+#### `void relu_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的ReLU激活结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->relu_into(input, output);  // 负数变为0，正数保持不变
+```
+
+#### `void sign_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的符号函数结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->sign_into(input, output);  // 每个元素为-1, 0, 或1
+```
+
+#### `void square_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的平方结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->square_into(input, output);  // 每个元素平方
+```
+
+#### `void sqrt_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的平方根结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32，必须非负）
+- `output` - 输出张量（仅支持FP32）
+
+**异常**：
+- `TRException` - 当输入包含负数时抛出（继承NaN检查配置）
+
+**示例**：
+```cpp
+backend->sqrt_into(input, output);  // 每个元素平方根
+```
+
+#### `void abs_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的绝对值结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->abs_into(input, output);  // 每个元素绝对值
+```
+
+#### `void negative_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的相反数结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**示例**：
+```cpp
+backend->negative_into(input, output);  // 每个元素取负
+```
+
+#### `void reciprocal_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的倒数结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `output` - 输出张量（仅支持FP32）
+
+**异常**：
+- `TRException` - 当输入包含0时抛出（继承NaN检查配置）
+
+**示例**：
+```cpp
+backend->reciprocal_into(input, output);  // 每个元素倒数
+```
+
+### 形状检查配置（V1.26.3新增）
+
+指定输出张量的运算支持形状检查控制，通过编译时宏`TR_ENABLE_INTO_FUNC_SHAPE_CHECK`配置：
+
+```cpp
+// 形状检查配置
+#define TR_ENABLE_INTO_FUNC_SHAPE_CHECK 0  // 不检查，直接计算
+#define TR_ENABLE_INTO_FUNC_SHAPE_CHECK 1  // 检查并报错（默认模式）
+```
+
+**错误信息示例**：
+```cpp
+// 形状不匹配
+"[CpuBackend::relu_into] Shape mismatch: input shape [2,3,4] != output shape [2,3,5]"
+
+// 类型不匹配
+"[CpuBackend::zeros_into] Dtype mismatch: input dtype 0 != output dtype 1"
+```
+
 ### NaN检查配置（V1.25.1新增）
 
 单目运算支持3种NaN检查模式，通过编译时宏`TR_ENABLE_NAN_CHECK`配置：
@@ -822,7 +978,7 @@ void large_scale_computation() {
 }
 ```
 
-### 单目运算示例（V1.25.1新增）
+### 单目运算示例（V1.26.3完善）
 
 ```cpp
 #include "tech_renaissance.h"
@@ -836,23 +992,32 @@ void unary_operations_example() {
     Tensor input(shape, DType::FP32, tr::CPU);
     cpu_backend->fill(input, 2.5f);
 
-    // 非原地运算
+    // 1. 非原地运算（创建新张量）
     Tensor zeros = cpu_backend->zeros_like(input);
     Tensor ones = cpu_backend->ones_like(input);
     Tensor relu_result = cpu_backend->relu(input);
     Tensor square_result = cpu_backend->square(input);
-    Tensor sqrt_result = cpu_backend->sqrt(input);  // 输入必须非负
+    Tensor sqrt_result = cpu_backend->sqrt(input);
     Tensor abs_result = cpu_backend->abs(input);
     Tensor negative_result = cpu_backend->negative(input);
     Tensor sign_result = cpu_backend->sign(input);
     Tensor reciprocal_result = cpu_backend->reciprocal(input);
 
-    // 原地运算（性能更高）
-    Tensor inplace_tensor = Tensor::randn(shape, 42);
-    cpu_backend->relu_inplace(inplace_tensor);      // 直接修改原张量
-    cpu_backend->square_inplace(inplace_tensor);    // 链式原地运算
+    // 2. 原地运算（直接修改原张量，性能最高）
+    Tensor inplace_tensor = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+    cpu_backend->relu_inplace(inplace_tensor);     // 负数变为0
+    cpu_backend->square_inplace(inplace_tensor);   // 继续原地运算
 
-    std::cout << "Unary operations completed successfully!" << std::endl;
+    // 3. 指定输出张量运算（灵活内存控制，支持覆盖测试）
+    Tensor output = Tensor::uniform(shape, -100.0f, 100.0f, 123);  // 随机初始化
+    cpu_backend->relu_into(input, output);        // 覆盖output的内容
+    // 可以继续使用同一个output张量进行多次运算
+    cpu_backend->square_into(input, output);      // 再次覆盖
+
+    std::cout << "All 27 unary operations completed successfully!" << std::endl;
+    std::cout << "Non-inplace: 9 functions" << std::endl;
+    std::cout << "Inplace:     9 functions" << std::endl;
+    std::cout << "Into:        9 functions" << std::endl;
 }
 ```
 
@@ -1044,14 +1209,18 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 
 ## 版本信息
 
-- **版本**：V1.25.1
+- **版本**：V1.26.3
 - **更新日期**：2025-10-31
 - **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen优化、跨后端转换、高性能矩阵乘法、9种单目运算（18个API）、静默模式支持
-- **性能优化**：memset零填充优化、原地运算支持、NaN检查配置
+- **主要特性**：行主序存储、Eigen优化、跨后端转换、高性能矩阵乘法、9种单目运算（27个API）、静默模式支持
+- **性能优化**：memset零填充优化、原地运算支持、NaN检查配置、指定输出张量运算
 - **新增功能**：
-  - 单目运算：zeros_like, ones_like, relu, sign, square, sqrt, abs, negative, reciprocal
-  - 原地版本：zeros_inplace, ones_inplace, relu_inplace, sign_inplace, square_inplace, sqrt_inplace, abs_inplace, negative_inplace, reciprocal_inplace
+  - 单目运算（三种模式）：
+    - 非原地版本：zeros_like, ones_like, relu, sign, square, sqrt, abs, negative, reciprocal
+    - 原地版本：zeros_inplace, ones_inplace, relu_inplace, sign_inplace, square_inplace, sqrt_inplace, abs_inplace, negative_inplace, reciprocal_inplace
+    - 指定输出张量版本：zeros_into, ones_into, relu_into, sign_into, square_into, sqrt_into, abs_into, negative_into, reciprocal_into
+  - 形状检查配置：TR_ENABLE_INTO_FUNC_SHAPE_CHECK宏控制
   - 静默模式：Python服务器DEBUG_MODE配置
   - NaN检查：3种可配置的NaN处理模式
+- **测试覆盖**：27个单目运算测试全部通过（9函数×3模式）
 - **依赖库**：Eigen3（可选）、标准C++库

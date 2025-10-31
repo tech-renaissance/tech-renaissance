@@ -14,6 +14,7 @@ struct TestCase {
     std::string pytorch_cmd;
     std::function<Tensor(CpuBackend&, const Tensor&)> cpu_func_non_inplace;
     std::function<void(CpuBackend&, Tensor&)> cpu_func_inplace;
+    std::function<void(CpuBackend&, const Tensor&, Tensor&)> cpu_func_into;
 };
 
 int main() {
@@ -31,47 +32,56 @@ int main() {
         {
             "zeros_like", "zeros_like",
             [](CpuBackend& backend, const Tensor& input) { return backend.zeros_like(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.zeros_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.zeros_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.zeros_into(input, output); }
         },
         {
             "ones_like", "ones_like",
             [](CpuBackend& backend, const Tensor& input) { return backend.ones_like(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.ones_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.ones_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.ones_into(input, output); }
         },
         {
             "relu", "relu",
             [](CpuBackend& backend, const Tensor& input) { return backend.relu(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.relu_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.relu_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.relu_into(input, output); }
         },
         {
             "sign", "sign",
             [](CpuBackend& backend, const Tensor& input) { return backend.sign(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.sign_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.sign_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.sign_into(input, output); }
         },
         {
             "square", "square",
             [](CpuBackend& backend, const Tensor& input) { return backend.square(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.square_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.square_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.square_into(input, output); }
         },
         {
             "sqrt", "sqrt",
             [](CpuBackend& backend, const Tensor& input) { return backend.sqrt(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.sqrt_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.sqrt_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.sqrt_into(input, output); }
         },
         {
             "abs", "abs",
             [](CpuBackend& backend, const Tensor& input) { return backend.abs(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.abs_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.abs_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.abs_into(input, output); }
         },
         {
             "negative", "negative",
             [](CpuBackend& backend, const Tensor& input) { return backend.negative(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.negative_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.negative_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.negative_into(input, output); }
         },
         {
             "reciprocal", "reciprocal",
             [](CpuBackend& backend, const Tensor& input) { return backend.reciprocal(input); },
-            [](CpuBackend& backend, Tensor& input) { backend.reciprocal_inplace(input); }
+            [](CpuBackend& backend, Tensor& input) { backend.reciprocal_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.reciprocal_into(input, output); }
         }
     };
 
@@ -180,6 +190,58 @@ int main() {
             }
         } catch (const std::exception& e) {
             std::cout << "  Inplace:     FAILED (Exception: " << e.what() << ")" << std::endl;
+        }
+
+        // TEST 3: 指定输出张量运算
+        total++;
+        try {
+            // 为sqrt测试生成正数张量，其他测试用普通张量
+            Tensor input;
+            if (test_case.name == "sqrt") {
+                // 生成4维正数张量，范围[0.1, 10.0]
+                input = Tensor::uniform(Shape(2, 3, 4, 5), 0.1f, 10.0f, static_cast<int>(time(nullptr)) + i + 2000);
+            } else {
+                // 生成普通4维张量，范围[-1.0, 1.0]
+                input = Tensor::uniform(Shape(2, 3, 4, 5), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 2000);
+            }
+
+            // 创建随机同形的输出张量来测试覆盖能力
+            Tensor output = Tensor::uniform(input.shape(), -100.0f, 100.0f, static_cast<int>(time(nullptr)) + i + 3000);
+
+            // 先发送到Python获取PyTorch结果
+            Tensor pytorch_result = ps.calculate(test_case.pytorch_cmd, input, 5000);
+
+            // 执行_into运算
+            test_case.cpu_func_into(*cpu_backend, input, output);
+
+            // 验证结果
+            bool is_close = cpu_backend->is_close(output, pytorch_result, 5e-5f);
+            std::cout << "  Into:        " << (is_close ? "PASSED" : "FAILED") << std::endl;
+
+            if (is_close) passed++;
+            else {
+                std::cout << "  Error: Into result differs from PyTorch!" << std::endl;
+                // 打印一些调试信息
+                if (output.numel() > 0) {
+                    std::cout << "  CPU shape: " << output.shape().to_string() << ", PyTorch shape: " << pytorch_result.shape().to_string() << std::endl;
+                    // 只对标量张量或1元素张量调用item()
+                    if (output.numel() == 1) {
+                        float cpu_val = output.item<float>();
+                        float torch_val = pytorch_result.item<float>();
+                        std::cout << "  CPU[0]=" << cpu_val << ", PyTorch[0]=" << torch_val << std::endl;
+                    } else {
+                        // 比较前几个元素
+                        float* cpu_data = static_cast<float*>(output.data_ptr());
+                        float* torch_data = static_cast<float*>(pytorch_result.data_ptr());
+                        std::cout << "  CPU[0]=" << cpu_data[0] << ", PyTorch[0]=" << torch_data[0] << std::endl;
+                        if (output.numel() > 1) {
+                            std::cout << "  CPU[1]=" << cpu_data[1] << ", PyTorch[1]=" << torch_data[1] << std::endl;
+                        }
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cout << "  Into:        FAILED (Exception: " << e.what() << ")" << std::endl;
         }
     }
 

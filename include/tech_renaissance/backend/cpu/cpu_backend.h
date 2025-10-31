@@ -87,6 +87,17 @@ public:
     void negative_inplace(Tensor& input) const;
     void reciprocal_inplace(Tensor& input) const;
 
+    // 指定输出张量的运算（V1.26.3新增）
+    void zeros_into(const Tensor& input, Tensor& output) const;
+    void ones_into(const Tensor& input, Tensor& output) const;
+    void relu_into(const Tensor& input, Tensor& output) const;
+    void sign_into(const Tensor& input, Tensor& output) const;
+    void square_into(const Tensor& input, Tensor& output) const;
+    void sqrt_into(const Tensor& input, Tensor& output) const;
+    void abs_into(const Tensor& input, Tensor& output) const;
+    void negative_into(const Tensor& input, Tensor& output) const;
+    void reciprocal_into(const Tensor& input, Tensor& output) const;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;
