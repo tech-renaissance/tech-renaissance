@@ -121,7 +121,7 @@ int main() {
     std::cout << "\n[SUCCESS] Framework CUDA GEMM test completed successfully!" << std::endl;
 
     // ========== 测试2: 与PyTorch对比测试 ==========
-    #ifdef TR_BUILD_PYTORCH_SESSION
+    #ifdef TR_BUILD_PYTHON_SESSION
     try {
         std::cout << "\n=== Test 2: PyTorch Comparison Test (4x8 x 8x5 = 4x5) ===" << std::endl;
 
@@ -317,7 +317,7 @@ int main() {
     }
     #else
     std::cout << "\n[INFO] PyTorch comparison test skipped - PyTorch support not enabled" << std::endl;
-    std::cout << "Enable with TR_BUILD_PYTORCH_SESSION=ON" << std::endl;
+    std::cout << "Enable with TR_BUILD_PYTHON_SESSION=ON" << std::endl;
     #endif
 
     return 0;

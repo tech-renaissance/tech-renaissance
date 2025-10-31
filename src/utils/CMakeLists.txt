@@ -1,7 +1,7 @@
 # 工具模块的CMakeLists.txt
 
 # Python会话支持选项
-option(TR_BUILD_PYTORCH_SESSION "Enable Python session integration" ON)
+option(TR_BUILD_PYTHON_SESSION "Enable Python session integration" ON)
 
 # 收集源文件
 set(UTILS_SOURCES
@@ -10,7 +10,7 @@ set(UTILS_SOURCES
 )
 
 # 添加PythonSession源文件（如果启用）
-if(TR_BUILD_PYTORCH_SESSION)
+if(TR_BUILD_PYTHON_SESSION)
     list(APPEND UTILS_SOURCES python_session.cpp)
 endif()
 
@@ -36,7 +36,7 @@ target_compile_definitions(tech_renaissance_utils
     PUBLIC
         $<$<BOOL:${TR_USE_PROTOBUF}>:TR_USE_PROTOBUF>
         $<$<BOOL:${TR_USE_ONNX}>:TR_USE_ONNX>
-        $<$<BOOL:${TR_BUILD_PYTORCH_SESSION}>:TR_BUILD_PYTORCH_SESSION>
+        $<$<BOOL:${TR_BUILD_PYTHON_SESSION}>:TR_BUILD_PYTHON_SESSION>
 )
 
 # 设置C++标准

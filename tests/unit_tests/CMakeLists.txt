@@ -801,7 +801,7 @@ set_tests_properties(TensorBackendTest PROPERTIES
 message(STATUS "[SUCCESS] Tensor-Backend joint test configured successfully")
 
 # PythonSession测试（可选组件）
-if(TR_BUILD_PYTORCH_SESSION)
+if(TR_BUILD_PYTHON_SESSION)
 
     add_executable(test_pytorch_data test_pytorch_data.cpp)
 
@@ -1039,7 +1039,7 @@ message(STATUS "[SUCCESS] is_close method test configured successfully")
 # =============================================================================
 # CPU矩阵乘法测试（新的测试文件）
 # =============================================================================
-if(TR_BUILD_PYTORCH_SESSION)
+if(TR_BUILD_PYTHON_SESSION)
     add_executable(test_cpu_mm test_cpu_mm.cpp)
 
     # 包含头文件目录

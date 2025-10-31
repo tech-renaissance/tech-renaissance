@@ -77,7 +77,7 @@ int main() {
     std::cout << "Mean relative error (Vs CPU): " << std::scientific << std::setprecision(6) << mean_rel_err << std::endl;
 
 
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
     {
         // 增加PyTorch结果验证
         PythonSession session("default", "verify", true);

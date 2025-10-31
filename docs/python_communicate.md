@@ -583,10 +583,10 @@ class MatrixMathServer(TechRenaissanceServer):
 
 ```cmake
 # 启用Python会话支持
-option(TR_BUILD_PYTORCH_SESSION "Enable Python session integration" ON)
+option(TR_BUILD_PYTHON_SESSION "Enable Python session integration" ON)
 
 # 条件编译
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
 #include "tech_renaissance/utils/python_session.h"
 #endif
 ```
@@ -595,10 +595,10 @@ option(TR_BUILD_PYTORCH_SESSION "Enable Python session integration" ON)
 
 ```bash
 # 启用Python会话支持
-cmake .. -DTR_BUILD_PYTORCH_SESSION=ON
+cmake .. -DTR_BUILD_PYTHON_SESSION=ON
 
 # 禁用Python会话支持（减少依赖）
-cmake .. -DTR_BUILD_PYTORCH_SESSION=OFF
+cmake .. -DTR_BUILD_PYTHON_SESSION=OFF
 ```
 
 ---

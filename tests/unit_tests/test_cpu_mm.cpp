@@ -9,7 +9,7 @@
  * @note 所属系列: tests
  */
 
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
 
 #include "tech_renaissance.h"
 #include <iostream>
@@ -401,7 +401,7 @@ int main() {
 int main() {
     std::cout << "=== CPU Backend Matrix Multiplication Test Suite ===" << std::endl;
     std::cout << "PyTorch session support is disabled. Skipping tests." << std::endl;
-    std::cout << "Enable TR_BUILD_PYTORCH_SESSION in CMake to run full tests." << std::endl;
+    std::cout << "Enable TR_BUILD_PYTHON_SESSION in CMake to run full tests." << std::endl;
     return 0;
 }
 

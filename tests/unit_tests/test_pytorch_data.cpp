@@ -9,7 +9,7 @@
  * @note 所属系列: tests
  */
 
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
 
 #include "tech_renaissance.h"
 #include <iostream>
@@ -242,12 +242,12 @@ int main() {
 
 
 
-#else // TR_BUILD_PYTORCH_SESSION
+#else // TR_BUILD_PYTHON_SESSION
 
 int main() {
     std::cout << "PythonSession support is not enabled in this build." << std::endl;
-    std::cout << "Enable with TR_BUILD_PYTORCH_SESSION=ON" << std::endl;
+    std::cout << "Enable with TR_BUILD_PYTHON_SESSION=ON" << std::endl;
     return 0;
 }
 
-#endif // TR_BUILD_PYTORCH_SESSION
+#endif // TR_BUILD_PYTHON_SESSION

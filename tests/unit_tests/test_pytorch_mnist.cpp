@@ -8,7 +8,7 @@
  * @note 所属系列: tests
  */
 
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
 
 #include "tech_renaissance.h"
 #include <iostream>
@@ -23,10 +23,7 @@ void test_mnist_parallel_processing() {
 
     try {
         // 创建PyTorch会话，启动Python脚本执行MNIST任务
-        // 使用PROJECT_ROOT_DIR宏确保在不同环境下都能找到Python脚本
-        std::string python_script_path = std::string(PROJECT_ROOT_DIR) + "/python/tests/pytorch_task_mnist.py";
-        std::cout << "[TEST] Python script path: " << python_script_path << std::endl;
-        PythonSession session(python_script_path, "mnist_session");
+        PythonSession session("default", "mnist_session");
 
         std::cout << "[TEST] Starting Python MNIST task in background..." << std::endl;
         session.start();
@@ -111,12 +108,12 @@ int main() {
     }
 }
 
-#else // TR_BUILD_PYTORCH_SESSION
+#else // TR_BUILD_PYTHON_SESSION
 
 int main() {
     std::cout << "PythonSession support is not enabled in this build." << std::endl;
-    std::cout << "Enable with TR_BUILD_PYTORCH_SESSION=ON" << std::endl;
+    std::cout << "Enable with TR_BUILD_PYTHON_SESSION=ON" << std::endl;
     return 0;
 }
 
-#endif // TR_BUILD_PYTORCH_SESSION
+#endif // TR_BUILD_PYTHON_SESSION

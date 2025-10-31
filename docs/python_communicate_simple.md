@@ -240,18 +240,18 @@ exiting    # 正在退出
 
 ### **启用Python会话支持**
 ```bash
-cmake .. -DTR_BUILD_PYTORCH_SESSION=ON
+cmake .. -DTR_BUILD_PYTHON_SESSION=ON
 cmake --build . --config Release
 ```
 
 ### **禁用Python会话支持**
 ```bash
-cmake .. -DTR_BUILD_PYTORCH_SESSION=OFF
+cmake .. -DTR_BUILD_PYTHON_SESSION=OFF
 ```
 
 ### **条件编译**
 ```cpp
-#ifdef TR_BUILD_PYTORCH_SESSION
+#ifdef TR_BUILD_PYTHON_SESSION
 #include "tech_renaissance/utils/python_session.h"
 // 使用PythonSession
 #endif

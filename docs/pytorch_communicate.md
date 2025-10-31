@@ -31,7 +31,7 @@
 │                    C++ 主进程                              │
 │  ┌─────────────────┐    ┌──────────────────────────────┐   │
 │  │   PyTorchSession│────│        Workspace目录         │   │
-│  │   (会话管理器)   │    │  workspace/pytorch_session/   │   │
+│  │   (会话管理器)   │    │  workspace/python_session/   │   │
 │  └─────────────────┘    └──────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               │ 临时文件通道
@@ -54,7 +54,7 @@
 
 | 组件 | 实现位置 | 主要职责 | 关键特性 |
 |------|----------|----------|----------|
-| **PyTorchSession类** | `src/utils/pytorch_session.cpp` | Python进程生命周期管理、TSR张量传输 | RAII管理、跨平台启动、多种API模式 |
+| **PyTorchSession类** | `src/utils/python_session.cpp` | Python进程生命周期管理、TSR张量传输 | RAII管理、跨平台启动、多种API模式 |
 | **TSR张量格式** | C++/Python共用 | 二进制张量数据交换 | 完整张量信息、高效传输、类型安全 |
 | **TechRenaissanceServer** | `python/module/tech_renaissance.py` | Python侧通信基类 | 原子操作、智能轮询、标准JSON |
 | **Python服务器脚本** | `python/tests/python_server.py` | 业务逻辑执行、PyTorch张量操作 | 模块化设计、命令解析、张量处理 |
@@ -70,7 +70,7 @@
 
 ```cpp
 /**
- * @file pytorch_session.h
+ * @file python_session.h
  * @brief PyTorch会话管理类声明
  * @details 管理Python进程生命周期，实现C++与Python的实时交互，支持TSR张量传输
  * @version 1.20.01
@@ -155,7 +155,7 @@ void PyTorchSession::create_session_dir() {
     namespace fs = std::filesystem;
 
     // 使用workspace目录作为临时文件存储位置
-    std::string base_dir = std::string(WORKSPACE_PATH) + "/pytorch_session";
+    std::string base_dir = std::string(WORKSPACE_PATH) + "/python_session";
     if (!fs::exists(base_dir)) {
         fs::create_directories(base_dir);
     }
@@ -322,7 +322,7 @@ void PyTorchSession::send_request(const std::string& msg) const {
 
 #### **文件通道规范（V1.20.01完整版）**
 
-每个会话在`workspace/pytorch_session/tr_session_{session_id}/`目录下创建以下文件：
+每个会话在`workspace/python_session/tr_session_{session_id}/`目录下创建以下文件：
 
 | 文件名 | 传输方向 | 格式 | 用途 | 示例内容 | 特性 |
 |--------|----------|------|------|----------|------|
@@ -512,7 +512,7 @@ def main():
     # 使用绝对路径，与C++保持一致
     current_file = os.path.abspath(__file__)
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-    session_dir = f"{project_root}/workspace/pytorch_session/tr_session_{session_id}"
+    session_dir = f"{project_root}/workspace/python_session/tr_session_{session_id}"
 
     # 创建会话目录
     os.makedirs(session_dir, exist_ok=True)
@@ -624,7 +624,7 @@ public:
  */
 
 #include "tech_renaissance.h"
-#include "tech_renaissance/utils/pytorch_session.h"
+#include "tech_renaissance/utils/python_session.h"
 
 // 测试1: 期望的写法A - 2维矩阵乘法
 bool test_matmul_style_a() {
@@ -698,7 +698,7 @@ bool test_cpp_to_python_communication() {
 
     // 发送平方命令
     std::string request_file = std::string(WORKSPACE_PATH) +
-                              "/pytorch_session/tr_session_cpp_to_python_test/request.json";
+                              "/python_session/tr_session_cpp_to_python_test/request.json";
     std::ofstream(request_file) << R"({"cmd": "tensor_square"})";
 
     // 等待处理完成
@@ -719,7 +719,7 @@ bool test_python_to_cpp_communication() {
 
     // 发送命令
     std::string request_file = std::string(WORKSPACE_PATH) +
-                              "/pytorch_session/tr_session_python_to_cpp_test/request.json";
+                              "/python_session/tr_session_python_to_cpp_test/request.json";
     std::ofstream(request_file) << R"({"cmd": "tensor_square"})";
 
     // 尝试接收结果
@@ -751,7 +751,7 @@ bool test_bidirectional_communication() {
         session.send_tensor(input_tensor, "input");
 
         std::string request_file = std::string(WORKSPACE_PATH) +
-                                  "/pytorch_session/tr_session_bidirectional_test/request.json";
+                                  "/python_session/tr_session_bidirectional_test/request.json";
         std::ofstream(request_file) << R"({"cmd": "tensor_square"})";
 
         // 接收结果
@@ -800,12 +800,12 @@ int main() {
 
 ```cpp
 // C++端 - 使用WORKSPACE_PATH宏
-std::string base_dir = std::string(WORKSPACE_PATH) + "/pytorch_session";
+std::string base_dir = std::string(WORKSPACE_PATH) + "/python_session";
 
 // Python端 - 计算绝对路径
 current_file = os.path.abspath(__file__)
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-session_dir = f"{project_root}/workspace/pytorch_session/tr_session_{session_id}"
+session_dir = f"{project_root}/workspace/python_session/tr_session_{session_id}"
 ```
 
 ### **2. RAII资源管理**
@@ -884,12 +884,12 @@ bool wait_for_file(const std::string& file_path, uint32_t timeout_ms) {
 
 ```cmake
 # PyTorchSession支持选项
-option(TR_BUILD_PYTORCH_SESSION "Enable PyTorch session integration" ON)
+option(TR_BUILD_PYTHON_SESSION "Enable PyTorch session integration" ON)
 
-if(TR_BUILD_PYTORCH_SESSION)
+if(TR_BUILD_PYTHON_SESSION)
     # PyTorchSession源文件
     add_library(tech_renaissance_utils STATIC
-        src/utils/pytorch_session.cpp
+        src/utils/python_session.cpp
         src/utils/tr_exception.cpp
         src/utils/logger.cpp
     )
@@ -901,17 +901,17 @@ if(TR_BUILD_PYTORCH_SESSION)
     )
 
     # 测试程序
-    add_executable(test_pytorch_session
-        tests/unit_tests/test_pytorch_session.cpp
+    add_executable(test_python_session
+        tests/unit_tests/test_python_session.cpp
     )
 
-    target_link_libraries(test_pytorch_session PRIVATE
+    target_link_libraries(test_python_session PRIVATE
         tech_renaissance
         tech_renaissance_utils
     )
 
     # 设置输出目录
-    set_target_properties(test_pytorch_session PROPERTIES
+    set_target_properties(test_python_session PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/tests
     )
 endif()
@@ -920,7 +920,7 @@ endif()
 ### **编译控制**
 
 **条件编译支持**
-- 通过`TR_BUILD_PYTORCH_SESSION`宏控制功能开启/关闭
+- 通过`TR_BUILD_PYTHON_SESSION`宏控制功能开启/关闭
 - 可完全移除PyTorch通信功能，不影响核心框架
 - 适用于生产环境部署
 

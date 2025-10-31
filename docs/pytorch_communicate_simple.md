@@ -24,11 +24,11 @@
 
 ```cpp
 #include "tech_renaissance.h"
-#include "tech_renaissance/utils/pytorch_session.h"
+#include "tech_renaissance/utils/python_session.h"
 
 int main() {
     // 创建会话
-    PyTorchSession session("python/tests/python_server.py", "matmul_demo");
+    PythonSession session("python/tests/python_server.py", "matmul_demo");
     session.start();
 
     // 创建测试张量：4x3 矩阵 × 3x5 矩阵 = 4x5 矩阵
@@ -56,10 +56,10 @@ int main() {
 
 ```cpp
 #include "tech_renaissance.h"
-#include "tech_renaissance/utils/pytorch_session.h"
+#include "tech_renaissance/utils/python_session.h"
 
 int main() {
-    PyTorchSession session("python/tests/python_server.py", "add_demo");
+    PythonSession session("python/tests/python_server.py", "add_demo");
     session.start();
 
     // 创建测试张量：2x3x4x5 张量
@@ -101,7 +101,7 @@ int main() {
 
 ### **V1.20.01目录结构**
 ```
-workspace/pytorch_session/tr_session_{session_id}/
+workspace/python_session/tr_session_{session_id}/
 ├── request.json          # C++发送的请求
 ├── response.json         # Python的响应（阅后即焚）
 ├── a.tsr                  # 输入张量数据
@@ -114,10 +114,10 @@ workspace/pytorch_session/tr_session_{session_id}/
 
 ## ⚡ **核心接口**
 
-### **PyTorchSession类V1.20.01完整API**
+### **PythonSession类V1.20.01完整API**
 
 ```cpp
-class PyTorchSession {
+class PythonSession {
 public:
     // 进程管理
     void start();                                    // 启动Python进程
@@ -148,7 +148,7 @@ public:
 
 ```cmake
 # 启用PyTorch通信支持
-option(TR_BUILD_PYTORCH_SESSION "Enable PyTorch session integration" ON)
+option(TR_BUILD_PYTHON_SESSION "Enable PyTorch session integration" ON)
 
 # 构建目标
 add_executable(my_app main.cpp)
@@ -157,7 +157,7 @@ target_link_libraries(my_app PRIVATE tech_renaissance)
 
 ### **关键宏定义**
 
-- `TR_BUILD_PYTORCH_SESSION`：启用PyTorch通信功能
+- `TR_BUILD_PYTHON_SESSION`：启用PyTorch通信功能
 - `WORKSPACE_PATH`：临时文件存储路径
 - `AUTO_QUEST_FREQUENCY`：启用智能轮询频率
 
@@ -211,7 +211,7 @@ All PyTorch Data tests PASSED!
 
 ```cpp
 try {
-    PyTorchSession session("python/tests/python_server.py", "tensor_test");
+    PythonSession session("python/tests/python_server.py", "tensor_test");
     session.start();
 
     // V1.20.01推荐模式：fetch_tensor
@@ -230,7 +230,7 @@ try {
 
 ```cpp
 {
-    PyTorchSession session("script.py", "test");
+    PythonSession session("script.py", "test");
     session.start();
     // 使用session...
     // 析构函数自动清理资源
