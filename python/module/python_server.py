@@ -8,6 +8,9 @@ import sys
 import os
 import torch
 
+# 调试模式开关，设置为False可关闭所有调试输出
+DEBUG_MODE = False
+
 # 添加python模块路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
@@ -28,19 +31,29 @@ class SimpleHelloServer(TechRenaissanceServer):
 
     def main_logic(self, command: str, parameters: str) -> bool:
         """重写父类方法，实现具体的业务逻辑"""
+        if DEBUG_MODE: print(f"[PYTHON_DEBUG] Received command: '{command}', parameters: '{parameters}'")
+
         if command.lower() == 'hello':
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing hello command")
             self.write_response('', f'Hello {parameters.title()}')
         elif command.lower() == 'hi':
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing hi command")
             self.write_response('', f'Hi {parameters.title()}')
         elif command.lower() == 'matmul':    # 执行矩阵乘法！
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing matmul command")
             tensors = self.get_tensors(parameters, 2)
             if tensors is None:
+                print(f"[ERROR] Failed to get tensors for matmul")
                 self.write_response('', 'invalid')
             else:
                 try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got {len(tensors)} tensors for matmul")
                     result = torch.mm(tensors[0], tensors[1])
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Matmul computation successful, result shape: {result.shape}")
                     self.send_tensors(result)
-                except:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Matmul result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] Matmul computation failed: {e}")
                     self.write_response('', 'invalid')
         elif command.lower() == 'add':    # 执行矩阵加法！
             tensors = self.get_tensors(parameters, 2)
@@ -52,8 +65,154 @@ class SimpleHelloServer(TechRenaissanceServer):
                     self.send_tensors(result)
                 except:
                     self.write_response('', 'invalid')
+        # ===== 单目运算命令 =====
+        elif command.lower() == 'zeros_like':  # 清零
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing zeros_like command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for zeros_like")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for zeros_like, shape: {tensor.shape}")
+                    result = torch.zeros_like(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] zeros_like computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] zeros_like result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] zeros_like computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'ones_like':   # 置一
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing ones_like command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for ones_like")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for ones_like, shape: {tensor.shape}")
+                    result = torch.ones_like(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] ones_like computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] ones_like result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] ones_like computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'relu':       # ReLU激活
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing relu command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for relu")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for relu, shape: {tensor.shape}")
+                    result = torch.relu(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] relu computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] relu result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] relu computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'sign':       # 符号函数
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing sign command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for sign")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for sign, shape: {tensor.shape}")
+                    result = torch.sign(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] sign computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] sign result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] sign computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'square':     # 平方
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing square command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for square")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for square, shape: {tensor.shape}")
+                    result = torch.square(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] square computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] square result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] square computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'sqrt':       # 平方根
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing sqrt command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for sqrt")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for sqrt, shape: {tensor.shape}")
+                    result = torch.sqrt(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] sqrt computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] sqrt result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] sqrt computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'abs':        # 绝对值
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing abs command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for abs")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for abs, shape: {tensor.shape}")
+                    result = torch.abs(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] abs computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] abs result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] abs computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'negative':    # 相反数
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing negative command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for negative")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for negative, shape: {tensor.shape}")
+                    result = torch.negative(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] negative computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] negative result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] negative computation failed: {e}")
+                    self.write_response('', 'invalid')
+        elif command.lower() == 'reciprocal': # 倒数
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing reciprocal command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for reciprocal")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for reciprocal, shape: {tensor.shape}")
+                    result = torch.reciprocal(tensor)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] reciprocal computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] reciprocal result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] reciprocal computation failed: {e}")
+                    self.write_response('', 'invalid')
         else:
-            self.debug_message('[Python] Invalid command.')
+            print(f"[ERROR] Unknown command: {command}")
+            self.debug_message(f'[Python] Invalid command: {command}')
             return False
         return True
 

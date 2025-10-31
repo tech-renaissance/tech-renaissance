@@ -64,6 +64,29 @@ public:
     double get_mean_abs_err(const Tensor& tensor_a, const Tensor& tensor_b) const;
     double get_mean_rel_err(const Tensor& tensor_a, const Tensor& tensor_b) const;
 
+    // 单目运算（V1.25.1新增）
+    // 非原地运算
+    Tensor zeros_like(const Tensor& input) const;
+    Tensor ones_like(const Tensor& input) const;
+    Tensor relu(const Tensor& input) const;
+    Tensor sign(const Tensor& input) const;
+    Tensor square(const Tensor& input) const;
+    Tensor sqrt(const Tensor& input) const;
+    Tensor abs(const Tensor& input) const;
+    Tensor negative(const Tensor& input) const;
+    Tensor reciprocal(const Tensor& input) const;
+
+    // 原地运算
+    void zeros_inplace(Tensor& input) const;
+    void ones_inplace(Tensor& input) const;
+    void relu_inplace(Tensor& input) const;
+    void sign_inplace(Tensor& input) const;
+    void square_inplace(Tensor& input) const;
+    void sqrt_inplace(Tensor& input) const;
+    void abs_inplace(Tensor& input) const;
+    void negative_inplace(Tensor& input) const;
+    void reciprocal_inplace(Tensor& input) const;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

@@ -12,6 +12,9 @@ import json
 import signal
 from typing import Union, Tuple, Optional
 
+# 调试模式开关，设置为False可关闭所有调试输出
+DEBUG_MODE = False
+
 
 class TSRError(Exception):
     """TSR文件处理异常"""
@@ -87,6 +90,7 @@ def _shape_to_nchw(tensor: torch.Tensor) -> Tuple[int, int, int, int]:
     Returns:
         (n, c, h, w)格式的4元组，缺失维度用1填充
     """
+    if DEBUG_MODE: print(f"[PYTHON_DEBUG] _shape_to_nchw: Input tensor shape = {tensor.shape}, ndim = {tensor.dim()}")
     dims = [1] * 4  # 初始化为[1, 1, 1, 1]
 
     # 按照右对齐规则填充维度
@@ -101,7 +105,9 @@ def _shape_to_nchw(tensor: torch.Tensor) -> Tuple[int, int, int, int]:
     elif tensor.dim() == 4:  # 4D张量 [N, C, H, W]
         dims = [tensor.shape[0], tensor.shape[1], tensor.shape[2], tensor.shape[3]]
 
-    return tuple(dims)
+    result = tuple(dims)
+    if DEBUG_MODE: print(f"[PYTHON_DEBUG] _shape_to_nchw: Output NCHW = {result}")
+    return result
 
 
 def _nchw_to_shape(nchw: Tuple[int, int, int, int], ndim: int) -> Tuple[int, ...]:
@@ -115,18 +121,23 @@ def _nchw_to_shape(nchw: Tuple[int, int, int, int], ndim: int) -> Tuple[int, ...
     Returns:
         原始张量形状
     """
+    if DEBUG_MODE: print(f"[PYTHON_DEBUG] _nchw_to_shape: Input NCHW = {nchw}, ndim = {ndim}")
+
     if ndim == 0:  # 标量
-        return ()
+        result = ()
     elif ndim == 1:  # 1D张量 [W]
-        return (nchw[3],)
+        result = (nchw[3],)
     elif ndim == 2:  # 2D张量 [H, W]
-        return (nchw[2], nchw[3])
+        result = (nchw[2], nchw[3])
     elif ndim == 3:  # 3D张量 [C, H, W]
-        return (nchw[1], nchw[2], nchw[3])
+        result = (nchw[1], nchw[2], nchw[3])
     elif ndim == 4:  # 4D张量 [N, C, H, W]
-        return nchw
+        result = nchw
     else:
         raise TSRError(f"不支持的维度数: {ndim}")
+
+    if DEBUG_MODE: print(f"[PYTHON_DEBUG] _nchw_to_shape: Output shape = {result}")
+    return result
 
 
 def export_tsr(tensor: torch.Tensor, filename: str) -> None:
@@ -223,7 +234,9 @@ def import_tsr(filename: str) -> torch.Tensor:
 
             # 重建形状
             nchw = (dim0, dim1, dim2, dim3)
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] import_tsr: Read dims[4] = {nchw}, ndim = {ndim}")
             shape = _nchw_to_shape(nchw, ndim)
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] import_tsr: Final reconstructed shape = {shape}")
 
             # 计算期望的数据大小
             element_size = 4 if dtype == torch.float32 else 1  # FP32=4字节, INT8=1字节
@@ -516,22 +529,39 @@ class TechRenaissanceServer:
         return False
 
     def get_tensors(self, p, num_tensors):
-        tensors = p.split(',')
+        if ',' in p:
+            tensors = p.split(',')
+        else:
+            tensors = [p]
         if len(tensors) != num_tensors:
             self.write_response('', 'invalid')
             return None
-        else:
-            tensor_a_path = os.path.join(self.session_dir, f"{tensors[0]}.tsr")
-            tensor_b_path = os.path.join(self.session_dir, f"{tensors[1]}.tsr")
-            try:
-                tensor_a = import_tsr(tensor_a_path)
-                tensor_b = import_tsr(tensor_b_path)
-            except:
-                return None
-            finally:
-                os.remove(tensor_a_path)
-                os.remove(tensor_b_path)
-            return tensor_a, tensor_b
+
+        if DEBUG_MODE: print(f"[PYTHON_DEBUG] get_tensors: Processing {num_tensors} tensors from parameters '{p}'")
+        result = []
+
+        try:
+            for i in range(num_tensors):
+                tensor_path = os.path.join(self.session_dir, f"{tensors[i]}.tsr")
+                if DEBUG_MODE: print(f"[PYTHON_DEBUG] get_tensors: Loading tensor {i+1}/{num_tensors} from {tensor_path}")
+                tensor = import_tsr(tensor_path)
+                result.append(tensor)
+                os.remove(tensor_path)
+                if DEBUG_MODE: print(f"[PYTHON_DEBUG] get_tensors: Successfully loaded tensor {i+1} with shape {tensor.shape}")
+
+            if num_tensors == 1:
+                return result[0]  # 返回单个张量
+            else:
+                return tuple(result)  # 返回张量元组
+
+        except Exception as e:
+            print(f"[ERROR] get_tensors: Failed to load tensors: {e}")
+            # 清理已创建的文件
+            for i in range(min(num_tensors, len(tensors))):
+                tensor_path = os.path.join(self.session_dir, f"{tensors[i]}.tsr")
+                if os.path.exists(tensor_path):
+                    os.remove(tensor_path)
+            return None
 
     def send_tensors(self, *tensors):
         num_tensors = len(tensors)

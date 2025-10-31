@@ -68,7 +68,7 @@ void PythonSession::create_session_dir() {
     if (!quiet_mode_) std::cout << "[PythonSession] Created session directory: " << session_dir_ << std::endl;
 }
 
-void PythonSession::start() {
+void PythonSession::start(int warmup_time) {
     if (running_) {
         if (!quiet_mode_) std::cout << "[PythonSession] Session already started" << std::endl;
         return;
@@ -104,6 +104,9 @@ void PythonSession::start() {
     // 写入状态文件通知Python可以开始工作
     write_status_file("ready");
     if (!quiet_mode_) std::cout << "[PythonSession] Python process started successfully" << std::endl;
+
+    // 等待进程启动
+    std::this_thread::sleep_for(std::chrono::milliseconds(warmup_time));
 }
 
 bool PythonSession::is_alive() {
@@ -349,6 +352,24 @@ Tensor PythonSession::fetch_tensor(const std::string& msg, uint32_t timeout_ms) 
     // 使用后端导入张量
     auto backend = BackendManager::instance().get_backend(CPU);
     return dynamic_cast<CpuBackend*>(backend.get())->import_tensor(result_path);
+}
+
+Tensor PythonSession::calculate(const std::string& msg, const Tensor& tensor_a, uint32_t timeout_ms) const {
+    send_tensor(tensor_a, "a");
+    return fetch_tensor(R"({"cmd": ")" + msg + R"(", "params": "a"})", timeout_ms);
+}
+
+Tensor PythonSession::calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, uint32_t timeout_ms) const {
+    send_tensor(tensor_a, "a");
+    send_tensor(tensor_b, "b");
+    return fetch_tensor(R"({"cmd": ")" + msg + R"(", "params": "a,b"})", timeout_ms);
+}
+
+Tensor PythonSession::calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, const Tensor& tensor_c, uint32_t timeout_ms) const {
+    send_tensor(tensor_a, "a");
+    send_tensor(tensor_b, "b");
+    send_tensor(tensor_c, "c");
+    return fetch_tensor(R"({"cmd": ")" + msg + R"(", "params": "a,b,c"})", timeout_ms);
 }
 
 Tensor PythonSession::wait_for_tensor(uint32_t timeout_ms) const {

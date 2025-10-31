@@ -147,8 +147,12 @@ set(WORKSPACE_DIR "${CMAKE_SOURCE_DIR}/workspace")
 add_definitions(-DWORKSPACE_DIR="${WORKSPACE_DIR}")
 
 # 确保workspace目录存在
-file(MAKE_DIRECTORY "${WORKSPACE_DIR}")
-message(STATUS "Workspace directory: ${WORKSPACE_DIR}")
+if(NOT EXISTS "${WORKSPACE_DIR}")
+    file(MAKE_DIRECTORY "${WORKSPACE_DIR}")
+    message(STATUS "Created workspace directory: ${WORKSPACE_DIR}")
+else()
+    message(STATUS "Workspace directory exists: ${WORKSPACE_DIR}")
+endif()
 
 # 输出编译器信息
 message(STATUS "编译器: ${CMAKE_CXX_COMPILER_ID}")

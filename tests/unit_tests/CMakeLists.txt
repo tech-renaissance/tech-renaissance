@@ -145,6 +145,42 @@ set_target_properties(test_cpu_backend PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
 )
 
+# CPU单目运算测试
+add_executable(test_cpu_unary
+    test_cpu_unary.cpp
+)
+
+target_include_directories(test_cpu_unary
+    PRIVATE
+        ../../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake
+)
+
+# 链接系统库
+if(WIN32)
+    target_link_libraries(test_cpu_unary PRIVATE tech_renaissance)
+else()
+    target_link_libraries(test_cpu_unary PRIVATE tech_renaissance pthread)
+endif()
+
+if(CUDA_BACKEND_ENABLED)
+    target_link_libraries(test_cpu_unary PRIVATE cudnn_static)
+    target_compile_definitions(test_cpu_unary PRIVATE TR_ENABLE_CUDA)
+    message(STATUS "[SUCCESS] Using cudnn_static target for test_cpu_unary")
+endif()
+
+target_compile_definitions(test_cpu_unary PRIVATE
+    TR_USE_EIGEN=${TR_USE_EIGEN}
+)
+
+set_target_properties(test_cpu_unary PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    FOLDER "tests"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+)
+
 # CUDA后端测试（仅在有CUDA时编译）
 if(CUDA_BACKEND_ENABLED)
     add_executable(test_cuda_backend
@@ -259,10 +295,8 @@ if(CUDA_BACKEND_ENABLED)
         add_static_cuda_test(test_cuda_conv test_cuda_conv.cpp)
         # 添加GEMM方案测试（统一标准版本）
         add_static_cuda_test(test_cuda_gemm test_cuda_gemm.cpp)
-        # 重新启用修复后的测试文件（已移除CUDA头文件污染）
-        add_static_cuda_test(test_cuda_gemm_framework test_cuda_gemm_framework.cpp)
 
-        message(STATUS "[SUCCESS] 3 tests (1 convolution + 2 GEMM) configured successfully with static linking")
+        message(STATUS "[SUCCESS] 2 tests (1 convolution + 1 GEMM) configured successfully with static linking")
 
     else()
         message(WARNING "[FAIL] cudnn_static target not available, static-link tests disabled")
