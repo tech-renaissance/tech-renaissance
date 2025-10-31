@@ -13,7 +13,7 @@ int main() {
     Tensor cpu_a = Tensor::randn(Shape(1024, 2048), time(nullptr));  // 1024 x 2048矩阵，种子22
     Tensor cpu_b = Tensor::randn(Shape(2048, 512), time(nullptr));  // 2048 x 512矩阵，种子22
 
-    // CPU到CUDA转换
+    // // CPU到CUDA转换
     Tensor cuda_a = cuda_backend->from_cpu(cpu_a);
     Tensor cuda_b = cuda_backend->from_cpu(cpu_b);
 
@@ -57,7 +57,12 @@ int main() {
               << profiler.get_performance() << " GFLOPS" << std::endl;
 
     // 结果一致性
-    Tensor cuda_result_on_cpu = cuda_backend->to_cpu(cuda_result);
+    // 尝试使用copy_into来实现跨后端复制
+    Tensor cuda_result_on_cpu = cpu_backend->zeros_like(cpu_result);
+    cuda_backend->copy_into(cuda_result, cuda_result_on_cpu);
+
+    // 以下是跨后端复制的另一种写法：
+    // Tensor cuda_result_on_cpu = cuda_backend->to_cpu(cuda_result);
 
     // 使用CPU后端的is_close方法
     bool is_close = cpu_backend->is_close(cpu_result, cuda_result_on_cpu, 1e-4f);

@@ -145,6 +145,28 @@ public:
      */
     virtual Device device() const = 0;
 
+    // ===== 张量复制操作 =====
+
+    /**
+     * @brief 复制张量（同后端内操作）
+     * @param tensor 源张量，必须属于当前后端
+     * @return 复制后的新张量，属于同一后端
+     * @throws TRException 当张量不属于当前后端时抛出
+     * @note 深拷贝操作，生成独立的数据副本
+     */
+    virtual Tensor copy(const Tensor& tensor) const = 0;
+
+    /**
+     * @brief 复制张量到指定目标（支持跨设备，但语义明确）
+     * @param src 源张量
+     * @param dst 目标张量，用于接收复制结果
+     * @throws TRException 当操作不被支持时抛出
+     * @note 深拷贝操作，将src完全复制到dst的内存中
+     * @note CPU后端：仅支持CPU↔CPU操作
+     * @note 其他后端：支持本后端↔CPU操作
+     */
+    virtual void copy_into(const Tensor& src, Tensor& dst) const = 0;
+
     // ===== 数据访问 =====
 
     /**

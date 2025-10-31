@@ -4,7 +4,7 @@
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.26.5
+**版本**: V1.27.1
 **更新日期**: 2025-10-31
 **作者**: 技术觉醒团队
 
@@ -444,6 +444,54 @@ void cpu_performance_example() {
 }
 ```
 
+### 张量复制操作（V1.27.1新增）
+
+CPU后端提供了高效的张量复制功能，支持同设备内的深拷贝操作。
+
+#### `Tensor copy(const Tensor& tensor) const`
+
+复制张量，返回新的张量副本。
+
+**参数**：
+- `tensor` - 源张量，必须属于CPU设备
+
+**返回值**：
+- `Tensor` - 复制后的新张量，属于CPU设备
+
+**特性**：
+- **深拷贝**：生成独立的数据副本
+- **同设备**：仅在CPU设备内操作
+- **高效复制**：使用std::memcpy进行内存拷贝
+
+**示例**：
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+Tensor original = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
+cpu_backend->fill(original, 1.23f);
+Tensor copied = cpu_backend->copy(original);  // 深拷贝
+```
+
+#### `void copy_into(const Tensor& src, Tensor& dst) const`
+
+将源张量复制到指定目标张量。
+
+**参数**：
+- `src` - 源张量，必须属于CPU设备
+- `dst` - 目标张量，必须属于CPU设备
+
+**特性**：
+- **深拷贝**：将src完整复制到dst的内存中
+- **CPU专用**：仅支持CPU↔CPU操作，跨设备会报错
+- **参数检查**：验证数据类型、形状和设备一致性
+
+**示例**：
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+Tensor src = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
+Tensor dst = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
+cpu_backend->copy_into(src, dst);  // 深拷贝到dst
+```
+
 ### 单目运算操作
 
 CPU后端提供了完整的单目运算功能，包括10种运算的30个API变体。详细的单目运算API、使用示例和性能优化请参考 [单目运算 API 文档](cpu_unary.md)。
@@ -710,10 +758,10 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 
 ## 版本信息
 
-- **版本**：V1.26.5
+- **版本**：V1.27.1
 - **更新日期**：2025-10-31
 - **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持（新增round函数）
+- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持、张量复制功能
 - **架构特性**：
   - **后端管理存储原则**：CPU使用行主序，与C/C++语言惯例一致
   - **跨后端透明转换**：`from_cpu()`和`to_cpu()`自动处理格式转换
@@ -723,6 +771,7 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
   - **基础运算**：张量填充、逐元素运算、内存管理
   - **矩阵乘法**：高性能GEMM实现（详见[矩阵乘法文档](cpu_mm_fp32.md)）
   - **单目运算**：10种运算的30个API变体（详见[单目运算文档](cpu_unary.md)）
+  - **张量复制**：同设备内深拷贝操作（V1.27.1新增）
   - **张量IO**：独有TSR格式导入导出功能
   - **跨后端转换**：与其他后端的无缝数据转换
 - **性能优化**：
@@ -731,4 +780,9 @@ tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
   - **零拷贝操作**：`Eigen::Map`避免内存拷贝
   - **智能优化选择**：根据数据特性选择最优实现
   - **全局Eigen配置**：默认开启Eigen优化，支持手动禁用
+- **复制功能特性**：
+  - **语义明确**：copy()返回新张量，copy_into()写入指定目标
+  - **深拷贝保证**：所有复制操作生成独立数据副本
+  - **类型安全**：严格的数据类型和形状检查
+  - **性能测试**：CPU复制平均0.494ms，CUDA复制平均0.318ms
 - **依赖库**：Eigen3（默认启用以获得最佳性能）、标准C++库

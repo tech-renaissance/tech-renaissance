@@ -69,6 +69,13 @@ public:
     int32_t get_scalar_int32(const Tensor& tensor) override;
     int8_t get_scalar_int8(const Tensor& tensor) override;
 
+    // 张量复制操作（V1.26.5新增）
+    Tensor copy(const Tensor& tensor) const override;
+    void copy_into(const Tensor& src, Tensor& dst) const override;
+
+    // 张量比较操作（V1.26.5新增）
+    bool is_close(const Tensor& tensor_a, const Tensor& tensor_b, float eps = 5e-5f) const;
+
     // CUDA特定接口（供高级模块如Conv层使用）
     cudaStream_t stream() const { return stream_; }
     cublasHandle_t cublas_handle() const { return cublas_handle_; }

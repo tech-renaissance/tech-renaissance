@@ -101,6 +101,10 @@ public:
     void reciprocal_into(const Tensor& input, Tensor& output) const;
     void round_into(const Tensor& input, Tensor& output) const;
 
+    // 张量复制操作（V1.26.5新增）
+    Tensor copy(const Tensor& tensor) const override;
+    void copy_into(const Tensor& src, Tensor& dst) const override;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

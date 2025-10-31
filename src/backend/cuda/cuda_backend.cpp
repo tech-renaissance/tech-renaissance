@@ -434,21 +434,8 @@ int8_t CudaBackend::get_scalar_int8(const Tensor& tensor) {
 
 // 设备转换方法实现
 Tensor CudaBackend::to(const Tensor& tensor, const Device& device) const {
-    if (tensor.device() == device) {
-        return tensor; // 设备相同，直接返回
-    }
-
-    if (device.is_cpu()) {
-        return to_cpu(tensor);
-    } else if (device.is_cuda()) {
-        // CUDA到CUDA的转换
-        if (device.index != device_id_) {
-            throw TRException("CUDA device transfer not yet implemented");
-        }
-        return tensor; // 同一设备，直接返回
-    } else {
-        throw TRException("Unsupported target device: " + device.to_string());
-    }
+    // to()方法已deprecated，请使用to_cpu()或from_cpu()方法
+    throw TRException("[CudaBackend::to] This method has been deprecated. Please use to_cpu() or from_cpu() methods instead.");
 }
 
 Tensor CudaBackend::to_cpu(const Tensor& tensor) const {
@@ -489,6 +476,111 @@ Tensor CudaBackend::from_cpu(const Tensor& tensor) const {
 
 void CudaBackend::synchronize() const {
     CUDA_CHECK(cudaDeviceSynchronize());
+}
+
+// ===== 张量复制操作 =====
+
+Tensor CudaBackend::copy(const Tensor& tensor) const {
+    // 检查源张量是否属于CUDA后端
+    validate_same_device(tensor.device());
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor.shape(), tensor.dtype(), device());
+
+    // 执行深拷贝
+    copy_data(result.data_ptr(), tensor.data_ptr(), tensor.memory_size(), device(), device());
+
+    return result;
+}
+
+void CudaBackend::copy_into(const Tensor& src, Tensor& dst) const {
+    // 检查至少一个张量属于当前CUDA后端
+    if (!src.device().is_cuda() && !dst.device().is_cuda()) {
+        throw TRException("[CudaBackend::copy_into] Cannot perform copy operation: neither tensor belongs to CUDA backend. Please use the appropriate backend's copy_into method.");
+    }
+
+    // 检查数据类型是否一致
+    if (src.dtype() != dst.dtype()) {
+        throw TRException("[CudaBackend::copy_into] Data type mismatch: source dtype " +
+                         std::to_string(static_cast<int>(src.dtype())) +
+                         " != destination dtype " + std::to_string(static_cast<int>(dst.dtype())));
+    }
+
+    // 检查形状是否完全匹配
+    validate_tensor_shape(src, dst);
+
+    // 执行深拷贝
+    copy_data(dst.data_ptr(), src.data_ptr(), src.memory_size(), dst.device(), src.device());
+}
+
+// ===== 张量比较操作 =====
+
+bool CudaBackend::is_close(const Tensor& tensor_a, const Tensor& tensor_b, float eps) const {
+    // 检查两个张量是否属于CUDA后端
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+
+    // 检查形状是否一致
+    if (tensor_a.shape() != tensor_b.shape()) {
+        return false;
+    }
+
+    // 检查数据类型是否一致
+    if (tensor_a.dtype() != tensor_b.dtype()) {
+        return false;
+    }
+
+    // 目前只支持FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CudaBackend::is_close] Only FP32 tensors are supported");
+    }
+
+    // 使用CUDA内核计算相对误差
+    size_t n = tensor_a.numel();
+    if (n == 0) return true;
+
+    const float* a_data = static_cast<const float*>(tensor_a.data_ptr());
+    const float* b_data = static_cast<const float*>(tensor_b.data_ptr());
+
+    // 分配临时内存用于计算
+    float* diff_data = nullptr;
+    CUDA_CHECK(cudaMalloc(&diff_data, n * sizeof(float)));
+
+    // 使用CUDA内核计算差值: diff = |a - b|
+    const int block_size = 256;
+    const int grid_size = (n + block_size - 1) / block_size;
+
+    // 简单的CUDA内核：计算差值的绝对值
+    // 这里使用简单的实现，后续可以优化为自定义内核
+    // 先复制数据到临时内存
+    CUDA_CHECK(cudaMemcpy(diff_data, a_data, n * sizeof(float), cudaMemcpyDeviceToDevice));
+
+    // 计算差值：diff = a - b
+    float alpha = -1.0f;
+    cublasSaxpy(cublas_handle_, n, &alpha, b_data, 1, diff_data, 1);
+
+    // 计算绝对值：diff = |diff|
+    // 这里我们使用一个简单的内核或者先复制到CPU计算
+    float* host_diff = new float[n];
+    CUDA_CHECK(cudaMemcpy(host_diff, diff_data, n * sizeof(float), cudaMemcpyDeviceToHost));
+
+    // 在CPU上计算绝对值和最大值
+    float max_diff = 0.0f;
+    for (size_t i = 0; i < n; ++i) {
+        host_diff[i] = std::abs(host_diff[i]);
+        if (host_diff[i] > max_diff) {
+            max_diff = host_diff[i];
+        }
+    }
+
+    // 清理内存
+    delete[] host_diff;
+    CUDA_CHECK(cudaFree(diff_data));
+
+    // 同步设备
+    synchronize();
+
+    return max_diff <= eps;
 }
 
 } // namespace tr

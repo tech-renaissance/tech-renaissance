@@ -683,17 +683,8 @@ double CpuBackend::get_mean_rel_err(const Tensor& tensor_a, const Tensor& tensor
 
 // 设备转换方法实现
 Tensor CpuBackend::to(const Tensor& tensor, const Device& device) const {
-    if (tensor.device() == device) {
-        return tensor; // 设备相同，直接返回
-    }
-
-    if (device.is_cpu()) {
-        return to_cpu(tensor);
-    } else {
-        // CPU后端不支持直接转换到其他设备
-        throw TRException("CPU backend cannot directly convert to device: " + device.to_string() +
-                         ". Please use BackendManager to get the appropriate backend first.");
-    }
+    // to()方法已deprecated，请使用to_cpu()或from_cpu()方法
+    throw TRException("[CpuBackend::to] This method has been deprecated. Please use to_cpu() or from_cpu() methods instead.");
 }
 
 Tensor CpuBackend::to_cpu(const Tensor& tensor) const {

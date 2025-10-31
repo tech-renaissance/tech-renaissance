@@ -181,6 +181,40 @@ set_target_properties(test_cpu_unary PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
 )
 
+# 张量复制功能测试
+add_executable(test_copy
+    test_copy.cpp
+)
+
+target_include_directories(test_copy
+    PRIVATE
+        ../../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake
+)
+
+# 链接系统库
+if(WIN32)
+    target_link_libraries(test_copy PRIVATE tech_renaissance)
+else()
+    target_link_libraries(test_copy PRIVATE tech_renaissance pthread)
+endif()
+
+if(CUDA_BACKEND_ENABLED)
+    target_link_libraries(test_copy PRIVATE cudnn_static)
+    target_compile_definitions(test_copy PRIVATE TR_ENABLE_CUDA)
+    message(STATUS "[SUCCESS] Using cudnn_static target for test_copy")
+endif()
+
+target_compile_definitions(test_copy PRIVATE
+    TR_USE_EIGEN=${TR_USE_EIGEN}
+)
+
+set_target_properties(test_copy PROPERTIES
+    CXX_STANDARD 17
+    FOLDER "tests"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+)
+
 # CUDA后端测试（仅在有CUDA时编译）
 if(CUDA_BACKEND_ENABLED)
     add_executable(test_cuda_backend

@@ -1156,4 +1156,40 @@ void CpuBackend::round_into(const Tensor& input, Tensor& output) const {
 #endif
 }
 
+// ===== 张量复制操作 =====
+
+Tensor CpuBackend::copy(const Tensor& tensor) const {
+    // 检查源张量是否属于CPU后端
+    validate_same_device(tensor.device());
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor.shape(), tensor.dtype(), tr::CPU);
+
+    // 执行深拷贝
+    copy_data(result.data_ptr(), tensor.data_ptr(), tensor.numel() * dtype_size(tensor.dtype()),
+              tr::CPU, tr::CPU);
+
+    return result;
+}
+
+void CpuBackend::copy_into(const Tensor& src, Tensor& dst) const {
+    // 检查两个张量是否都属于CPU后端
+    validate_same_device(src.device());
+    validate_same_device(dst.device());
+
+    // 检查数据类型是否一致
+    if (src.dtype() != dst.dtype()) {
+        throw TRException("[CpuBackend::copy_into] Data type mismatch: source dtype " +
+                         std::to_string(static_cast<int>(src.dtype())) +
+                         " != destination dtype " + std::to_string(static_cast<int>(dst.dtype())));
+    }
+
+    // 检查形状是否完全匹配
+    validate_tensor_shape(src, dst);
+
+    // 执行深拷贝
+    copy_data(dst.data_ptr(), src.data_ptr(), src.numel() * dtype_size(src.dtype()),
+              tr::CPU, tr::CPU);
+}
+
 } // namespace tr
