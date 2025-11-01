@@ -1156,6 +1156,168 @@ void CpuBackend::round_into(const Tensor& input, Tensor& output) const {
 #endif
 }
 
+// ===== 矩阵转置操作 =====
+
+Tensor CpuBackend::transpose(const Tensor& input) const {
+    validate_same_device(input.device());
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::transpose] Only FP32 tensors are supported");
+    }
+
+    // 检查是否为2D张量
+    if (input.shape().ndim() != 2) {
+        throw TRException("[CpuBackend::transpose] Only 2D tensors are supported, but got " +
+                         std::to_string(input.shape().ndim()) + "D tensor");
+    }
+
+    // 获取维度信息
+    int32_t height = input.shape().height();
+    int32_t width = input.shape().width();
+
+    // 创建转置后的张量（交换维度）
+    Tensor result = Tensor::empty(Shape(width, height), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    // 将输入映射为Eigen矩阵（行主序）
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Map<const MatrixType> input_matrix(input_data, height, width);
+    Eigen::Map<MatrixType> result_matrix(result_data, width, height);
+
+    // 使用Eigen的转置功能
+    result_matrix = input_matrix.transpose();
+#else
+    // 朴素实现
+    // 对于行主序存储的矩阵，转置操作如下：
+    // 原始矩阵 A[H,W]，行主序内存布局：[a_00, a_01, ..., a_0(W-1), a_10, a_11, ..., a_(H-1)(W-1)]
+    // 转置矩阵 B[W,H]，行主序内存布局：[a_00, a_10, ..., a_(H-1)0, a_01, a_11, ..., a_(W-1)(H-1)]
+
+    for (int32_t i = 0; i < height; ++i) {        // 原矩阵的行
+        for (int32_t j = 0; j < width; ++j) {     // 原矩阵的列
+            // A[i,j] -> B[j,i]
+            result_data[j * height + i] = input_data[i * width + j];
+        }
+    }
+#endif
+
+    return result;
+}
+
+    Tensor CpuBackend::transpose_inplace(Tensor& input) const {
+    validate_same_device(input.device());
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::transpose] Only FP32 tensors are supported");
+    }
+
+    // 检查是否为2D张量
+    if (input.shape().ndim() != 2) {
+        throw TRException("[CpuBackend::transpose] Only 2D tensors are supported, but got " +
+                         std::to_string(input.shape().ndim()) + "D tensor");
+    }
+
+    // 获取维度信息
+    int32_t height = input.shape().height();
+    int32_t width = input.shape().width();
+
+    // 创建转置后的张量（交换维度）
+    Tensor result = Tensor::empty(Shape(width, height), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    // 将输入映射为Eigen矩阵（行主序）
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Map<const MatrixType> input_matrix(input_data, height, width);
+    Eigen::Map<MatrixType> result_matrix(result_data, width, height);
+
+    // 使用Eigen的转置功能
+    result_matrix = input_matrix.transpose();
+#else
+    // 朴素实现
+    // 对于行主序存储的矩阵，转置操作如下：
+    // 原始矩阵 A[H,W]，行主序内存布局：[a_00, a_01, ..., a_0(W-1), a_10, a_11, ..., a_(H-1)(W-1)]
+    // 转置矩阵 B[W,H]，行主序内存布局：[a_00, a_10, ..., a_(H-1)0, a_01, a_11, ..., a_(W-1)(H-1)]
+
+    for (int32_t i = 0; i < height; ++i) {        // 原矩阵的行
+        for (int32_t j = 0; j < width; ++j) {     // 原矩阵的列
+            // A[i,j] -> B[j,i]
+            result_data[j * height + i] = input_data[i * width + j];
+        }
+    }
+#endif
+
+    input = result;
+    return input;
+}
+
+void CpuBackend::transpose_into(const Tensor& input, Tensor& output) const {
+    validate_same_device(input.device());
+    validate_same_device(output.device());
+
+    if (input.dtype() != DType::FP32 || output.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::transpose_into] Only FP32 tensors are supported");
+    }
+
+    // 检查输入是否为2D张量
+    if (input.shape().ndim() != 2) {
+        throw TRException("[CpuBackend::transpose_into] Only 2D tensors are supported for input, but got " +
+                         std::to_string(input.shape().ndim()) + "D tensor");
+    }
+
+    // 检查输出是否为2D张量
+    if (output.shape().ndim() != 2) {
+        throw TRException("[CpuBackend::transpose_into] Only 2D tensors are supported for output, but got " +
+                         std::to_string(output.shape().ndim()) + "D tensor");
+    }
+
+    // 获取输入输出维度信息
+    int32_t input_height = input.shape().height();
+    int32_t input_width = input.shape().width();
+    int32_t output_height = output.shape().height();
+    int32_t output_width = output.shape().width();
+
+    // 检查维度是否匹配（输入 H,W -> 输出 W,H）
+    if (output_height != input_width || output_width != input_height) {
+        throw TRException("[CpuBackend::transpose_into] Dimension mismatch: input shape " +
+                         input.shape().to_string() + " cannot be transposed to output shape " +
+                         output.shape().to_string() + ". Expected output shape " +
+                         Shape(input_width, input_height).to_string());
+    }
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* output_data = static_cast<float*>(output.data_ptr());
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    // 将输入映射为Eigen矩阵（行主序）
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Map<const MatrixType> input_matrix(input_data, input_height, input_width);
+    Eigen::Map<MatrixType> output_matrix(output_data, output_height, output_width);
+
+    // 使用Eigen的转置功能
+    output_matrix = input_matrix.transpose();
+#else
+    // 朴素实现
+    // 对于行主序存储的矩阵，转置操作如下：
+    // 原始矩阵 A[H,W]，行主序内存布局：[a_00, a_01, ..., a_0(W-1), a_10, a_11, ..., a_(H-1)(W-1)]
+    // 转置矩阵 B[W,H]，行主序内存布局：[a_00, a_10, ..., a_(H-1)0, a_01, a_11, ..., a_(W-1)(H-1)]
+
+    for (int32_t i = 0; i < input_height; ++i) {        // 原矩阵的行
+        for (int32_t j = 0; j < input_width; ++j) {     // 原矩阵的列
+            // A[i,j] -> B[j,i]
+            output_data[j * input_height + i] = input_data[i * input_width + j];
+        }
+    }
+#endif
+}
+
 // ===== 张量复制操作 =====
 
 Tensor CpuBackend::copy(const Tensor& tensor) const {

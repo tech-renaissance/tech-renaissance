@@ -88,6 +88,12 @@ int main() {
             [](CpuBackend& backend, const Tensor& input) { return backend.round(input); },
             [](CpuBackend& backend, Tensor& input) { backend.round_inplace(input); },
             [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.round_into(input, output); }
+        },
+        {
+            "transpose", "transpose",
+            [](CpuBackend& backend, const Tensor& input) { return backend.transpose(input); },
+            [](CpuBackend& backend, Tensor& input) { return backend.transpose_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.transpose_into(input, output); }
         }
     };
 
@@ -103,11 +109,14 @@ int main() {
         // TEST 1: 非原地运算
         total++;
         try {
-            // 为sqrt测试生成正数张量，其他测试用普通张量
+            // 为特殊测试生成专门张量，其他测试用普通张量
             Tensor input;
             if (test_case.name == "sqrt") {
                 // 生成4维正数张量，范围[0.1, 10.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), 0.1f, 10.0f, static_cast<int>(time(nullptr)) + i);
+            } else if (test_case.name == "transpose") {
+                // 生成2D张量用于转置测试，范围[-1.0, 1.0]
+                input = Tensor::uniform(Shape(3, 4), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i);
@@ -152,11 +161,14 @@ int main() {
         // TEST 2: 原地运算
         total++;
         try {
-            // 为sqrt测试生成正数张量，其他测试用普通张量
+            // 为特殊测试生成专门张量，其他测试用普通张量
             Tensor input;
             if (test_case.name == "sqrt") {
                 // 生成4维正数张量，范围[0.1, 10.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), 0.1f, 10.0f, static_cast<int>(time(nullptr)) + i + 1000);
+            } else if (test_case.name == "transpose") {
+                // 生成3x4矩阵用于原地转置测试，范围[-1.0, 1.0]
+                input = Tensor::uniform(Shape(3, 4), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 1000);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 1000);
@@ -201,18 +213,28 @@ int main() {
         // TEST 3: 指定输出张量运算
         total++;
         try {
-            // 为sqrt测试生成正数张量，其他测试用普通张量
+            // 为特殊测试生成专门张量，其他测试用普通张量
             Tensor input;
             if (test_case.name == "sqrt") {
                 // 生成4维正数张量，范围[0.1, 10.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), 0.1f, 10.0f, static_cast<int>(time(nullptr)) + i + 2000);
+            } else if (test_case.name == "transpose") {
+                // 生成2D张量用于转置测试，范围[-1.0, 1.0]
+                input = Tensor::uniform(Shape(2, 3), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 2000);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
                 input = Tensor::uniform(Shape(2, 3, 4, 5), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 2000);
             }
 
-            // 创建随机同形的输出张量来测试覆盖能力
-            Tensor output = Tensor::uniform(input.shape(), -100.0f, 100.0f, static_cast<int>(time(nullptr)) + i + 3000);
+            // 创建输出张量（transpose需要特殊处理输出形状）
+            Tensor output;
+            if (test_case.name == "transpose") {
+                // 转置的输出形状是输入形状的交换
+                output = Tensor::uniform(Shape(3, 2), -100.0f, 100.0f, static_cast<int>(time(nullptr)) + i + 3000);
+            } else {
+                // 创建随机同形的输出张量来测试覆盖能力
+                output = Tensor::uniform(input.shape(), -100.0f, 100.0f, static_cast<int>(time(nullptr)) + i + 3000);
+            }
 
             // 先发送到Python获取PyTorch结果
             Tensor pytorch_result = ps.calculate(test_case.pytorch_cmd, input, 5000);

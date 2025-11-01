@@ -226,6 +226,22 @@ class SimpleHelloServer(TechRenaissanceServer):
                 except Exception as e:
                     print(f"[ERROR] round computation failed: {e}")
                     self.write_response('', 'invalid')
+        elif command.lower() == 'transpose':   # 矩阵转置
+            if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing transpose command")
+            tensor = self.get_tensors(parameters, 1)
+            if tensor is None:
+                print(f"[ERROR] Failed to get tensor for transpose")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] Successfully got tensor for transpose, shape: {tensor.shape}")
+                    result = torch.transpose(tensor, 0, 1)  # 转置前两个维度
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] transpose computation successful, result shape: {result.shape}")
+                    self.send_tensors(result)
+                    if DEBUG_MODE: print(f"[PYTHON_DEBUG] transpose result sent successfully")
+                except Exception as e:
+                    print(f"[ERROR] transpose computation failed: {e}")
+                    self.write_response('', 'invalid')
         else:
             print(f"[ERROR] Unknown command: {command}")
             self.debug_message(f'[Python] Invalid command: {command}')

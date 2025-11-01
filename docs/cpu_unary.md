@@ -2,9 +2,9 @@
 
 ## 概述
 
-本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括10种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
+本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括11种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
 
-**版本**: V1.26.5
+**版本**: V1.26.6
 **更新日期**: 2025-10-31
 **作者**: 技术觉醒团队
 
@@ -30,6 +30,7 @@
 | 8 | 相反数 | `negative` | `negative_inplace` | `negative_into` | -x |
 | 9 | 倒数 | `reciprocal` | `reciprocal_inplace` | `reciprocal_into` | 1/x |
 | 10 | 四舍五入 | `round` | `round_inplace` | `round_into` | round(x) |
+| 11 | 矩阵转置 | `transpose` | `transpose_inplace` | `transpose_into` | A^T |
 
 ## 数据类型支持
 
@@ -552,6 +553,90 @@ backend->round_into(input, output);  // 每个元素四舍五入
 - 数值精度控制
 - 与PyTorch兼容的数值处理
 
+#### `Tensor transpose(const Tensor& input) const`
+
+执行矩阵转置运算，返回转置后的新张量。
+
+**参数**：
+- `input` - 输入张量，必须是2D张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 转置结果张量，形状为`(width, height)`
+
+**异常**：
+- `TRException` - 当输入不是2D张量或不支持FP32时抛出
+
+**实现特点**：
+- 仅支持2D矩阵转置
+- 自动交换维度：`Shape(H,W)` → `Shape(W,H)`
+- 支持Eigen优化和朴素实现
+- 行主序存储的转置算法
+
+**数学含义**：
+- 矩阵转置：`B[j,i] = A[i,j]`
+- 对于行主序存储，需要重新排列内存布局
+
+```cpp
+// 创建3x4矩阵
+Tensor input(Shape(3, 4), DType::FP32, tr::CPU);
+cpu_backend->fill(input, 2.5f);
+
+// 转置为4x3矩阵
+Tensor result = backend->transpose(input);
+// result.shape() = Shape(4, 3)
+```
+
+#### `Tensor transpose_inplace(Tensor& input) const`
+
+原地执行矩阵转置运算。
+
+**参数**：
+- `input` - 要转置的2D张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 转置后的张量引用
+
+**异常**：
+- `TRException` - 当输入不是2D张量或不支持FP32时抛出
+
+**实现特点**：
+- 通过赋值操作符更新张量内容和形状
+- 复用transpose()的验证算法，保证正确性
+- 支持方阵和非方阵转置
+
+```cpp
+backend->transpose_inplace(input);  // 原地转置，形状自动更新
+```
+
+#### `void transpose_into(const Tensor& input, Tensor& output) const`
+
+将输入张量的转置结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量，必须是2D张量（仅支持FP32）
+- `output` - 输出张量，必须是转置后的形状（仅支持FP32）
+
+**异常**：
+- `TRException` - 当形状不匹配、不是2D张量或不支持FP32时抛出
+
+**实现特点**：
+- 严格的形状验证：输入`(H,W)`，输出必须是`(W,H)`
+- 支持Eigen优化和朴素实现
+- 高性能的内存复制操作
+
+```cpp
+// 输入3x4，输出4x3
+Tensor input(Shape(3, 4), DType::FP32, tr::CPU);
+Tensor output(Shape(4, 3), DType::FP32, tr::CPU);
+backend->transpose_into(input, output);  // 转置结果写入output
+```
+
+**使用场景**：
+- 线性代数运算：矩阵乘法的维度调整
+- 卷积神经网络：特征图维度变换
+- 数据预处理：行列数据交换
+- 与PyTorch兼容的矩阵操作
+
 ## 使用示例
 
 ### 基础单目运算
@@ -576,7 +661,8 @@ void basic_unary_operations() {
     Tensor abs_result = cpu_backend->abs(input);
     Tensor negative_result = cpu_backend->negative(input);
     Tensor sign_result = cpu_backend->sign(input);
-    Tensor round_result = cpu_backend->round(input);  // 新增：四舍五入
+    Tensor round_result = cpu_backend->round(input);  // 四舍五入
+    Tensor transpose_result = cpu_backend->transpose(input);  // 矩阵转置
 
     // 2. 原地运算（直接修改原张量，性能最高）
     Tensor inplace_tensor = Tensor::uniform(shape, -1.0f, 1.0f, 42);
@@ -588,9 +674,51 @@ void basic_unary_operations() {
     cpu_backend->relu_into(input, output);        // 覆盖output的内容
     // 可以继续使用同一个output张量进行多次运算
     cpu_backend->square_into(input, output);      // 再次覆盖
-    cpu_backend->round_into(input, output);       // 新增：四舍五入覆盖
+    cpu_backend->round_into(input, output);       // 四舍五入覆盖
 
-    std::cout << "All 30 unary operations completed successfully!" << std::endl;
+    std::cout << "All 33 unary operations completed successfully!" << std::endl;
+}
+```
+
+### 矩阵转置使用示例
+
+```cpp
+#include "tech_renaissance.h"
+using namespace tr;
+
+void matrix_transpose_operations() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 创建3x4矩阵进行转置测试
+    Shape input_shape(3, 4);
+    Tensor input(input_shape, DType::FP32, tr::CPU);
+
+    // 填充测试数据：[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
+    float* data = static_cast<float*>(input.data_ptr());
+    for (int32_t i = 0; i < 3; ++i) {
+        for (int32_t j = 0; j < 4; ++j) {
+            data[i * 4 + j] = static_cast<float>(i * 4 + j + 1);
+        }
+    }
+
+    // 1. 非原地转置
+    Tensor result = cpu_backend->transpose(input);
+    // result.shape() = Shape(4, 3)
+    // result内容：[[1, 5, 9], [2, 6, 10], [3, 7, 11], [4, 8, 12]]
+
+    // 2. 原地转置（适用于需要修改原张量的场景）
+    Tensor inplace_tensor = input.clone();  // 复制原张量
+    cpu_backend->transpose_inplace(inplace_tensor);
+    // inplace_tensor.shape() = Shape(4, 3)，包含转置结果
+
+    // 3. 指定输出转置（适用于预分配输出张量的场景）
+    Tensor output(Shape(4, 3), DType::FP32, tr::CPU);
+    cpu_backend->transpose_into(input, output);
+    // output包含转置结果
+
+    std::cout << "Matrix transpose operations completed successfully!" << std::endl;
+    std::cout << "Original shape: " << input.shape().to_string() << std::endl;
+    std::cout << "Transposed shape: " << result.shape().to_string() << std::endl;
 }
 ```
 
@@ -786,9 +914,10 @@ try {
 
 ### 测试统计
 
-- **总测试数量**：30个测试（10个函数 × 3种模式）
+- **总测试数量**：33个测试（11个函数 × 3种模式）
 - **测试通过率**：100%
 - **测试范围**：覆盖所有功能路径和错误情况
+- **新增测试**：矩阵转置功能完整测试覆盖
 
 ### 测试类型
 
@@ -796,6 +925,15 @@ try {
 2. **边界条件测试**：极值、NaN、Inf等特殊情况
 3. **形状验证测试**：不同形状张量的处理
 4. **性能回归测试**：确保优化不影响正确性
+
+## 版本信息
+
+- **版本**：V1.26.6
+- **更新日期**：2025-10-31
+- **作者**：技术觉醒团队
+- **主要更新**：新增矩阵转置功能（transpose、transpose_inplace、transpose_into）
+- **功能总数**：11种单目运算，33个API变体
+- **测试覆盖**：33/33测试通过，100%成功率
 
 ## 相关文档
 
