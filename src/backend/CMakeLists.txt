@@ -12,6 +12,7 @@ set(BACKEND_SOURCES
     cpu/cpu_mm_fp32.cpp
     cpu/cpu_unary.cpp
     cpu/cpu_scalar.cpp
+    cpu/cpu_broadcast.cpp
 )
 
 # 创建基础后端库
