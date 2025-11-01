@@ -586,15 +586,12 @@ Tensor result = backend->transpose(input);
 // result.shape() = Shape(4, 3)
 ```
 
-#### `Tensor transpose_inplace(Tensor& input) const`
+#### `void transpose_inplace(Tensor& input) const`
 
 原地执行矩阵转置运算。
 
 **参数**：
 - `input` - 要转置的2D张量（仅支持FP32）
-
-**返回值**：
-- `Tensor` - 转置后的张量引用
 
 **异常**：
 - `TRException` - 当输入不是2D张量或不支持FP32时抛出

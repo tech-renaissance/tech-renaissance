@@ -89,7 +89,7 @@ public:
     void negative_inplace(Tensor& input) const;
     void reciprocal_inplace(Tensor& input) const;
     void round_inplace(Tensor& input) const;
-    Tensor transpose_inplace(Tensor& input) const;
+    void transpose_inplace(Tensor& input) const;
 
     // 指定输出张量的运算（V1.26.3新增）
     void zeros_into(const Tensor& input, Tensor& output) const;
@@ -107,6 +107,32 @@ public:
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;
     void copy_into(const Tensor& src, Tensor& dst) const override;
+
+    // 标量运算（V1.28.1新增）
+    // 乘法：tensor * scalar
+    Tensor mul(const Tensor& input, float scalar) const;
+    void mul_inplace(Tensor& input, float scalar) const;
+    void mul_into(const Tensor& input, float scalar, Tensor& output) const;
+
+    // 加法：tensor + scalar
+    Tensor add(const Tensor& input, float scalar) const;
+    void add_inplace(Tensor& input, float scalar) const;
+    void add_into(const Tensor& input, float scalar, Tensor& output) const;
+
+    // 减法：tensor - scalar
+    Tensor minus(const Tensor& input, float scalar) const;
+    void minus_inplace(Tensor& input, float scalar) const;
+    void minus_into(const Tensor& input, float scalar, Tensor& output) const;
+
+    // 减法：scalar - tensor
+    Tensor minus(float scalar, const Tensor& input) const;
+    void minus_inplace(float scalar, Tensor& input) const;
+    void minus_into(float scalar, const Tensor& input, Tensor& output) const;
+
+    // 乘加：tensor * scalar_x + scalar_y
+    Tensor mac(const Tensor& input, float scalar_x, float scalar_y) const;
+    void mac_inplace(Tensor& input, float scalar_x, float scalar_y) const;
+    void mac_into(const Tensor& input, float scalar_x, float scalar_y, Tensor& output) const;
 
 private:
     void validate_same_device(const Device& device) const;

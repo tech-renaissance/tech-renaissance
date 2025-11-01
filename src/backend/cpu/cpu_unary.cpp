@@ -1207,7 +1207,7 @@ Tensor CpuBackend::transpose(const Tensor& input) const {
     return result;
 }
 
-    Tensor CpuBackend::transpose_inplace(Tensor& input) const {
+void CpuBackend::transpose_inplace(Tensor& input) const {
     validate_same_device(input.device());
 
     if (input.dtype() != DType::FP32) {
@@ -1254,7 +1254,6 @@ Tensor CpuBackend::transpose(const Tensor& input) const {
 #endif
 
     input = result;
-    return input;
 }
 
 void CpuBackend::transpose_into(const Tensor& input, Tensor& output) const {

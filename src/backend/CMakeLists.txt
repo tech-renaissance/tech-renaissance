@@ -11,6 +11,7 @@ set(BACKEND_SOURCES
     cpu/cpu_backend.cpp
     cpu/cpu_mm_fp32.cpp
     cpu/cpu_unary.cpp
+    cpu/cpu_scalar.cpp
 )
 
 # 创建基础后端库
