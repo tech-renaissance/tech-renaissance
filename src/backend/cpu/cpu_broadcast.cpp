@@ -316,6 +316,155 @@ static void broadcast_operation_eigen(
 }
 #endif
 
+// ===== 扩展运算核心实现 =====
+
+/**
+ * @brief 扩展运算的通用实现（朴素版本）
+ * @param tensor_a 输入张量
+ * @param result 输出张量（广播后的形状）
+ */
+static void expand_operation_naive(const Tensor& tensor_a, Tensor& result) {
+    const Shape& shape_a = tensor_a.shape();
+    const Shape& shape_result = result.shape();
+
+    int64_t total_elements = shape_result.numel();
+    const float* data_a = static_cast<const float*>(tensor_a.data_ptr());
+    float* data_result = static_cast<float*>(result.data_ptr());
+
+    // 标量扩展优化
+    if (shape_a.is_scalar()) {
+        float scalar_a = data_a[0];
+        for (int64_t i = 0; i < total_elements; ++i) {
+            data_result[i] = scalar_a;
+        }
+        return;
+    }
+
+    // 一般扩展情况
+    std::vector<int32_t> indices(shape_result.ndim());
+
+    for (int64_t i = 0; i < total_elements; ++i) {
+        // 将线性索引转换为多维索引
+        linear_to_multi_index(i, shape_result, indices.data());
+
+        // 计算在源张量中的线性索引（考虑广播）
+        int64_t idx_a = multi_index_to_linear_with_broadcast(indices.data(), shape_a, shape_result);
+
+        // 复制值
+        data_result[i] = data_a[idx_a];
+    }
+}
+
+#ifdef TR_USE_EIGEN
+/**
+ * @brief 扩展运算的通用实现（Eigen优化版本）
+ * @param tensor_a 输入张量
+ * @param result 输出张量（广播后的形状）
+ */
+static void expand_operation_eigen(const Tensor& tensor_a, Tensor& result) {
+    const Shape& shape_a = tensor_a.shape();
+    const Shape& shape_result = result.shape();
+
+    const float* data_a = static_cast<const float*>(tensor_a.data_ptr());
+    float* data_result = static_cast<float*>(result.data_ptr());
+
+    // 标量扩展优化
+    if (shape_a.is_scalar()) {
+        float scalar_a = data_a[0];
+        Eigen::Map<Eigen::VectorXf> vec_result(data_result, shape_result.numel());
+        vec_result.setConstant(scalar_a);
+        return;
+    }
+
+    // 对于简单情况（相同形状），直接复制
+    if (shape_a == shape_result) {
+        int64_t total_elements = shape_result.numel();
+        std::memcpy(data_result, data_a, total_elements * sizeof(float));
+        return;
+    }
+
+    // 复杂扩展情况回退到朴素实现
+    expand_operation_naive(tensor_a, result);
+}
+#endif
+
+// ===== 扩展运算 =====
+
+Tensor CpuBackend::expand(const Tensor& tensor_a, const Shape& shape_b) const {
+    // 验证数据类型和设备
+    validate_tensor_dtype_and_device(tensor_a, "tensor_a");
+
+    // 处理空张量特殊情况
+    if (tensor_a.is_empty()) {
+        throw TRException("[CPU Expand] Cannot expand empty tensor");
+    }
+
+    // 验证非空张量
+    validate_tensor_not_empty(tensor_a, "tensor_a");
+
+    // 检查tensor_a是否可以广播到shape_b
+    // 创建一个虚拟的张量b来使用现有的广播检查逻辑
+    if (!shape_b.is_scalar() && !tensor_a.shape().is_scalar()) {
+        if (tensor_a.shape().ndim() != shape_b.ndim()) {
+            throw TRException("[CPU Expand] Tensor shapes do not meet operation requirements: " +
+                             tensor_a.shape().to_string() + " cannot expand to " + shape_b.to_string());
+        }
+
+        // 使用广播兼容性检查
+        if (!tensor_a.shape().is_broadcastable_to(shape_b)) {
+            throw TRException("[CPU Expand] Tensor shapes are incompatible for expansion: " +
+                             tensor_a.shape().to_string() + " cannot expand to " + shape_b.to_string());
+        }
+    }
+
+    // 创建输出张量
+    Tensor result = Tensor::empty(shape_b, DType::FP32, tr::CPU);
+
+    // 执行扩展
+    expand_into(tensor_a, result);
+
+    return result;
+}
+
+void CpuBackend::expand_into(const Tensor& tensor_a, Tensor& tensor_b) const {
+    // 验证数据类型和设备
+    validate_tensor_dtype_and_device(tensor_a, "tensor_a");
+    validate_tensor_dtype_and_device(tensor_b, "tensor_b");
+
+    // 处理空张量特殊情况
+    if (tensor_a.is_empty()) {
+        if (tensor_b.is_empty()) {
+            return;  // 两个都是空张量，直接返回
+        } else {
+            throw TRException("[CPU Expand] Cannot expand empty tensor to non-empty tensor");
+        }
+    }
+
+    // 验证非空张量
+    validate_tensor_not_empty(tensor_a, "tensor_a");
+    validate_tensor_not_empty(tensor_b, "tensor_b");
+
+    // 检查tensor_a是否可以广播到tensor_b的形状
+    if (!tensor_b.shape().is_scalar() && !tensor_a.shape().is_scalar()) {
+        if (tensor_a.shape().ndim() != tensor_b.shape().ndim()) {
+            throw TRException("[CPU Expand] Tensor shapes do not meet operation requirements: " +
+                             tensor_a.shape().to_string() + " cannot expand to " + tensor_b.shape().to_string());
+        }
+
+        if (!tensor_a.shape().is_broadcastable_to(tensor_b.shape())) {
+            throw TRException("[CPU Expand] Tensor shapes are incompatible for expansion: " +
+                             tensor_a.shape().to_string() + " cannot expand to " + tensor_b.shape().to_string());
+        }
+    }
+
+    // 执行扩展运算
+#ifdef TR_USE_EIGEN
+    expand_operation_eigen(tensor_a, tensor_b);
+#else
+    expand_operation_naive(tensor_a, tensor_b);
+#endif
+}
+
 // ===== 加法运算 =====
 
 Tensor CpuBackend::add_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const {

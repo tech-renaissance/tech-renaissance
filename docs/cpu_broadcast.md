@@ -6,18 +6,21 @@ This document describes the implementation of broadcast tensor operations in the
 
 ## Version Information
 
-- **Version**: V1.28.1
+- **Version**: V1.29.2
 - **Date**: 2025-11-01
 - **Author**: 技术觉醒团队
 
 ## Supported Operations
 
-The CPU backend implements 6 broadcast functions across 3 arithmetic operations:
+The CPU backend implements 8 broadcast functions across 4 operation types:
 
 ### Arithmetic Operations
 1. **Addition**: `add_broadcast`, `add_broadcast_into`
 2. **Subtraction**: `minus_broadcast`, `minus_broadcast_into`
 3. **Multiplication**: `mul_broadcast`, `mul_broadcast_into`
+
+### Expansion Operations
+4. **Tensor Expansion**: `expand`, `expand_into`
 
 ### Function Modes
 - **Regular Mode**: Returns a new tensor with the result
@@ -80,11 +83,18 @@ static Shape get_broadcast_output_shape(const Shape& shape_a, const Shape& shape
 - Uses Eigen's vectorized operations
 - Falls back to naive implementation for complex cases
 
+#### Expand Implementation
+- **Naive Expand (`expand_operation_naive`)**: Handles tensor expansion through index conversion
+- **Eigen Expand (`expand_operation_eigen`)**: Optimized for scalar expansion and same-shape copying
+- **Shape Validation**: Validates compatibility between input tensor and target shape
+
 ### Performance Optimizations
 
 1. **Scalar Broadcasting**: Direct scalar arithmetic without indexing
 2. **Same Shape**: Direct vectorized operations using Eigen
 3. **Eigen Vectorization**: Leverages SIMD instructions when available
+4. **Scalar Expansion**: Efficient scalar filling using Eigen setConstant
+5. **Same Shape Expansion**: Direct memory copy for identical shapes
 
 ## API Reference
 
@@ -107,6 +117,12 @@ Performs element-wise multiplication with broadcasting, returning a new tensor.
 
 #### `void mul_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const`
 Performs element-wise multiplication with broadcasting, writing to pre-allocated result tensor.
+
+#### `Tensor expand(const Tensor& tensor_a, const Shape& shape_b) const`
+Expands a tensor to the specified shape, returning a new tensor with broadcasted values.
+
+#### `void expand_into(const Tensor& tensor_a, Tensor& tensor_b) const`
+Expands tensor_a to the shape of tensor_b, writing the result directly to tensor_b.
 
 ### Error Handling
 
@@ -148,11 +164,30 @@ Tensor result = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
 cpu_backend->add_broadcast_into(a, b, result);  // Result written to pre-allocated tensor
 ```
 
+### Expand Operations
+```cpp
+// Scalar expansion
+Tensor scalar = Tensor::full(Shape(), 3.0f);
+Shape target_shape(2, 3);
+Tensor expanded = cpu_backend->expand(scalar, target_shape);  // 2x3 tensor of 3s
+
+// Shape expansion
+Tensor row_vec = Tensor::full(Shape(1, 4), 2.0f);
+Tensor result = cpu_backend->expand(row_vec, Shape(3, 4));  // 3x4 tensor, each row [2,2,2,2]
+
+// Into expansion
+Tensor input = Tensor::full(Shape(2, 1), 5.0f);
+Tensor output = Tensor::empty(Shape(2, 4), DType::FP32, tr::CPU);
+cpu_backend->expand_into(input, output);  // Output becomes [[5,5,5,5], [5,5,5,5]]
+```
+
 ## Performance Characteristics
 
 Based on benchmark tests:
 - **Scalar Broadcasting**: ~511 microseconds for 1M elements
 - **Same Shape Operations**: ~8 microseconds for 10K elements
+- **Scalar Expansion**: ~486 microseconds for 1M elements
+- **Same Shape Expansion**: ~9 microseconds for 10K elements
 - **Eigen Optimization**: Significant speedup for simple cases
 - **Complex Broadcasting**: Moderate overhead due to index conversion
 
@@ -170,11 +205,17 @@ The implementation includes comprehensive test coverage:
 
 ### Running Tests
 ```bash
-# Build the test
+# Build broadcast tests
 cmake --build . --target test_cpu_broadcast
 
-# Run tests
+# Run broadcast tests
 bin/tests/Release/test_cpu_broadcast.exe
+
+# Build expand tests
+cmake --build . --target test_cpu_expand
+
+# Run expand tests
+bin/tests/Release/test_cpu_expand.exe
 ```
 
 ## Dependencies
@@ -195,5 +236,7 @@ bin/tests/Release/test_cpu_broadcast.exe
 
 - **Implementation**: `src/backend/cpu/cpu_broadcast.cpp`
 - **Header**: `include/tech_renaissance/backend/cpu/cpu_backend.h`
-- **Tests**: `tests/unit_tests/test_cpu_broadcast.cpp`
+- **Broadcast Tests**: `tests/unit_tests/test_cpu_broadcast.cpp`
+- **Expand Tests**: `tests/unit_tests/test_cpu_expand.cpp`
 - **Build Configuration**: `src/backend/CMakeLists.txt`
+- **Test Configuration**: `tests/unit_tests/CMakeLists.txt`

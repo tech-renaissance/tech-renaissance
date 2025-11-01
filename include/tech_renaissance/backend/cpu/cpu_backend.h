@@ -12,6 +12,7 @@
 #pragma once
 
 #include "tech_renaissance/backend/backend.h"
+#include "tech_renaissance/data/shape.h"
 #define EXPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->export_tensor
 #define IMPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->import_tensor
 
@@ -146,6 +147,11 @@ public:
     // 张量乘法：支持广播
     Tensor mul_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
     void mul_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+
+    // 张量扩展广播（V1.28.1新增）
+    // 将张量广播到指定形状
+    Tensor expand(const Tensor& tensor_a, const Shape& shape_b) const;
+    void expand_into(const Tensor& tensor_a, Tensor& tensor_b) const;
 
 private:
     void validate_same_device(const Device& device) const;
