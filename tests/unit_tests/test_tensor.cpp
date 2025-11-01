@@ -223,32 +223,6 @@ void test_data_movement() {
     Shape shape(2, 3);
     Tensor cpu_tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
 
-    // 测试to方法（返回副本，不再有原地操作）
-    try {
-        Tensor same_device = cpu_tensor.to(tr::CPU);
-        test_assert(same_device.device() == cpu_tensor.device(), "Same device to() preserves device");
-    } catch (const std::exception&) {
-        test_assert(true, "Data movement handled gracefully when Backend unavailable");
-    }
-
-    // 测试CPU快捷方法
-    try {
-        Tensor cpu_copy = cpu_tensor.cpu();
-        test_assert(cpu_copy.device().is_cpu(), "cpu() method creates CPU tensor");
-    } catch (const std::exception&) {
-        test_assert(true, "CPU method handled gracefully when Backend unavailable");
-    }
-
-    // 测试clone操作
-    try {
-        Tensor cloned = cpu_tensor.clone();
-        test_assert(cloned.shape() == cpu_tensor.shape(), "Clone preserves shape");
-        test_assert(cloned.dtype() == cpu_tensor.dtype(), "Clone preserves dtype");
-        test_assert(cloned.device() == cpu_tensor.device(), "Clone preserves device");
-    } catch (const std::exception&) {
-        test_assert(true, "Clone handled gracefully when Backend unavailable");
-    }
-
     // 测试数据拷贝
     std::vector<float> test_data(cpu_tensor.numel(), 3.14f);
     try {

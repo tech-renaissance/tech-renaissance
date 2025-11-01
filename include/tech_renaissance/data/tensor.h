@@ -267,34 +267,6 @@ public:
     // ===== 数据移动操作 =====
 
     /**
-     * @brief 创建指定设备上的副本
-     * @param device 目标设备
-     * @return 新的Tensor对象
-     * @throws std::runtime_error 如果Backend不可用
-     */
-    Tensor to(const Device& device) const;
-
-    /**
-     * @brief 创建CPU上的副本
-     * @return 新的Tensor对象
-     */
-    Tensor cpu() const;
-
-    /**
-     * @brief 创建CUDA上的副本
-     * @param device_id CUDA设备ID
-     * @return 新的Tensor对象
-     */
-    Tensor cuda(int device_id = 0) const;
-
-    /**
-     * @brief 克隆Tensor（深拷贝）
-     * @details 创建形状、数据类型、设备相同的副本，并复制数据
-     * @return 新的Tensor对象
-     */
-    Tensor clone() const;
-
-    /**
      * @brief 创建视图（浅拷贝）
      * @details 创建共享Storage的新Tensor对象
      * @return 新的Tensor对象

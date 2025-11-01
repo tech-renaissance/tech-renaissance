@@ -138,10 +138,10 @@ int main() {
         std::cout << "\nConsistency verification: " << (all_consistent ? "ALL PASS" : "SOME FAIL");
 
         if (all_consistent) {
-            std::cout << "\n\n🎉 All CPU scalar operations completed successfully!";
+            std::cout << "\n\n[PASS] All CPU scalar operations completed successfully!";
             return 0;
         } else {
-            std::cout << "\n\n❌ Some consistency checks failed!";
+            std::cout << "\n\n[FAIL] Some consistency checks failed!";
             return 1;
         }
 

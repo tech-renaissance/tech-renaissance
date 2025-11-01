@@ -413,7 +413,7 @@ void performance_optimization_example() {
     std::cout << "3 scalar operations completed in " << duration.count() << " microseconds" << std::endl;
 
     // 原地运算（零拷贝，最高性能）
-    Tensor inplace_tensor = input.clone();
+    Tensor inplace_tensor = cpu_backend->copy(input);
     cpu_backend->mul_inplace(inplace_tensor, 3.0f);     // 直接向量化操作
     cpu_backend->add_inplace(inplace_tensor, 1.0f);     // 继续向量化操作
 

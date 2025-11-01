@@ -455,7 +455,9 @@ size_t memory_size = allocate_memory_on_device(device, size);
 ### 设备传输
 
 ```cpp
-Tensor gpu_tensor = cpu_tensor.to(tr::CUDA[0]);
+// 设备传输通过后端接口实现
+auto cuda_backend = BackendManager::get_cuda_backend();
+Tensor gpu_tensor = cuda_backend->from_cpu(cpu_tensor);
 ```
 
 ## 最佳实践
@@ -477,7 +479,9 @@ Tensor tensor(shape, dtype, cpu);
 ```cpp
 Device target_device = tr::CUDA[0];
 try {
-    Tensor result = source_tensor.to(target_device);
+    // 设备传输通过后端接口实现
+    auto target_backend = BackendManager::get_backend(target_device);
+    Tensor result = target_backend->from_cpu(source_tensor);
 } catch (const std::runtime_error& e) {
     std::cerr << "无法移动到设备 "
               << target_device.to_string() << ": " << e.what() << std::endl;
@@ -640,7 +644,7 @@ Tensor cuda_data = cuda_backend->from_cpu(cpu_data);  // 自动格式转换
 
 ## 版本信息
 
-- **版本**：V1.23.1
-- **更新日期**：2025-10-30
+- **版本**：V1.28.1
+- **更新日期**：2025-11-01
 - **作者**：技术觉醒团队
 - **主要特性**：简化设备模型、跨后端支持、全局设备常量

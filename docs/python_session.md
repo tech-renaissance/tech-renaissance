@@ -464,7 +464,7 @@ void comprehensive_unary_verification() {
             // TEST 2: 原地运算验证
             try {
                 // 创建输入副本用于原地测试
-                Tensor inplace_input = input.clone();
+                Tensor inplace_input = cpu_backend->copy(input);
 
                 // C++原地计算
                 if (op == "zeros_like") {

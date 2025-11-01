@@ -110,7 +110,7 @@ Tensor CudaBackend::to_cpu(const Tensor& tensor) {
 
 - **用户视角**：所有张量都是行主序访问，无论在哪个后端
 - **后端内部**：各自选择最优的内存布局进行计算
-- **转换透明**：`to_cpu()`、`from_cpu()`、`to()` 自动处理格式转换
+- **转换透明**：`to_cpu()`、`from_cpu()` 自动处理格式转换
 
 ## 核心组件详解
 
@@ -135,18 +135,14 @@ class Tensor {
 #### a) 跨后端转换接口
 
 ```cpp
-// 设备转移（通用接口）
-Tensor to(const Device& target_device) const {
-    auto backend = BackendManager::get_backend(target_device);
-    return backend->to(*this, target_device);
-}
-
 // CPU到CUDA转换（行主序 → 列主序）
 Tensor CudaBackend::from_cpu(const Tensor& tensor);
 
 // CUDA到CPU转换（列主序 → 行主序）
 Tensor CudaBackend::to_cpu(const Tensor& tensor);
 ```
+
+**设计理念**：设备间的数据转移完全通过后端接口实现，Tensor类本身不包含设备转移逻辑，保持轻量级设计。
 
 #### b) 类型安全的标量访问
 
@@ -235,7 +231,6 @@ public:
                        const Device& dst_device, const Device& src_device) = 0;
 
     // 跨后端转换接口
-    virtual Tensor to(const Tensor& tensor, const Device& target_device) = 0;
     virtual Tensor from_cpu(const Tensor& tensor) = 0;
     virtual Tensor to_cpu(const Tensor& tensor) = 0;
 

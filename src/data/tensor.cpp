@@ -106,67 +106,6 @@ bool Tensor::is_contiguous() const noexcept {
     return true;
 }
 
-Tensor Tensor::to(const Device& device) const {
-    Device current_device = this->device();
-    if (current_device == device) {
-        return clone(); // 同设备直接克隆
-    }
-
-    auto src_backend = BackendManager::instance().get_backend(current_device);
-    auto dst_backend = BackendManager::instance().get_backend(device);
-
-    Tensor result(shape_, dtype_, device);
-    size_t size_bytes = memory_size();
-
-    if (!is_empty()) {
-        try {
-            // 由目标backend分配内存
-            auto holder = dst_backend->allocate(size_bytes);
-            result.storage_ = std::make_shared<Storage>(size_bytes, device);
-            result.storage_->set_data_ptr(dst_backend->get_data_ptr(holder), holder);
-
-            // 由目标backend执行跨设备拷贝
-            dst_backend->copy_data(result.data_ptr(), data_ptr(), size_bytes, device, current_device);
-        } catch (const std::exception& e) {
-            throw TRException("[Tensor::to] Failed to copy Tensor to device: " + std::string(e.what()));
-        }
-    }
-
-    return result;
-}
-
-Tensor Tensor::cpu() const {
-    return to(tr::CPU);
-}
-
-Tensor Tensor::cuda(int device_id) const {
-    if (device_id < 0 || device_id >= 8) {
-        throw TRException("[Tensor::cuda] CUDA device ID must be between 0 and 7");
-    }
-    return to(tr::CUDA[device_id]);
-}
-
-Tensor Tensor::clone() const {
-    Device current_device = this->device();
-    Tensor result(shape_, dtype_, current_device);
-
-    if (!is_empty()) {
-        try {
-            auto backend = get_backend();
-            void* dst_ptr = result.data_ptr();
-            const void* src_ptr = data_ptr();
-            size_t size = memory_size();
-
-            // 在相同设备间拷贝数据
-            backend->copy_data(dst_ptr, src_ptr, size, current_device, current_device);
-        } catch (const std::exception& e) {
-            throw TRException("Failed to clone Tensor: " + std::string(e.what()));
-        }
-    }
-
-    return result;
-}
-
 Tensor Tensor::view() const {
     // 创建共享Storage的新Tensor
     Tensor result;

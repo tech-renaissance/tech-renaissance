@@ -704,7 +704,7 @@ void matrix_transpose_operations() {
     // result内容：[[1, 5, 9], [2, 6, 10], [3, 7, 11], [4, 8, 12]]
 
     // 2. 原地转置（适用于需要修改原张量的场景）
-    Tensor inplace_tensor = input.clone();  // 复制原张量
+    Tensor inplace_tensor = cpu_backend->copy(input);  // 复制原张量
     cpu_backend->transpose_inplace(inplace_tensor);
     // inplace_tensor.shape() = Shape(4, 3)，包含转置结果
 
