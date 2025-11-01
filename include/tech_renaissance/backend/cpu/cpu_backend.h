@@ -164,6 +164,10 @@ public:
     void squeeze_inplace(Tensor& tensor_a, int32_t dim) const;
     void squeeze_into(const Tensor& tensor_a, Tensor& tensor_b) const;
 
+    // Pad：在张量的H和W维度周围补零
+    Tensor pad(const Tensor& tensor_a, int32_t padding) const;
+    void pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tensor_b) const;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <cstring>
 
 namespace tr {
 
@@ -157,9 +158,9 @@ static void squeeze_operation_core(const Tensor& input, Tensor& result) {
  * @throws TRException 如果数据类型不是FP32或设备不是CPU
  */
 static void validate_tensor_dtype_and_device(const Tensor& tensor, const std::string& name) {
-    // 检查数据类型
-    if (tensor.dtype() != DType::FP32) {
-        throw TRException("[CPU Dimension] Currently only supports FP32 tensor operations, " + name + " data type is: " +
+    // 检查数据类型 - 支持FP32和INT8
+    if (tensor.dtype() != DType::FP32 && tensor.dtype() != DType::INT8) {
+        throw TRException("[CPU Dimension] Currently only supports FP32 and INT8 tensor operations, " + name + " data type is: " +
                          dtype_to_string(tensor.dtype()));
     }
 
@@ -179,6 +180,219 @@ static void validate_tensor_dtype_and_device(const Tensor& tensor, const std::st
 static void validate_tensor_not_empty(const Tensor& tensor, const std::string& name) {
     if (tensor.is_empty()) {
         throw TRException("[CPU Dimension] " + name + " is an empty tensor");
+    }
+}
+
+// ===== Pad 操作核心实现 =====
+
+/**
+ * @brief 计算padding后的新形状
+ * @param original_shape 原始形状
+ * @param padding padding大小
+ * @return 新的形状
+ * @throws TRException 如果张量维度小于2维
+ */
+static Shape calculate_pad_shape(const Shape& original_shape, int32_t padding) {
+    int32_t original_ndim = original_shape.ndim();
+
+    // 验证维度至少为2
+    if (original_ndim < 2) {
+        throw TRException("[CPU Pad] Tensor must have at least 2 dimensions");
+    }
+
+    // 构建新的形状数组
+    std::vector<int32_t> new_dims;
+
+    if (original_ndim == 2) {
+        // (H, W) -> (H+2*padding, W+2*padding)
+        int32_t h = original_shape.dim(0);
+        int32_t w = original_shape.dim(1);
+        new_dims.push_back(h + 2 * padding);
+        new_dims.push_back(w + 2 * padding);
+    } else if (original_ndim == 3) {
+        // (C, H, W) -> (C, H+2*padding, W+2*padding)
+        int32_t c = original_shape.dim(0);
+        int32_t h = original_shape.dim(1);
+        int32_t w = original_shape.dim(2);
+        new_dims.push_back(c);
+        new_dims.push_back(h + 2 * padding);
+        new_dims.push_back(w + 2 * padding);
+    } else if (original_ndim == 4) {
+        // (N, C, H, W) -> (N, C, H+2*padding, W+2*padding)
+        int32_t n = original_shape.dim(0);
+        int32_t c = original_shape.dim(1);
+        int32_t h = original_shape.dim(2);
+        int32_t w = original_shape.dim(3);
+        new_dims.push_back(n);
+        new_dims.push_back(c);
+        new_dims.push_back(h + 2 * padding);
+        new_dims.push_back(w + 2 * padding);
+    }
+
+    // 创建新形状
+    Shape new_shape;
+    if (new_dims.size() == 2) {
+        new_shape = Shape(new_dims[0], new_dims[1]);
+    } else if (new_dims.size() == 3) {
+        new_shape = Shape(new_dims[0], new_dims[1], new_dims[2]);
+    } else if (new_dims.size() == 4) {
+        new_shape = Shape(new_dims[0], new_dims[1], new_dims[2], new_dims[3]);
+    }
+
+    return new_shape;
+}
+
+/**
+ * @brief 执行padding操作的核心实现（FP32版本）
+ * @param input 输入张量
+ * @param result 输出张量（预分配了正确的形状）
+ * @param padding padding大小
+ */
+static void pad_operation_core_fp32(const Tensor& input, Tensor& result, int32_t padding) {
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    // 获取形状信息
+    int32_t input_ndim = input.shape().ndim();
+
+    // 首先将整个输出张量填充为0
+    std::memset(result_data, 0, result.numel() * sizeof(float));
+
+    if (input_ndim == 2) {
+        // 2D情况：(H, W) -> (H+2p, W+2p)
+        int32_t input_h = input.shape().dim(0);
+        int32_t input_w = input.shape().dim(1);
+        int32_t output_h = result.shape().dim(0);
+        int32_t output_w = result.shape().dim(1);
+
+        // 将输入数据复制到中心位置
+        for (int32_t i = 0; i < input_h; ++i) {
+            for (int32_t j = 0; j < input_w; ++j) {
+                int32_t src_idx = i * input_w + j;
+                int32_t dst_idx = (i + padding) * output_w + (j + padding);
+                result_data[dst_idx] = input_data[src_idx];
+            }
+        }
+
+    } else if (input_ndim == 3) {
+        // 3D情况：(C, H, W) -> (C, H+2p, W+2p)
+        int32_t input_c = input.shape().dim(0);
+        int32_t input_h = input.shape().dim(1);
+        int32_t input_w = input.shape().dim(2);
+        int32_t output_h = result.shape().dim(1);
+        int32_t output_w = result.shape().dim(2);
+
+        for (int32_t c = 0; c < input_c; ++c) {
+            for (int32_t i = 0; i < input_h; ++i) {
+                for (int32_t j = 0; j < input_w; ++j) {
+                    int32_t src_idx = c * input_h * input_w + i * input_w + j;
+                    int32_t dst_idx = c * output_h * output_w +
+                                   (i + padding) * output_w + (j + padding);
+                    result_data[dst_idx] = input_data[src_idx];
+                }
+            }
+        }
+
+    } else if (input_ndim == 4) {
+        // 4D情况：(N, C, H, W) -> (N, C, H+2p, W+2p)
+        int32_t input_n = input.shape().dim(0);
+        int32_t input_c = input.shape().dim(1);
+        int32_t input_h = input.shape().dim(2);
+        int32_t input_w = input.shape().dim(3);
+        int32_t output_h = result.shape().dim(2);
+        int32_t output_w = result.shape().dim(3);
+
+        for (int32_t n = 0; n < input_n; ++n) {
+            for (int32_t c = 0; c < input_c; ++c) {
+                for (int32_t i = 0; i < input_h; ++i) {
+                    for (int32_t j = 0; j < input_w; ++j) {
+                        int32_t src_idx = n * input_c * input_h * input_w +
+                                       c * input_h * input_w + i * input_w + j;
+                        int32_t dst_idx = n * input_c * output_h * output_w +
+                                       c * output_h * output_w +
+                                       (i + padding) * output_w + (j + padding);
+                        result_data[dst_idx] = input_data[src_idx];
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief 执行padding操作的核心实现（INT8版本）
+ * @param input 输入张量
+ * @param result 输出张量（预分配了正确的形状）
+ * @param padding padding大小
+ */
+static void pad_operation_core_int8(const Tensor& input, Tensor& result, int32_t padding) {
+    const int8_t* input_data = static_cast<const int8_t*>(input.data_ptr());
+    int8_t* result_data = static_cast<int8_t*>(result.data_ptr());
+
+    // 获取形状信息
+    int32_t input_ndim = input.shape().ndim();
+
+    // 首先将整个输出张量填充为0
+    std::memset(result_data, 0, result.numel() * sizeof(int8_t));
+
+    if (input_ndim == 2) {
+        // 2D情况：(H, W) -> (H+2p, W+2p)
+        int32_t input_h = input.shape().dim(0);
+        int32_t input_w = input.shape().dim(1);
+        int32_t output_h = result.shape().dim(0);
+        int32_t output_w = result.shape().dim(1);
+
+        // 将输入数据复制到中心位置
+        for (int32_t i = 0; i < input_h; ++i) {
+            for (int32_t j = 0; j < input_w; ++j) {
+                int32_t src_idx = i * input_w + j;
+                int32_t dst_idx = (i + padding) * output_w + (j + padding);
+                result_data[dst_idx] = input_data[src_idx];
+            }
+        }
+
+    } else if (input_ndim == 3) {
+        // 3D情况：(C, H, W) -> (C, H+2p, W+2p)
+        int32_t input_c = input.shape().dim(0);
+        int32_t input_h = input.shape().dim(1);
+        int32_t input_w = input.shape().dim(2);
+        int32_t output_h = result.shape().dim(1);
+        int32_t output_w = result.shape().dim(2);
+
+        for (int32_t c = 0; c < input_c; ++c) {
+            for (int32_t i = 0; i < input_h; ++i) {
+                for (int32_t j = 0; j < input_w; ++j) {
+                    int32_t src_idx = c * input_h * input_w + i * input_w + j;
+                    int32_t dst_idx = c * output_h * output_w +
+                                   (i + padding) * output_w + (j + padding);
+                    result_data[dst_idx] = input_data[src_idx];
+                }
+            }
+        }
+
+    } else if (input_ndim == 4) {
+        // 4D情况：(N, C, H, W) -> (N, C, H+2p, W+2p)
+        int32_t input_n = input.shape().dim(0);
+        int32_t input_c = input.shape().dim(1);
+        int32_t input_h = input.shape().dim(2);
+        int32_t input_w = input.shape().dim(3);
+        int32_t output_h = result.shape().dim(2);
+        int32_t output_w = result.shape().dim(3);
+
+        for (int32_t n = 0; n < input_n; ++n) {
+            for (int32_t c = 0; c < input_c; ++c) {
+                for (int32_t i = 0; i < input_h; ++i) {
+                    for (int32_t j = 0; j < input_w; ++j) {
+                        int32_t src_idx = n * input_c * input_h * input_w +
+                                       c * input_h * input_w + i * input_w + j;
+                        int32_t dst_idx = n * input_c * output_h * output_w +
+                                       c * output_h * output_w +
+                                       (i + padding) * output_w + (j + padding);
+                        result_data[dst_idx] = input_data[src_idx];
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -334,6 +548,90 @@ void CpuBackend::squeeze_into(const Tensor& tensor_a, Tensor& tensor_b) const {
 
     // 执行squeeze操作（本质上是数据复制）
     squeeze_operation_core(tensor_a, tensor_b);
+}
+
+// ===== Pad 操作实现 =====
+
+Tensor CpuBackend::pad(const Tensor& tensor_a, int32_t padding) const {
+    // 验证padding值
+    if (padding < 0) {
+        throw TRException("[CPU Pad] Padding value must be non-negative");
+    }
+
+    // 验证数据类型和设备
+    validate_tensor_dtype_and_device(tensor_a, "tensor_a");
+
+    // 处理空张量特殊情况
+    if (tensor_a.is_empty()) {
+        return Tensor();  // 返回空张量
+    }
+
+    // 验证非空张量
+    validate_tensor_not_empty(tensor_a, "tensor_a");
+
+    // 计算新形状
+    Shape new_shape = calculate_pad_shape(tensor_a.shape(), padding);
+
+    // 创建输出张量
+    Tensor result = Tensor::empty(new_shape, tensor_a.dtype(), tr::CPU);
+
+    // 执行padding操作
+    if (tensor_a.dtype() == DType::FP32) {
+        pad_operation_core_fp32(tensor_a, result, padding);
+    } else if (tensor_a.dtype() == DType::INT8) {
+        pad_operation_core_int8(tensor_a, result, padding);
+    } else {
+        throw TRException("[CPU Pad] Unsupported data type: " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    return result;
+}
+
+void CpuBackend::pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tensor_b) const {
+    // 验证padding值
+    if (padding < 0) {
+        throw TRException("[CPU Pad] Padding value must be non-negative");
+    }
+
+    // 验证数据类型和设备
+    validate_tensor_dtype_and_device(tensor_a, "tensor_a");
+    validate_tensor_dtype_and_device(tensor_b, "tensor_b");
+
+    // 处理空张量特殊情况
+    if (tensor_a.is_empty()) {
+        if (tensor_b.is_empty()) {
+            return;  // 两个都是空张量，直接返回
+        } else {
+            throw TRException("[CPU Pad] Cannot pad empty tensor into non-empty tensor");
+        }
+    }
+
+    // 验证非空张量
+    validate_tensor_not_empty(tensor_a, "tensor_a");
+    validate_tensor_not_empty(tensor_b, "tensor_b");
+
+    // 验证数据类型一致
+    if (tensor_a.dtype() != tensor_b.dtype()) {
+        throw TRException("[CPU Pad] Data type mismatch for pad_into: " +
+                         dtype_to_string(tensor_a.dtype()) + " vs " +
+                         dtype_to_string(tensor_b.dtype()));
+    }
+
+    // 验证输出张量形状是否正确
+    Shape expected_shape = calculate_pad_shape(tensor_a.shape(), padding);
+    if (tensor_b.shape() != expected_shape) {
+        throw TRException("[CPU Pad] Output tensor shape mismatch for pad_into. Expected: " +
+                         expected_shape.to_string() + ", Actual: " + tensor_b.shape().to_string());
+    }
+
+    // 执行padding操作
+    if (tensor_a.dtype() == DType::FP32) {
+        pad_operation_core_fp32(tensor_a, tensor_b, padding);
+    } else if (tensor_a.dtype() == DType::INT8) {
+        pad_operation_core_int8(tensor_a, tensor_b, padding);
+    } else {
+        throw TRException("[CPU Pad] Unsupported data type: " + dtype_to_string(tensor_a.dtype()));
+    }
 }
 
 } // namespace tr
