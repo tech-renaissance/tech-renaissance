@@ -273,32 +273,6 @@ public:
      */
     Tensor view() const;
 
-    // ===== 视图操作（基础版本，一期暂不实现完整视图功能） =====
-
-    /**
-     * @brief 重塑形状
-     * @param shape 新形状
-     * @return 新的Tensor对象
-     * @throws std::invalid_argument 如果元素总数不匹配
-     */
-    Tensor reshape(const Shape& shape) const;
-
-    /**
-     * @brief 扩展维度
-     * @param dim 维度索引
-     * @return 新的Tensor对象
-     * @throws std::out_of_range 如果索引超出范围
-     */
-    Tensor expand_dim(int32_t dim) const;
-
-    /**
-     * @brief 压缩维度
-     * @param dim 维度索引
-     * @return 新的Tensor对象
-     * @throws std::out_of_range 如果索引超出范围
-     */
-    Tensor squeeze_dim(int32_t dim) const;
-
     // ===== 实用方法 =====
 
     /**

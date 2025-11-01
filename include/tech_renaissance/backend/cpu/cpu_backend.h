@@ -153,6 +153,17 @@ public:
     Tensor expand(const Tensor& tensor_a, const Shape& shape_b) const;
     void expand_into(const Tensor& tensor_a, Tensor& tensor_b) const;
 
+    // 张量维度操作（V1.29.2新增）
+    // Unsqueeze：在指定位置插入大小为1的维度
+    Tensor unsqueeze(const Tensor& tensor_a, int32_t dim) const;
+    void unsqueeze_inplace(Tensor& tensor_a, int32_t dim) const;
+    void unsqueeze_into(const Tensor& tensor_a, Tensor& tensor_b) const;
+
+    // Squeeze：移除大小为1的指定维度
+    Tensor squeeze(const Tensor& tensor_a, int32_t dim) const;
+    void squeeze_inplace(Tensor& tensor_a, int32_t dim) const;
+    void squeeze_into(const Tensor& tensor_a, Tensor& tensor_b) const;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

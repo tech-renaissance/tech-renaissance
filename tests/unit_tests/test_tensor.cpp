@@ -187,33 +187,6 @@ void test_view_operations() {
     test_assert(view_tensor.shape() == tensor.shape(), "View preserves shape");
     test_assert(view_tensor.dtype() == tensor.dtype(), "View preserves dtype");
     test_assert(view_tensor.device() == tensor.device(), "View preserves device");
-
-    // 测试reshape操作
-    Shape new_shape(6, 4); // 2*3*4 = 24, 6*4 = 24
-    Tensor reshaped = tensor.reshape(new_shape);
-    test_assert(reshaped.shape() == new_shape, "Reshape changes shape");
-    test_assert(reshaped.numel() == tensor.numel(), "Reshape preserves numel");
-
-    // 测试reshape失败情况
-    Shape wrong_shape(5, 5); // 25 != 24
-    try {
-        Tensor wrong_reshaped = tensor.reshape(wrong_shape);
-        test_assert(false, "Invalid reshape should throw exception");
-    } catch (const TRException&) {
-        test_assert(true, "Invalid reshape throws TRException");
-    }
-
-    // 测试expand_dim操作
-    Tensor expanded = tensor.expand_dim(1); // 在第1个位置插入维度1
-    test_assert(expanded.ndim() == 4, "Expand dim increases ndim");
-    test_assert(expanded.dim_size(1) == 1, "Expanded dimension size is 1");
-
-    // 测试squeeze_dim操作
-    Shape shape_with_one(2, 1, 3);
-    Tensor tensor_with_one = Tensor::empty(shape_with_one, DType::FP32);
-    Tensor squeezed = tensor_with_one.squeeze_dim(1); // 移除第1个维度
-    test_assert(squeezed.ndim() == 2, "Squeeze dim reduces ndim");
-    test_assert(squeezed.shape() == Shape(2, 3), "Squeeze removes dimension of size 1");
 }
 
 // 测试数据移动操作

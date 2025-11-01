@@ -1350,6 +1350,59 @@ set_tests_properties(CPUExpandTest PROPERTIES
 
 message(STATUS "[SUCCESS] CPU expand operations test configured successfully")
 
+# ========== CPU维度操作测试 ==========
+add_executable(test_cpu_dimension test_cpu_dimension.cpp)
+
+# 包含头文件目录
+target_include_directories(test_cpu_dimension
+    PRIVATE
+        ../../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake
+)
+
+# 如果Eigen可用，添加Eigen支持
+if(EIGEN_FOUND)
+    target_include_directories(test_cpu_dimension PRIVATE
+        ${EIGEN_INCLUDE_DIR}
+    )
+    target_compile_definitions(test_cpu_dimension PRIVATE TR_USE_EIGEN)
+    message(STATUS "[SUCCESS] test_cpu_dimension configured with Eigen support")
+endif()
+
+# 链接库
+if(WIN32)
+    target_link_libraries(test_cpu_dimension PRIVATE tech_renaissance)
+else()
+    target_link_libraries(test_cpu_dimension PRIVATE tech_renaissance pthread)
+endif()
+
+# 如果CUDA可用，添加CUDA库支持
+if(CUDA_BACKEND_ENABLED)
+    if(TARGET cudnn_static)
+        target_link_libraries(test_cpu_dimension PRIVATE cudnn_static)
+        target_compile_definitions(test_cpu_dimension PRIVATE TR_ENABLE_CUDA)
+        message(STATUS "[SUCCESS] Using cudnn_static target for test_cpu_dimension")
+    endif()
+endif()
+
+# 设置编译属性
+set_target_properties(test_cpu_dimension PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    FOLDER "tests"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+)
+
+# 注册测试到CTest
+add_test(NAME CPUDimensionTest COMMAND test_cpu_dimension)
+set_tests_properties(CPUDimensionTest PROPERTIES
+    TIMEOUT 120
+    PASS_REGULAR_EXPRESSION "CPU dimension operations test completed successfully"
+)
+
+message(STATUS "[SUCCESS] CPU dimension operations test configured successfully")
+
 # ========== Python会话测试 ==========
 add_executable(test_python_session test_python_session.cpp)
 
