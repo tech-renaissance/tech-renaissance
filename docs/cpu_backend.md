@@ -34,6 +34,10 @@ Tensor tensor(shape, dtype, CPU);  // 段错误！
 
 // 错误：使用Tensor静态方法（不推荐）
 Tensor tensor = Tensor::zeros(shape, dtype, device);
+
+// 错误：误认为Backend基类有这些方法（方法在子类中实现）
+auto backend = BackendManager::instance().get_backend(CPU);
+Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 ```
 
 ## 概述

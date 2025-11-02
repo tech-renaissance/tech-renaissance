@@ -7,14 +7,16 @@
 在Tech Renaissance框架中，Tensor构造函数只创建元数据，不分配实际内存。所有张量必须通过Backend类的方法来创建，因为Backend会在创建后立即分配内存。
 
 **正确的张量创建流程：**
-1. 获取Backend实例：`BackendManager::instance().get_backend(CPU)`
-2. 使用Backend方法创建：`backend->zeros(shape, dtype)`
-3. Backend自动分配内存并返回可用张量
+1. 获取Backend子类实例：`BackendManager::instance().get_backend(CPU)`
+2. 转换为具体的Backend子类：`std::dynamic_pointer_cast<CpuBackend>(backend)`
+3. 使用Backend子类方法创建：`cpu_backend->zeros(shape, dtype)`
+4. Backend子类自动分配内存并返回可用张量
 
 **错误的操作（会导致段错误）：**
 - 直接调用`Tensor(shape, dtype, device)`构造函数
 - 使用Tensor类的静态工厂方法（不推荐）
 - 试图访问未分配内存的张量
+- 误认为Backend基类直接包含创建方法
 
 ## Overview
 

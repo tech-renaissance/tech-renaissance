@@ -15,12 +15,18 @@
 
 **正确的张量创建方式：**
 ```cpp
-// 正确：使用Backend方法
-auto backend = BackendManager::instance().get_backend(CPU);
-Tensor tensor1 = backend->zeros(shape, dtype);
-Tensor tensor2 = backend->ones(shape, dtype);
-Tensor tensor3 = backend->full(shape, value, dtype);
-Tensor tensor4 = backend->empty(shape, dtype);
+// 正确：使用Backend子类的方法
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+Tensor tensor1 = cpu_backend->zeros(shape, dtype);
+Tensor tensor2 = cpu_backend->ones(shape, dtype);
+Tensor tensor3 = cpu_backend->full(shape, value, dtype);
+Tensor tensor4 = cpu_backend->empty(shape, dtype);
+
+// 或者使用其他Backend子类的方法
+auto cuda_backend = std::dynamic_pointer_cast<CudaBackend>(
+    BackendManager::instance().get_backend(CUDA));
+Tensor tensor5 = cuda_backend->zeros(shape, dtype);
 ```
 
 **错误的方式：**

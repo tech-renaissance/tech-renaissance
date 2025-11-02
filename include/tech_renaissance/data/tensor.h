@@ -184,16 +184,16 @@ public:
     // ========== 重要：张量创建方法警告 ==========
     // 注意：虽然以下静态方法会自动分配内存并返回可用张量，
     // 但强烈建议不要使用Tensor类的工厂函数创建新张量！
-    // 推荐使用相应后端的方法：
-    // - Tensor.zeros() -> Backend.zeros()
-    // - Tensor.ones() -> Backend.ones()
-    // - Tensor.full() -> Backend.full()
-    // - Tensor.empty() -> Backend.empty()
-    // 后端方法提供更好的设备管理和性能优化！
+    // 推荐使用相应Backend子类的方法：
+    // - Tensor.zeros() -> CpuBackend::zeros() 或其他Backend子类的zeros()
+    // - Tensor.ones() -> CpuBackend::ones() 或其他Backend子类的ones()
+    // - Tensor.full() -> CpuBackend::full() 或其他Backend子类的full()
+    // - Tensor.empty() -> CpuBackend::empty() 或其他Backend子类的empty()
+    // Backend子类方法提供更好的设备管理和性能优化！
 
     /**
      * @brief 创建全零张量
-     * @warning 不建议使用！请使用Backend::zeros()替代
+     * @warning 不建议使用！请使用Backend子类的zeros()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -203,7 +203,7 @@ public:
 
     /**
      * @brief 创建全一张量
-     * @warning 不建议使用！请使用Backend::ones()替代
+     * @warning 不建议使用！请使用Backend子类的ones()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -213,7 +213,7 @@ public:
 
     /**
      * @brief 创建填充指定值的张量
-     * @warning 不建议使用！请使用Backend::full()替代
+     * @warning 不建议使用！请使用Backend子类的full()替代
      * @param shape 张量形状
      * @param value 填充值
      * @param dtype 数据类型
@@ -224,7 +224,7 @@ public:
 
     /**
      * @brief 创建未初始化的张量
-     * @warning 不建议使用！请使用Backend::empty()替代
+     * @warning 不建议使用！请使用Backend子类的empty()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -357,9 +357,9 @@ protected:
      * 构造函数只能被Backend类及其子类使用，因为它们会在构造后立即分配内存。
      *
      * 正确的张量创建方式：
-     * - 使用Backend的empty(), zeros(), ones(), full()等方法
-     * - 使用Backend的randn(), uniform(), randint()等随机生成方法
-     * - 使用Tensor类的工厂方法（如果有提供）
+     * - 使用Backend的子类的empty(), zeros(), ones(), full()等方法（如果有）
+     * - 使用Backend的子类的randn(), uniform(), randint()等随机生成方法（如果有）
+     * - 如果Backend的子类没有提供上述方法，则可考虑先在CPU后端上创建张量，再拷贝到目标设备
      *
      * @param shape 张量形状
      * @param dtype 数据类型

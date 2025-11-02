@@ -30,7 +30,17 @@ Tensor tensor(shape, dtype, CPU);  // 段错误！
 
 // 错误：使用Tensor静态方法（不推荐）
 Tensor tensor = Tensor::zeros(shape, dtype, device);
+
+// 错误：误认为其他Backend子类的方法和CPU后端一样
+auto cuda_backend = std::dynamic_pointer_cast<CudaBackend>(
+    BackendManager::instance().get_backend(CUDA));
+// 注意：CUDA后端可能有不同的方法或参数！
 ```
+
+**重要提醒：**
+- 每个Backend子类（如CpuBackend、CudaBackend）可能有不同的方法实现
+- 使用前请检查具体Backend子类的API文档
+- 如果某个Backend子类没有提供特定方法，可以考虑先在CPU后端创建，然后转换到目标设备
 
 ## Overview
 

@@ -8,23 +8,29 @@
 
 **推荐的张量创建方法：**
 ```cpp
+// 获取Backend基类实例
 auto backend = BackendManager::instance().get_backend(CPU);
-// 基础创建方法
-Tensor zeros = backend->zeros(shape, dtype);
-Tensor ones = backend->ones(shape, dtype);
-Tensor full = backend->full(shape, value, dtype);
-Tensor empty = backend->empty(shape, dtype);
 
-// 随机生成方法
-Tensor randn = backend->randn(shape, seed);
-Tensor uniform = backend->uniform(shape, min_val, max_val, seed);
-Tensor randint = backend->randint(shape, low, high, dtype, seed);
+// 转换为具体的Backend子类（如CpuBackend）
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(backend);
+
+// 使用Backend子类的方法（这些方法在子类中实现）
+Tensor zeros = cpu_backend->zeros(shape, dtype);
+Tensor ones = cpu_backend->ones(shape, dtype);
+Tensor full = cpu_backend->full(shape, value, dtype);
+Tensor empty = cpu_backend->empty(shape, dtype);
+
+// 随机生成方法（如果子类支持）
+Tensor randn = cpu_backend->randn(shape, seed);
+Tensor uniform = cpu_backend->uniform(shape, min_val, max_val, seed);
+Tensor randint = cpu_backend->randint(shape, low, high, dtype, seed);
 ```
 
 **绝对禁止的方式：**
 - 直接使用`Tensor(shape, dtype, device)`构造函数（不分配内存！）
 - 使用Tensor类的静态工厂方法（不推荐）
 - 试图手动分配张量内存
+- 误认为Backend基类直接包含创建方法（这些方法在子类中实现）
 
 ## 概述
 
