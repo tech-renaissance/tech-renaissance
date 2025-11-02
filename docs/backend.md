@@ -1,11 +1,37 @@
 # Backend API 文档
 
+## # 重要警告：张量创建的正确方式！
+
+**Backend是唯一推荐的张量创建方式！**
+
+在Tech Renaissance框架中，所有张量都必须通过Backend类的方法来创建：
+
+**推荐的张量创建方法：**
+```cpp
+auto backend = BackendManager::instance().get_backend(CPU);
+// 基础创建方法
+Tensor zeros = backend->zeros(shape, dtype);
+Tensor ones = backend->ones(shape, dtype);
+Tensor full = backend->full(shape, value, dtype);
+Tensor empty = backend->empty(shape, dtype);
+
+// 随机生成方法
+Tensor randn = backend->randn(shape, seed);
+Tensor uniform = backend->uniform(shape, min_val, max_val, seed);
+Tensor randint = backend->randint(shape, low, high, dtype, seed);
+```
+
+**绝对禁止的方式：**
+- 直接使用`Tensor(shape, dtype, device)`构造函数（不分配内存！）
+- 使用Tensor类的静态工厂方法（不推荐）
+- 试图手动分配张量内存
+
 ## 概述
 
 `Backend`是技术觉醒框架的抽象后端基类，定义了所有计算后端（CPU、CUDA等）必须实现的统一接口。它采用纯虚函数设计，确保不同计算设备的后端实现具有一致的API接口，从而实现设备无关的张量计算。
 
-**版本**: V1.27.1
-**更新日期**: 2025-10-31
+**版本**: V1.31.2
+**更新日期**: 2025-11-03
 **作者**: 技术觉醒团队
 
 ## 设计理念

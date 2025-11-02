@@ -1,11 +1,47 @@
 # CpuBackend API 文档
 
+## # 重要警告：CPU后端张量创建指南！
+
+**CpuBackend是推荐的后端张量创建方式！**
+
+CPU后端提供了完整的张量创建和操作API，是框架的默认计算后端：
+
+**推荐的使用方式：**
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+// 基础张量创建（自动分配内存）
+Tensor zeros = cpu_backend->zeros({2, 3, 4}, DType::FP32);
+Tensor ones = cpu_backend->ones({2, 3, 4}, DType::FP32);
+Tensor full = cpu_backend->full({2, 3, 4}, 1.5f);
+Tensor empty = cpu_backend->empty({2, 3, 4}, DType::FP32);
+
+// 随机张量生成
+Tensor randn = cpu_backend->randn({2, 3, 4}, 12345);
+Tensor uniform = cpu_backend->uniform({2, 3, 4}, 0.0f, 1.0f, 54321);
+Tensor randint = cpu_backend->randint({2, 3, 4}, 0, 10, DType::INT32, 99999);
+
+// 类型转换
+Tensor int32_tensor = cpu_backend->cast(fp32_tensor, DType::INT32);
+Tensor int8_tensor = cpu_backend->cast(fp32_tensor, DType::INT8);
+```
+
+**绝对禁止的方式：**
+```cpp
+// 错误：直接使用构造函数不会分配内存！
+Tensor tensor(shape, dtype, CPU);  // 段错误！
+
+// 错误：使用Tensor静态方法（不推荐）
+Tensor tensor = Tensor::zeros(shape, dtype, device);
+```
+
 ## 概述
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.31.1
-**更新日期**: 2025-11-02
+**版本**: V1.31.2
+**更新日期**: 2025-11-03
 **作者**: 技术觉醒团队
 
 ## 设计理念

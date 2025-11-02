@@ -75,6 +75,11 @@ public:
     Tensor randbool(const Shape& shape, float rate_of_zeros, unsigned int seed = 0, DType dtype = DType::FP32);
     static void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0);
 
+    // 类型转换函数（V1.31.2新增）
+    Tensor cast(const Tensor& tensor_a, DType target_dtype);
+    void cast_inplace(Tensor& tensor_a, DType target_dtype);
+    void cast_into(const Tensor& tensor_a, DType target_dtype, Tensor& result);
+
     // 张量IO算子（CPU后端独有功能）
     void export_tensor(const Tensor& tensor, const std::string& filename) const;
     Tensor import_tensor(const std::string& filename) const;

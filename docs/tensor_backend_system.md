@@ -1,13 +1,29 @@
 # Tensor-Backend System Architecture Documentation
 
+## # 重要警告：不要直接使用Tensor构造函数！
+
+**警告：Tensor类的构造函数不会分配内存！**
+
+在Tech Renaissance框架中，Tensor构造函数只创建元数据，不分配实际内存。所有张量必须通过Backend类的方法来创建，因为Backend会在创建后立即分配内存。
+
+**正确的张量创建流程：**
+1. 获取Backend实例：`BackendManager::instance().get_backend(CPU)`
+2. 使用Backend方法创建：`backend->zeros(shape, dtype)`
+3. Backend自动分配内存并返回可用张量
+
+**错误的操作（会导致段错误）：**
+- 直接调用`Tensor(shape, dtype, device)`构造函数
+- 使用Tensor类的静态工厂方法（不推荐）
+- 试图访问未分配内存的张量
+
 ## Overview
 
 The Tensor-Backend system in Tech Renaissance framework adopts a layered decoupled design, implementing efficient and safe tensor data management through five core classes. The system follows the "backend manages storage" principle, providing a unified data abstraction layer for deep learning computations.
 
 ## Version Information
 
-- **Version**: V1.31.1
-- **Date**: 2025-11-02
+- **Version**: V1.31.2
+- **Date**: 2025-11-03
 - **Author**: 技术觉醒团队
 
 ## Design Philosophy

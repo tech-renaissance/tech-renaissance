@@ -16,6 +16,7 @@ set(BACKEND_SOURCES
     cpu/cpu_broadcast.cpp
     cpu/cpu_dimension.cpp
     cpu/cpu_create.cpp
+    cpu/cpu_cast.cpp
 )
 
 # 创建基础后端库

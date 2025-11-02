@@ -1,13 +1,42 @@
 # Tensor Class Documentation
 
+## 重要警告：不要直接使用Tensor构造函数！
+
+### # 不要直接使用Tensor构造函数创建张量！
+
+**警告：Tensor类的构造函数不会分配内存！**
+
+执行Tensor构造函数只会创建对象的元数据（形状、类型、设备等），但不会为张量数据分配实际的内存空间。
+
+**后果：**
+- 使用构造函数创建的张量无法进行任何数据操作
+- 会导致段错误或内存访问错误
+- 违反了框架的设计原则
+
+**正确的张量创建方式：**
+```cpp
+// 正确：使用Backend方法
+auto backend = BackendManager::instance().get_backend(CPU);
+Tensor tensor1 = backend->zeros(shape, dtype);
+Tensor tensor2 = backend->ones(shape, dtype);
+Tensor tensor3 = backend->full(shape, value, dtype);
+Tensor tensor4 = backend->empty(shape, dtype);
+```
+
+**错误的方式：**
+```cpp
+// 错误：不要直接使用构造函数！
+Tensor tensor(shape, dtype, device);  // 没有分配内存！
+```
+
 ## Overview
 
 The Tensor class is the core data structure in Tech Renaissance framework, representing multi-dimensional arrays with associated metadata. It serves as a lightweight container for tensor metadata and a handle to storage, while delegating all computational operations to backend implementations.
 
 ## Version Information
 
-- **Version**: V1.31.1
-- **Date**: 2025-11-02
+- **Version**: V1.31.2
+- **Date**: 2025-11-03
 - **Author**: 技术觉醒团队
 
 ## Design Philosophy

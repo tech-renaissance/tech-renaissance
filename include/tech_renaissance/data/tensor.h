@@ -41,6 +41,10 @@ public:
     /**
      * @brief 默认构造函数
      * @details 创建一个空的Tensor（无Storage）
+     *
+     * 警告：此构造函数创建的是空张量，没有分配内存。
+     * 不能直接使用空张量进行任何数据操作。
+     * 空张量通常用作占位符或后续赋值的目标。
      */
     Tensor();
 
@@ -177,17 +181,29 @@ public:
 
     // ===== 静态工厂方法 =====
 
+    // ========== 重要：张量创建方法警告 ==========
+    // 注意：虽然以下静态方法会自动分配内存并返回可用张量，
+    // 但强烈建议不要使用Tensor类的工厂函数创建新张量！
+    // 推荐使用相应后端的方法：
+    // - Tensor.zeros() -> Backend.zeros()
+    // - Tensor.ones() -> Backend.ones()
+    // - Tensor.full() -> Backend.full()
+    // - Tensor.empty() -> Backend.empty()
+    // 后端方法提供更好的设备管理和性能优化！
+
     /**
      * @brief 创建全零张量
+     * @warning 不建议使用！请使用Backend::zeros()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
-     * @return 新的Tensor对象
+     * @return 新的Tensor对象（已分配内存）
      */
     static Tensor zeros(const Shape& shape, DType dtype = DType::FP32, const Device& device = tr::CPU);
 
     /**
      * @brief 创建全一张量
+     * @warning 不建议使用！请使用Backend::ones()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -197,6 +213,7 @@ public:
 
     /**
      * @brief 创建填充指定值的张量
+     * @warning 不建议使用！请使用Backend::full()替代
      * @param shape 张量形状
      * @param value 填充值
      * @param dtype 数据类型
@@ -207,6 +224,7 @@ public:
 
     /**
      * @brief 创建未初始化的张量
+     * @warning 不建议使用！请使用Backend::empty()替代
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -330,6 +348,19 @@ public:
 protected:
     /**
      * @brief 构造函数（受保护，强制使用工厂方法）
+     *
+     * 警告：此构造函数不分配内存！
+     * 执行此构造函数只会创建Tensor对象的元数据（形状、类型、设备等），
+     * 但不会为张量数据分配实际的内存空间。
+     *
+     * 不要直接使用构造函数来创建张量！
+     * 构造函数只能被Backend类及其子类使用，因为它们会在构造后立即分配内存。
+     *
+     * 正确的张量创建方式：
+     * - 使用Backend的empty(), zeros(), ones(), full()等方法
+     * - 使用Backend的randn(), uniform(), randint()等随机生成方法
+     * - 使用Tensor类的工厂方法（如果有提供）
+     *
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备
@@ -373,6 +404,7 @@ private:
 
     /**
      * @brief 创建并分配存储的私有辅助函数
+     * @warning 仅限内部使用！外部请使用Backend方法
      * @param shape 张量形状
      * @param dtype 数据类型
      * @param device 设备

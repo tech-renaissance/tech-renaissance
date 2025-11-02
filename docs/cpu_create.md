@@ -1,13 +1,45 @@
 # CPU Backend Tensor Creation Operations
 
+## # 重要警告：CPU后端是唯一推荐张量创建方式！
+
+**所有张量必须通过CPU后端方法创建！**
+
+在Tech Renaissance框架中，CPU后端提供了完整的张量创建API，这些方法会自动分配内存并返回可用的张量对象：
+
+**推荐的张量创建方式：**
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+// 基础张量创建（自动分配内存）
+Tensor tensor_zeros = cpu_backend->zeros({2, 3, 4}, DType::FP32);
+Tensor tensor_ones = cpu_backend->ones({2, 3, 4}, DType::FP32);
+Tensor tensor_full = cpu_backend->full({2, 3, 4}, 1.5f);
+Tensor tensor_empty = cpu_backend->empty({2, 3, 4}, DType::FP32);
+
+// 随机张量生成
+Tensor tensor_randn = cpu_backend->randn({2, 3, 4}, 12345);
+Tensor tensor_uniform = cpu_backend->uniform({2, 3, 4}, 0.0f, 1.0f, 54321);
+Tensor tensor_randint = cpu_backend->randint({2, 3, 4}, 0, 10, DType::INT32, 99999);
+```
+
+**绝对禁止的方式：**
+```cpp
+// 错误：直接使用Tensor构造函数不会分配内存！
+Tensor tensor(shape, dtype, CPU);  // 段错误！
+
+// 错误：使用Tensor静态方法（不推荐）
+Tensor tensor = Tensor::zeros(shape, dtype, device);
+```
+
 ## Overview
 
 This document describes the implementation of tensor creation functions in the CPU backend of Tech Renaissance. The creation operations support various ways to generate tensors with specific values, random distributions, and patterns.
 
 ## Version Information
 
-- **Version**: V1.31.1
-- **Date**: 2025-11-02
+- **Version**: V1.31.2
+- **Date**: 2025-11-03
 - **Author**: 技术觉醒团队
 
 ## Supported Operations
