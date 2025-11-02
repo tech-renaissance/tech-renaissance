@@ -4,7 +4,7 @@
 
 本文档详细介绍了技术觉醒框架中CPU后端卷积操作的实现，包括标准卷积和转置卷积。实现支持多种stride、padding配置，并提供了高效的数值计算算法。
 
-**版本**: V1.35.0
+**版本**: V1.35.2
 **更新日期**: 2025-11-03
 **作者**: 技术觉醒团队
 **文件位置**: `src/backend/cpu/cpu_conv.cpp`
@@ -174,9 +174,20 @@ int32_t ow_start = iw * stride - padding;
 int32_t oh = oh_start + (kernel_h - 1 - kh);
 int32_t ow = ow_start + (kernel_w - 1 - kw);
 
+// 计算旋转180度后的卷积核索引
+int32_t kernel_idx = oc * (in_channels * kernel_h * kernel_w) +
+                  ic * (kernel_h * kernel_w) +
+                  (kernel_h - 1 - kh) * kernel_w + (kernel_w - 1 - kw);
+
 // 累加到结果张量
 result_data[result_idx] += input_val * kernel_data[kernel_idx];
 ```
+
+**关键实现细节**：
+
+1. **输出位置计算**：使用`(kernel_h - 1 - kh)`和`(kernel_w - 1 - kw)`实现旋转180度的位置映射
+2. **卷积核索引计算**：使用`(kernel_h - 1 - kh) * kernel_w + (kernel_w - 1 - kw)`访问旋转后的卷积核元素
+3. **数学等价性**：转置卷积等价于卷积核旋转180度后的标准卷积操作
 
 ### 5. 性能优化
 
@@ -269,6 +280,29 @@ oh = ih * stride - padding + kh
 ow = iw * stride - padding + kw
 ```
 
+## 重要修复说明
+
+### 转置卷积卷积核旋转修复 (V1.35.2)
+
+在初始实现中发现转置卷积的卷积核旋转存在问题。转置卷积在数学上等价于将卷积核旋转180度后的标准卷积。
+
+**问题描述**：
+- 原始实现中，虽然输出位置计算正确使用了旋转180度的映射
+- 但卷积核索引计算仍然使用原始的`kh * kernel_w + kw`
+- 导致使用了错误的卷积核元素进行计算
+
+**修复方案**：
+```cpp
+// 修复前（错误）
+int32_t kernel_idx = kh * kernel_w + kw;
+
+// 修复后（正确）
+int32_t kernel_idx = (kernel_h - 1 - kh) * kernel_w + (kernel_w - 1 - kw);
+```
+
+**验证结果**：
+修复后所有转置卷积测试通过，包括stride=1和stride=2的各种配置，确保了数学正确性。
+
 ## 错误处理
 
 实现提供了全面的错误处理机制：
@@ -306,6 +340,12 @@ try {
 测试文件: `tests/unit_tests/test_cpu_conv_new.cpp`
 
 ## 版本历史
+
+- **V1.35.2** (2025-11-03): **修复转置卷积卷积核旋转180度问题**
+  - 修正了转置卷积中卷积核索引计算错误
+  - 确保转置卷积数学正确性，等价于卷积核旋转180度后的标准卷积
+  - 所有转置卷积测试通过（stride=1和stride=2）
+  - 更新了实现细节文档说明
 
 - **V1.35.0** (2025-11-03): 初始实现，支持标准卷积和转置卷积
 - 支持多种stride和padding配置

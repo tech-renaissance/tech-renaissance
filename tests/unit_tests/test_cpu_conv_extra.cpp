@@ -64,12 +64,12 @@ bool test_conv_stride1() {
     std::cout << "Testing: Standard Convolution with stride=1" << std::endl;
 
     // 创建5x5随机输入 (1,1,5,5)
-    Tensor input = cpu_backend->randint(Shape(1, 1, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
+    Tensor input = cpu_backend->randint(Shape(1, 2, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
     std::cout << "Input tensor (1,1,5,5):" << std::endl;
     input.print();
 
     // 创建3x3全1卷积核 (1,1,3,3)
-    Tensor kernel = cpu_backend->ones(Shape(1, 1, 3, 3), DType::FP32);
+    Tensor kernel = cpu_backend->randbool(Shape(1, 2, 3, 3), 0.5, 0, DType::FP32);
     std::cout << "\nKernel tensor (1,1,3,3) - all ones:" << std::endl;
     kernel.print();
 
@@ -90,12 +90,12 @@ bool test_conv_stride2() {
     std::cout << "Testing: Standard Convolution with stride=2" << std::endl;
 
     // 创建5x5随机输入 (1,1,5,5)
-    Tensor input = cpu_backend->randint(Shape(1, 1, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
+    Tensor input = cpu_backend->randint(Shape(1, 2, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
     std::cout << "Input tensor (1,1,5,5):" << std::endl;
     input.print();
 
     // 创建3x3全1卷积核 (1,1,3,3)
-    Tensor kernel = cpu_backend->ones(Shape(1, 1, 3, 3), DType::FP32);
+    Tensor kernel = cpu_backend->randbool(Shape(1, 2, 3, 3), 0.5, 0, DType::FP32);
     std::cout << "\nKernel tensor (1,1,3,3) - all ones:" << std::endl;
     kernel.print();
 
@@ -118,12 +118,12 @@ bool test_transposed_conv_stride1() {
     std::cout << "Testing: Transposed Convolution with stride=1" << std::endl;
 
     // 创建5x5随机输入 (1,1,5,5)
-    Tensor input = cpu_backend->randint(Shape(1, 1, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
+    Tensor input = cpu_backend->randint(Shape(1, 2, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
     std::cout << "Input tensor (1,1,5,5):" << std::endl;
     input.print();
 
     // 创建3x3全1卷积核 (1,1,3,3)
-    Tensor kernel = cpu_backend->ones(Shape(1, 1, 3, 3), DType::FP32);
+    Tensor kernel = cpu_backend->randbool(Shape(1, 2, 3, 3), 0.5, 0, DType::FP32);
     std::cout << "\nKernel tensor (1,1,3,3) - all ones:" << std::endl;
     kernel.print();
 
@@ -144,12 +144,12 @@ bool test_transposed_conv_stride2() {
     std::cout << "Testing: Transposed Convolution with stride=2" << std::endl;
 
     // 创建5x5随机输入 (1,1,5,5)
-    Tensor input = cpu_backend->randint(Shape(1, 1, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
+    Tensor input = cpu_backend->randint(Shape(1, 2, 5, 5), 1, 6, DType::FP32); // 1~5的随机数
     std::cout << "Input tensor (1,1,5,5):" << std::endl;
     input.print();
 
     // 创建3x3全1卷积核 (1,1,3,3)
-    Tensor kernel = cpu_backend->ones(Shape(1, 1, 3, 3), DType::FP32);
+    Tensor kernel = cpu_backend->randbool(Shape(1, 2, 3, 3), 0.5, 0, DType::FP32);
     std::cout << "\nKernel tensor (1,1,3,3) - all ones:" << std::endl;
     kernel.print();
 
