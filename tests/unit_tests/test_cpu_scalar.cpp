@@ -1,7 +1,7 @@
 /**
  * @file test_cpu_scalar.cpp
  * @brief CPU后端标量运算测试
- * @details 测试CPU后端的5种标量运算：mul、add、minus（两种形式）、mac
+ * @details 测试CPU后端的6种标量运算：mul、add、minus（两种形式）、mac、clamp
  * @version 1.00.00
  * @date 2025-11-01
  * @author 技术觉醒团队
@@ -115,6 +115,50 @@ int main() {
         cpu_backend->mac_into(input, scalar_x, scalar_y, mac_into_result);
         print_tensor_info("Multiply-Add Result (into)", mac_into_result);
 
+        // ===== 测试裁剪运算：clamp(tensor, min_val, max_val) =====
+        std::cout << "\n=== Testing Clamp: clamp(tensor, min_val, max_val) ===";
+
+        float min_val = -0.3f;
+        float max_val = 0.7f;
+        std::cout << "\n  Using min_val = " << min_val << ", max_val = " << max_val;
+
+        Tensor clamp_result = cpu_backend->clamp(input, min_val, max_val);
+        print_tensor_info("Clamp Result (non-inplace)", clamp_result);
+
+        Tensor clamp_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        cpu_backend->clamp_inplace(clamp_inplace_input, min_val, max_val);
+        print_tensor_info("Clamp Result (inplace)", clamp_inplace_input);
+
+        Tensor clamp_into_result = Tensor::empty(shape, DType::FP32, tr::CPU);
+        cpu_backend->clamp_into(input, min_val, max_val, clamp_into_result);
+        print_tensor_info("Clamp Result (into)", clamp_into_result);
+
+        // ===== 测试clamp边界值 =====
+        std::cout << "\n=== Testing Clamp Boundary Values ===";
+
+        // 创建包含明确边界值的测试张量
+        Tensor boundary_test = Tensor::empty(shape, DType::FP32, tr::CPU);
+        float* boundary_data = static_cast<float*>(boundary_test.data_ptr());
+        for (size_t i = 0; i < boundary_test.numel(); ++i) {
+            // 创建测试数据：-1.0, -0.3(min), 0.0, 0.5, 0.7(max), 1.0 的循环
+            float values[] = {-1.0f, min_val, 0.0f, 0.5f, max_val, 1.0f};
+            boundary_data[i] = values[i % 6];
+        }
+        print_tensor_info("Boundary Test Input", boundary_test);
+
+        Tensor boundary_result = cpu_backend->clamp(boundary_test, min_val, max_val);
+        print_tensor_info("Boundary Clamp Result", boundary_result);
+
+        // ===== 测试clamp异常情况 =====
+        std::cout << "\n=== Testing Clamp Exception Handling ===";
+
+        try {
+            Tensor invalid_clamp = cpu_backend->clamp(input, 1.0f, 0.5f); // min_val > max_val
+            std::cout << "\n[FAIL] Expected exception for min_val > max_val, but none was thrown!";
+        } catch (const TRException& e) {
+            std::cout << "\n[PASS] Correctly caught exception for min_val > max_val: " << e.what();
+        }
+
         // ===== 验证非原地和into方式的一致性 =====
         std::cout << "\n=== Verifying Consistency Between Implementations ===";
 
@@ -123,18 +167,20 @@ int main() {
         bool minus_consistent = cpu_backend->is_close(minus_result, minus_into_result, 1e-6f);
         bool scalar_minus_consistent = cpu_backend->is_close(scalar_minus_result, scalar_minus_into_result, 1e-6f);
         bool mac_consistent = cpu_backend->is_close(mac_result, mac_into_result, 1e-6f);
+        bool clamp_consistent = cpu_backend->is_close(clamp_result, clamp_into_result, 1e-6f);
 
         std::cout << "\n  Multiplication consistency: " << (mul_consistent ? "PASS" : "FAIL");
         std::cout << "\n  Addition consistency: " << (add_consistent ? "PASS" : "FAIL");
         std::cout << "\n  Subtraction (tensor - scalar) consistency: " << (minus_consistent ? "PASS" : "FAIL");
         std::cout << "\n  Subtraction (scalar - tensor) consistency: " << (scalar_minus_consistent ? "PASS" : "FAIL");
         std::cout << "\n  Multiply-Add consistency: " << (mac_consistent ? "PASS" : "FAIL");
+        std::cout << "\n  Clamp consistency: " << (clamp_consistent ? "PASS" : "FAIL");
 
         bool all_consistent = mul_consistent && add_consistent && minus_consistent &&
-                              scalar_minus_consistent && mac_consistent;
+                              scalar_minus_consistent && mac_consistent && clamp_consistent;
 
         std::cout << "\n\n=== Test Summary ===";
-        std::cout << "\nAll scalar operations tested: 5 operations × 3 implementations = 15 tests";
+        std::cout << "\nAll scalar operations tested: 6 operations * 3 implementations = 18 tests";
         std::cout << "\nConsistency verification: " << (all_consistent ? "ALL PASS" : "SOME FAIL");
 
         if (all_consistent) {

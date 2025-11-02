@@ -147,6 +147,11 @@ public:
     void mac_inplace(Tensor& input, float scalar_x, float scalar_y) const;
     void mac_into(const Tensor& input, float scalar_x, float scalar_y, Tensor& output) const;
 
+    // 裁剪：clamp(tensor, min_val, max_val)
+    Tensor clamp(const Tensor& input, float min_val, float max_val) const;
+    void clamp_inplace(Tensor& input, float min_val, float max_val) const;
+    void clamp_into(const Tensor& input, float min_val, float max_val, Tensor& output) const;
+
     // 可广播张量运算（V1.28.1新增）
     // 张量加法：支持广播
     Tensor add_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;

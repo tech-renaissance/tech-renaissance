@@ -420,4 +420,107 @@ void CpuBackend::mac_into(const Tensor& input, float scalar_x, float scalar_y, T
 #endif
 }
 
+// ===== 裁剪运算：clamp(tensor, min_val, max_val) =====
+
+Tensor CpuBackend::clamp(const Tensor& input, float min_val, float max_val) const {
+    validate_same_device(input.device());
+
+    if (input.is_empty()) {
+        throw TRException("[CpuBackend::clamp] Input tensor has no allocated Storage");
+    }
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::clamp] Only FP32 tensors are supported for clamp operation. "
+                        "TODO: Consider implementing INT8 clamp operations in future versions.");
+    }
+
+    // 验证min_val <= max_val
+    if (min_val > max_val) {
+        throw TRException("[CpuBackend::clamp] min_val (" + std::to_string(min_val) +
+                        ") cannot be greater than max_val (" + std::to_string(max_val) + ")");
+    }
+
+    // 创建输出张量
+    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    clamp_into(input, min_val, max_val, result);
+    return result;
+}
+
+void CpuBackend::clamp_inplace(Tensor& input, float min_val, float max_val) const {
+    validate_same_device(input.device());
+
+    if (input.is_empty()) {
+        throw TRException("[CpuBackend::clamp_inplace] Input tensor has no allocated Storage");
+    }
+
+    if (input.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::clamp_inplace] Only FP32 tensors are supported for clamp operation. "
+                        "TODO: Consider implementing INT8 clamp operations in future versions.");
+    }
+
+    // 验证min_val <= max_val
+    if (min_val > max_val) {
+        throw TRException("[CpuBackend::clamp_inplace] min_val (" + std::to_string(min_val) +
+                        ") cannot be greater than max_val (" + std::to_string(max_val) + ")");
+    }
+
+    float* data = static_cast<float*>(input.data_ptr());
+    size_t count = input.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<Eigen::VectorXf>(data, count) =
+        Eigen::Map<Eigen::VectorXf>(data, count).cwiseMax(min_val).cwiseMin(max_val);
+#else
+    std::transform(data, data + count, data,
+                   [min_val, max_val](float x) {
+                       return (x < min_val) ? min_val : ((x > max_val) ? max_val : x);
+                   });
+#endif
+}
+
+void CpuBackend::clamp_into(const Tensor& input, float min_val, float max_val, Tensor& output) const {
+    validate_same_device(input.device());
+    validate_same_device(output.device());
+
+    if (input.is_empty()) {
+        throw TRException("[CpuBackend::clamp_into] Input tensor has no allocated Storage");
+    }
+
+    if (output.is_empty()) {
+        throw TRException("[CpuBackend::clamp_into] Output tensor has no allocated Storage");
+    }
+
+    if (input.dtype() != DType::FP32 || output.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::clamp_into] Only FP32 tensors are supported for clamp operation. "
+                        "TODO: Consider implementing INT8 clamp operations in future versions.");
+    }
+
+    if (input.shape() != output.shape()) {
+        throw TRException("[CpuBackend::clamp_into] Shape mismatch: input shape " +
+                        input.shape().to_string() + " != output shape " +
+                        output.shape().to_string());
+    }
+
+    // 验证min_val <= max_val
+    if (min_val > max_val) {
+        throw TRException("[CpuBackend::clamp_into] min_val (" + std::to_string(min_val) +
+                        ") cannot be greater than max_val (" + std::to_string(max_val) + ")");
+    }
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* output_data = static_cast<float*>(output.data_ptr());
+    size_t count = input.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<const Eigen::VectorXf> input_vec(input_data, count);
+    Eigen::Map<Eigen::VectorXf> output_vec(output_data, count);
+    output_vec = input_vec.cwiseMax(min_val).cwiseMin(max_val);
+#else
+    std::transform(input_data, input_data + count, output_data,
+                   [min_val, max_val](float x) {
+                       return (x < min_val) ? min_val : ((x > max_val) ? max_val : x);
+                   });
+#endif
+}
+
 } // namespace tr

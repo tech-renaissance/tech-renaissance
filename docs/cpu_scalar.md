@@ -2,10 +2,10 @@
 
 ## 概述
 
-本文档详细描述了技术觉醒框架中`CpuBackend`的标量运算实现，包括5种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
+本文档详细描述了技术觉醒框架中`CpuBackend`的标量运算实现，包括6种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
 
-**版本**: V1.28.1
-**更新日期**: 2025-11-01
+**版本**: V1.30.2
+**更新日期**: 2025-11-02
 **作者**: 技术觉醒团队
 
 ## 核心特性
@@ -25,6 +25,7 @@
 | 3 | 减法(张量-标量) | `minus` | `minus_inplace` | `minus_into` | tensor - scalar |
 | 4 | 减法(标量-张量) | `minus` | `minus_inplace` | `minus_into` | scalar - tensor |
 | 5 | 乘加 | `mac` | `mac_inplace` | `mac_into` | tensor × scalar_x + scalar_y |
+| 6 | 裁剪 | `clamp` | `clamp_inplace` | `clamp_into` | clamp(tensor, min_val, max_val) |
 
 ## 数据类型支持
 
@@ -294,6 +295,106 @@ cpu_backend->mac_inplace(input, 0.5f, 2.0f);  // 原地执行input*0.5 + 2.0
 cpu_backend->mac_into(input, 3.0f, -1.0f, output);  // input*3.0 - 1.0写入output
 ```
 
+### 6. 裁剪运算：clamp(tensor, min_val, max_val)
+
+#### `Tensor clamp(const Tensor& input, float min_val, float max_val) const`
+
+执行张量元素的裁剪运算，将每个元素限制在指定范围内。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `min_val` - 最小值，小于此值的元素将被设置为min_val
+- `max_val` - 最大值，大于此值的元素将被设置为max_val
+
+**返回值**：
+- `Tensor` - 裁剪结果张量
+
+**异常**：
+- `TRException` - 当min_val > max_val时抛出
+- `TRException` - 当输入张量不支持的数据类型时抛出
+
+**数学含义**：
+```
+result[i] = {
+    min_val,    if input[i] < min_val
+    input[i],   if min_val ≤ input[i] ≤ max_val
+    max_val,    if input[i] > max_val
+}
+```
+
+**实现特点**：
+- 使用Eigen的cwiseMax和cwiseMin实现向量化裁剪
+- 边界值（等于min_val或max_val）保持不变
+- 支持任意形状的张量
+
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+cpu_backend->fill(input, 0.5f);
+Tensor result = cpu_backend->clamp(input, -0.3f, 0.7f);  // 将元素限制在[-0.3, 0.7]范围内
+```
+
+#### `void clamp_inplace(Tensor& input, float min_val, float max_val) const`
+
+原地执行张量元素的裁剪运算。
+
+**参数**：
+- `input` - 要修改的张量（仅支持FP32）
+- `min_val` - 最小值
+- `max_val` - 最大值
+
+**异常**：
+- `TRException` - 当min_val > max_val时抛出
+- `TRException` - 当输入张量不支持的数据类型时抛出
+
+**实现特点**：
+- 直接在原内存上操作，零内存分配
+- Eigen向量化裁剪操作
+- 最优性能
+
+```cpp
+cpu_backend->clamp_inplace(input, 0.0f, 1.0f);  // 原地将元素限制在[0.0, 1.0]范围内
+```
+
+#### `void clamp_into(const Tensor& input, float min_val, float max_val, Tensor& output) const`
+
+将裁剪结果写入指定的输出张量。
+
+**参数**：
+- `input` - 输入张量（仅支持FP32）
+- `min_val` - 最小值
+- `max_val` - 最大值
+- `output` - 输出张量，形状和类型必须与输入一致
+
+**异常**：
+- `TRException` - 当min_val > max_val时抛出
+- `TRException` - 当张量形状、数据类型或设备不匹配时抛出
+- `TRException` - 当输入张量不支持的数据类型时抛出
+
+**实现特点**：
+- 严格的参数验证
+- 支持覆盖测试
+- 高性能内存复制
+
+```cpp
+Tensor output(Shape(2, 3), DType::FP32, tr::CPU);
+cpu_backend->clamp_into(input, -1.0f, 1.0f, output);  // 裁剪结果写入output
+```
+
+**边界值处理示例**：
+```cpp
+// 输入张量包含边界值测试数据：[-1.0, -0.3, 0.0, 0.5, 0.7, 1.0]
+// 裁剪范围：[-0.3, 0.7]
+// 结果：[-0.3, -0.3, 0.0, 0.5, 0.7, 0.7]
+// 说明：
+// - -1.0 < -0.3     → 裁剪为 -0.3
+// - -0.3 = -0.3     → 保持 -0.3 (边界值不变)
+// - 0.0 在范围内     → 保持 0.0
+// - 0.5 在范围内     → 保持 0.5
+// - 0.7 = 0.7       → 保持 0.7 (边界值不变)
+// - 1.0 > 0.7       → 裁剪为 0.7
+```
+
 ## 使用示例
 
 ### 基础标量运算
@@ -345,6 +446,13 @@ void basic_scalar_operations() {
     Tensor mac_output(shape, DType::FP32, tr::CPU);
     cpu_backend->mac_into(input, 3.0f, -1.0f, mac_output);
 
+    // 6. 裁剪运算
+    Tensor clamp_result = cpu_backend->clamp(input, -0.5f, 0.8f);  // 非原地
+    cpu_backend->clamp_inplace(input, 0.0f, 1.0f);              // 原地
+
+    Tensor clamp_output(shape, DType::FP32, tr::CPU);
+    cpu_backend->clamp_into(input, -0.3f, 0.7f, clamp_output);  // 指定输出
+
     std::cout << "All scalar operations completed successfully!" << std::endl;
 }
 ```
@@ -373,6 +481,21 @@ void neural_network_examples() {
     // 激活函数缩放：output = activation * scale + shift
     Tensor scale_activation(const Tensor& activation, float scale, float shift) {
         return cpu_backend->mac(activation, scale, shift);
+    }
+
+    // 梯度裁剪：防止梯度爆炸
+    void clip_gradients(Tensor& gradients, float clip_min, float clip_max) {
+        cpu_backend->clamp_inplace(gradients, clip_min, clip_max);
+    }
+
+    // 权重约束：限制权重在指定范围内
+    Tensor constrain_weights(const Tensor& weights, float min_val, float max_val) {
+        return cpu_backend->clamp(weights, min_val, max_val);
+    }
+
+    // 激活值裁剪：限制激活函数输出范围
+    void clip_activation(Tensor& activation, float lower_bound, float upper_bound) {
+        cpu_backend->clamp_inplace(activation, lower_bound, upper_bound);
     }
 
     std::cout << "Neural network examples completed!" << std::endl;
@@ -406,11 +529,12 @@ void performance_optimization_example() {
     Tensor result1 = cpu_backend->mul(input, 2.0f);      // 向量化乘法
     Tensor result2 = cpu_backend->add(input, 1.0f);      // 向量化加法
     Tensor result3 = cpu_backend->mac(input, 0.5f, 2.0f); // 融合乘加
+    Tensor result4 = cpu_backend->clamp(input, -1.0f, 1.0f); // 向量化裁剪
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
-    std::cout << "3 scalar operations completed in " << duration.count() << " microseconds" << std::endl;
+    std::cout << "4 scalar operations completed in " << duration.count() << " microseconds" << std::endl;
 
     // 原地运算（零拷贝，最高性能）
     Tensor inplace_tensor = cpu_backend->copy(input);
@@ -518,6 +642,44 @@ try {
 }
 ```
 
+### Clamp参数验证示例
+
+```cpp
+#include "tech_renaissance.h"
+using namespace tr;
+
+void clamp_validation_example() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
+    Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+    cpu_backend->fill(input, 0.5f);
+
+    // 正常裁剪参数
+    try {
+        Tensor result = cpu_backend->clamp(input, -1.0f, 1.0f);
+        std::cout << "Normal clamp operation successful" << std::endl;
+    } catch (const TRException& e) {
+        std::cerr << "Unexpected error: " << e.what() << std::endl;
+    }
+
+    // 错误的裁剪参数：min_val > max_val
+    try {
+        Tensor invalid_result = cpu_backend->clamp(input, 1.0f, -1.0f);
+        std::cout << "ERROR: Should have thrown exception!" << std::endl;
+    } catch (const TRException& e) {
+        std::cout << "Correctly caught invalid clamp parameters: " << e.what() << std::endl;
+        // Expected: "[CpuBackend::clamp] min_val (1.000000) cannot be greater than max_val (-1.000000)"
+    }
+
+    // 边界相等的情况（所有元素被设置为相同值）
+    try {
+        Tensor uniform_result = cpu_backend->clamp(input, 0.5f, 0.5f);
+        std::cout << "Clamp with equal bounds successful - all elements become 0.5" << std::endl;
+    } catch (const TRException& e) {
+        std::cerr << "Unexpected error with equal bounds: " << e.what() << std::endl;
+    }
+}
+```
+
 ## 注意事项
 
 1. **数据类型支持**：当前仅支持FP32，INT8支持计划在未来版本中实现
@@ -526,15 +688,19 @@ try {
 4. **内存管理**：原地运算避免内存分配，提升性能
 5. **数值精度**：使用IEEE 754标准的FP32浮点运算
 6. **线程安全**：所有函数都是线程安全的，可以在多线程环境中使用
+7. **裁剪参数验证**：clamp函数会验证min_val ≤ max_val，否则抛出异常
+8. **边界值处理**：等于min_val或max_val的值保持不变，不会重复计算
+9. **裁剪范围**：支持min_val = max_val的特殊情况，所有元素将被设置为该值
 
 ## 测试覆盖
 
 ### 测试统计
 
-- **总测试数量**：15个测试（5个函数 × 3种模式）
+- **总测试数量**：18个测试（6个函数 × 3种模式）
 - **测试通过率**：100%
 - **测试范围**：覆盖所有功能路径和错误情况
 - **一致性验证**：验证三种实现方式的数值一致性
+- **新增测试**：clamp函数边界值测试和参数验证测试
 
 ### 测试类型
 
@@ -543,15 +709,18 @@ try {
 3. **形状验证测试**：不同形状张量的处理
 4. **性能回归测试**：确保优化不影响正确性
 5. **一致性测试**：验证三种实现方式的结果一致性
+6. **参数验证测试**：验证clamp函数min_val ≤ max_val的参数检查
+7. **边界值测试**：验证clamp函数在边界值处的正确处理
 
 ## 版本信息
 
-- **版本**：V1.28.1
-- **更新日期**：2025-11-01
+- **版本**：V1.30.2
+- **更新日期**：2025-11-02
 - **作者**：技术觉醒团队
-- **主要更新**：新增CPU标量运算功能（mul、add、minus、mac）
-- **功能总数**：5种标量运算，15个API变体
-- **测试覆盖**：15/15测试通过，100%成功率
+- **主要更新**：新增clamp裁剪运算，完善标量运算功能集
+- **功能总数**：6种标量运算，18个API变体
+- **测试覆盖**：18/18测试通过，100%成功率
+- **新增特性**：clamp函数支持参数验证和边界值处理
 
 ## 相关文档
 
