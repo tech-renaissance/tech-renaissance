@@ -152,6 +152,10 @@ public:
     void clamp_inplace(Tensor& input, float min_val, float max_val) const;
     void clamp_into(const Tensor& input, float min_val, float max_val, Tensor& output) const;
 
+    // 二元交叉熵：bce(goal, pred)
+    Tensor bce(const Tensor& goal, const Tensor& pred) const;
+    void bce_into(const Tensor& goal, const Tensor& pred, Tensor& result) const;
+
     // 可广播张量运算（V1.28.1新增）
     // 张量加法：支持广播
     Tensor add_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
