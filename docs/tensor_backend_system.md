@@ -6,8 +6,8 @@ The Tensor-Backend system in Tech Renaissance framework adopts a layered decoupl
 
 ## Version Information
 
-- **Version**: V1.29.2
-- **Date**: 2025-11-01
+- **Version**: V1.31.1
+- **Date**: 2025-11-02
 - **Author**: 技术觉醒团队
 
 ## Design Philosophy
@@ -75,7 +75,13 @@ class Tensor {
 
 **Key Features**:
 
-#### a) Cross-Backend Conversion Interface
+#### a) Multi-Type Support
+- **FP32**: 32-bit floating point for training and inference
+- **INT8**: 8-bit signed integers for quantized inference
+- **INT32**: 32-bit signed integers for labels and index operations
+- All tensor operations support the three data types
+
+#### b) Cross-Backend Conversion Interface
 
 ```cpp
 // CPU to CUDA conversion (row-major → column-major)
@@ -353,6 +359,23 @@ void CudaBackend::mm(Tensor& result, const Tensor& a, const Tensor& b) {
 
 ## Data Flow and Interaction Mechanisms
 
+### Backend-Based Tensor Creation Flow (V1.31.1)
+
+```cpp
+// Backend-based tensor creation with type support
+auto cpu_backend = BackendManager::get_cpu_backend();
+
+// Create tensors with different data types
+Tensor fp32_tensor = cpu_backend->randint(Shape(2, 3), 0, 10, DType::FP32, 42);
+Tensor int8_tensor = cpu_backend->randint(Shape(2, 3), 0, 100, DType::INT8, 123);
+Tensor int32_tensor = cpu_backend->randint(Shape(2, 3), 0, 1000, DType::INT32, 456);
+
+// Cross-backend conversion preserves data types
+auto cuda_backend = BackendManager::get_cuda_backend();
+Tensor cuda_fp32 = cuda_backend->from_cpu(fp32_tensor);
+Tensor cuda_int8 = cuda_backend->from_cpu(int8_tensor);
+```
+
 ### Cross-Backend Computation Flow
 
 ```cpp
@@ -610,7 +633,7 @@ The Tech Renaissance framework's Tensor-Backend system through the innovative "B
 
 ## Version Information
 
-- **Version**: V1.29.2
-- **Date**: 2025-11-01
+- **Version**: V1.31.1
+- **Date**: 2025-11-02
 - **Author**: 技术觉醒团队
 - **Major Updates**: Removed Tensor shape operations, expanded backend operation capabilities, added scalar and broadcast operations, enhanced dimension manipulation

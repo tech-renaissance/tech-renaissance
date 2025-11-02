@@ -201,6 +201,40 @@ void CudaBackend::fill(Tensor& dst, int8_t value) {
     CUDA_CHECK(cudaMemset(data, static_cast<int>(value), count));
 }
 
+void CudaBackend::fill(Tensor& dst, int32_t value) {
+    validate_same_device(dst.device());
+
+    // 新增：检查Storage是否已分配
+    if (dst.is_empty()) {
+        throw TRException("[CudaBackend::fill] Target tensor has no allocated Storage");
+    }
+
+    if (dst.dtype() != DType::INT32) {
+        throw TRException("[CudaBackend::fill] fill(int32_t) requires INT32 tensor");
+    }
+
+    int32_t* data = static_cast<int32_t*>(dst.data_ptr());
+    size_t count = dst.numel();
+
+    // 对int32_t使用memset填充，需要注意内存按字节设置
+    // 这里使用cudaMemcpy从主机内存复制相同值的数组
+    std::vector<int32_t> host_data(count, value);
+    CUDA_CHECK(cudaMemcpy(data, host_data.data(), count * sizeof(int32_t), cudaMemcpyHostToDevice));
+}
+
+// fill方法别名实现
+void CudaBackend::fill_fp32(Tensor& dst, float value) {
+    fill(dst, value);
+}
+
+void CudaBackend::fill_int8(Tensor& dst, int8_t value) {
+    fill(dst, value);
+}
+
+void CudaBackend::fill_int32(Tensor& dst, int32_t value) {
+    fill(dst, value);
+}
+
 void CudaBackend::add(Tensor& result, const Tensor& a, const Tensor& b) {
     validate_same_device(a.device());
     validate_same_device(b.device());

@@ -6,8 +6,8 @@ The Tensor class is the core data structure in Tech Renaissance framework, repre
 
 ## Version Information
 
-- **Version**: V1.29.2
-- **Date**: 2025-11-01
+- **Version**: V1.31.1
+- **Date**: 2025-11-02
 - **Author**: 技术觉醒团队
 
 ## Design Philosophy
@@ -67,7 +67,7 @@ public:
     // Random number generation
     static Tensor randn(const Shape& shape, unsigned int seed = 0, DType dtype = DType::FP32, const Device& device = tr::CPU);
     static Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0, DType dtype = DType::FP32, const Device& device = tr::CPU);
-    static Tensor randint(int low, int high, const Shape& shape, unsigned int seed = 0, const Device& device = tr::CPU);
+    static Tensor randint(int low, int high, const Shape& shape, DType dtype, unsigned int seed = 0, const Device& device = tr::CPU);
 
     // View operations
     Tensor view() const;
@@ -115,6 +115,11 @@ Tensor zeros = Tensor::zeros(Shape(2, 3));           // All zeros
 Tensor ones = Tensor::ones(Shape(2, 3));            // All ones
 Tensor full = Tensor::full(Shape(2, 3), 5.0f);       // All 5.0
 Tensor empty = Tensor::empty(Shape(2, 3));          // Uninitialized
+
+// All methods support dtype and device parameters
+Tensor zeros_int8 = Tensor::zeros(Shape(2, 3), DType::INT8);
+Tensor ones_int32 = Tensor::ones(Shape(2, 3), DType::INT32);
+Tensor empty_cuda = Tensor::empty(Shape(2, 3), DType::FP32, tr::CUDA[0]);
 ```
 
 #### Random Number Generation
@@ -122,7 +127,9 @@ Tensor empty = Tensor::empty(Shape(2, 3));          // Uninitialized
 // Different random distributions
 Tensor normal = Tensor::randn(Shape(2, 3));         // Normal distribution N(0,1)
 Tensor uniform = Tensor::uniform(Shape(2, 3));      // Uniform distribution U(0,1)
-Tensor randint = Tensor::randint(0, 10, Shape(2, 3)); // Integer uniform U[0,10]
+Tensor randint = Tensor::randint(0, 10, Shape(2, 3), DType::FP32); // Integer uniform U[0,10]
+Tensor randint_int8 = Tensor::randint(0, 100, Shape(2, 3), DType::INT8); // INT8 integers
+Tensor randint_int32 = Tensor::randint(0, 1000, Shape(2, 3), DType::INT32); // INT32 integers
 ```
 
 ### 3. Data Access and Manipulation
@@ -343,7 +350,7 @@ std::cout << "Scalar value: " << value << std::endl;
 // Different random distributions with fixed seeds
 Tensor normal_dist = Tensor::randn(Shape(3, 3), 42);        // Reproducible normal
 Tensor uniform_dist = Tensor::uniform(Shape(3, 3), 0.0f, 1.0f, 123);
-Tensor int_dist = Tensor::randint(0, 100, Shape(3, 3), 456);
+Tensor int_dist = Tensor::randint(0, 100, Shape(3, 3), DType::FP32, 456);
 
 normal_dist.print("Normal Distribution");
 uniform_dist.print("Uniform Distribution");

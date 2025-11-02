@@ -29,7 +29,7 @@ int main() {
 
         // 创建4x5的FP32张量，使用uniform随机值初始化
         Shape shape(4, 5);
-        Tensor input = Tensor::uniform(shape, -1.0f, 1.0f, 42); // 固定种子42
+        Tensor input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42); // 固定种子42
         float scalar = 2.0f;
 
         std::cout << "\nTest Configuration:";
@@ -47,7 +47,7 @@ int main() {
         print_tensor_info("Multiplication Result (non-inplace)", mul_result);
 
         // 为每个测试创建独立的张量
-        Tensor mul_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor mul_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->mul_inplace(mul_inplace_input, scalar);
         print_tensor_info("Multiplication Result (inplace)", mul_inplace_input);
 
@@ -61,7 +61,7 @@ int main() {
         Tensor add_result = cpu_backend->add(input, scalar);
         print_tensor_info("Addition Result (non-inplace)", add_result);
 
-        Tensor add_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor add_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->add_inplace(add_inplace_input, scalar);
         print_tensor_info("Addition Result (inplace)", add_inplace_input);
 
@@ -75,7 +75,7 @@ int main() {
         Tensor minus_result = cpu_backend->minus(input, scalar);
         print_tensor_info("Subtraction Result (tensor - scalar, non-inplace)", minus_result);
 
-        Tensor minus_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor minus_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->minus_inplace(minus_inplace_input, scalar);
         print_tensor_info("Subtraction Result (tensor - scalar, inplace)", minus_inplace_input);
 
@@ -89,7 +89,7 @@ int main() {
         Tensor scalar_minus_result = cpu_backend->minus(scalar, input);
         print_tensor_info("Subtraction Result (scalar - tensor, non-inplace)", scalar_minus_result);
 
-        Tensor scalar_minus_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor scalar_minus_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->minus_inplace(scalar, scalar_minus_inplace_input);
         print_tensor_info("Subtraction Result (scalar - tensor, inplace)", scalar_minus_inplace_input);
 
@@ -107,7 +107,7 @@ int main() {
         Tensor mac_result = cpu_backend->mac(input, scalar_x, scalar_y);
         print_tensor_info("Multiply-Add Result (non-inplace)", mac_result);
 
-        Tensor mac_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor mac_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->mac_inplace(mac_inplace_input, scalar_x, scalar_y);
         print_tensor_info("Multiply-Add Result (inplace)", mac_inplace_input);
 
@@ -125,7 +125,7 @@ int main() {
         Tensor clamp_result = cpu_backend->clamp(input, min_val, max_val);
         print_tensor_info("Clamp Result (non-inplace)", clamp_result);
 
-        Tensor clamp_inplace_input = Tensor::uniform(shape, -1.0f, 1.0f, 42);
+        Tensor clamp_inplace_input = cpu_backend->uniform(shape, -1.0f, 1.0f, 42);
         cpu_backend->clamp_inplace(clamp_inplace_input, min_val, max_val);
         print_tensor_info("Clamp Result (inplace)", clamp_inplace_input);
 

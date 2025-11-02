@@ -40,7 +40,7 @@ int main() {
         }
 
         // 创建预测概率张量（0到1之间的值）
-        Tensor pred = Tensor::uniform(shape, 0.1f, 0.9f, 42); // 固定种子42
+        Tensor pred = cpu_backend->uniform(shape, 0.1f, 0.9f, 42); // 固定种子42
 
         std::cout << "\nTest Configuration:";
         std::cout << "\n  Goal tensor shape: " << shape.to_string();
@@ -111,7 +111,7 @@ int main() {
         // 测试形状不匹配
         try {
             Shape different_shape(2, 5);
-            Tensor different_pred = Tensor::uniform(different_shape, 0.1f, 0.9f, 42);
+            Tensor different_pred = cpu_backend->uniform(different_shape, 0.1f, 0.9f, 42);
             Tensor invalid_bce = cpu_backend->bce(goal, different_pred);
             std::cout << "\n[FAIL] Expected exception for shape mismatch, but none was thrown!";
         } catch (const TRException& e) {

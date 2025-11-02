@@ -214,44 +214,6 @@ public:
      */
     static Tensor empty(const Shape& shape, DType dtype = DType::FP32, const Device& device = tr::CPU);
 
-    // ===== 随机数生成静态工厂方法 =====
-
-    /**
-     * @brief 创建正态分布随机张量 N(0,1)
-     * @param shape 张量形状
-     * @param seed 随机种子，默认为0（可重现结果）
-     * @param dtype 数据类型，仅支持FP32
-     * @param device 设备
-     * @return 新的Tensor对象
-     */
-    static Tensor randn(const Shape& shape, unsigned int seed = 0,
-                       DType dtype = DType::FP32, const Device& device = tr::CPU);
-
-    /**
-     * @brief 创建均匀分布随机张量 U(min_val, max_val)
-     * @param shape 张量形状
-     * @param min_val 最小值（包含）
-     * @param max_val 最大值（包含）
-     * @param seed 随机种子，默认为0（可重现结果）
-     * @param dtype 数据类型，仅支持FP32
-     * @param device 设备
-     * @return 新的Tensor对象
-     */
-    static Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f,
-                         unsigned int seed = 0, DType dtype = DType::FP32, const Device& device = tr::CPU);
-
-    /**
-     * @brief 创建整数均匀分布随机张量 U[low, high)
-     * @param low 最小值（包含）
-     * @param high 最大值（不包含）
-     * @param shape 张量形状
-     * @param seed 随机种子，默认为0（可重现结果）
-     * @param device 设备
-     * @return 新的Tensor对象
-     */
-    static Tensor randint(int low, int high, const Shape& shape,
-                         unsigned int seed = 0, const Device& device = tr::CPU);
-
     /**
      * @brief 获取原始数据指针
      * @return 数据指针

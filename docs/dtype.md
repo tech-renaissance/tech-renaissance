@@ -2,7 +2,7 @@
 
 ## 概述
 
-`DType`（数据类型）枚举和相关工具函数为技术觉醒框架提供了类型安全的数据类型处理。它遵循快速失败的设计原则，防止开发早期出现类型相关错误。
+`DType`（数据类型）枚举和相关工具函数为技术觉醒框架提供了类型安全的数据类型处理。它遵循快速失败的设计原则，防止开发早期出现类型相关错误。支持FP32、INT8和INT32三种数据类型，符合轻量级设计原则。
 
 ## 设计理念
 
@@ -21,10 +21,10 @@
 ## 枚举定义
 
 ```cpp
-enum class DType : int32_t {
-    UNKNOWN = 0,    // 未知类型
-    FP32 = 1,       // 32位浮点数
-    INT8 = 2        // 8位整数
+enum class DType {
+    FP32 = 1,   ///< 32位浮点数
+    INT8 = 2,   ///< 8位有符号整数
+    INT32 = 3   ///< 32位有符号整数
 };
 ```
 
@@ -42,10 +42,10 @@ enum class DType : int32_t {
 
 **为什么这样设计**：对量化推理模型至关重要，与FP32相比提供4倍的内存减少。
 
-#### `DType::UNKNOWN`
-无效或未初始化数据类型的占位符。
+#### `DType::INT32`
+32位有符号整数数据类型。
 
-**为什么这样设计**：提供安全的默认值，启用未初始化状态的检测。
+**为什么这样设计**：支持整数运算和标签处理，为分类任务和索引操作提供精确的整数表示。
 
 ### 工具函数
 
@@ -57,7 +57,7 @@ enum class DType : int32_t {
 **返回值**：
 - `DType::FP32` → 4 字节
 - `DType::INT8` → 1 字节
-- `DType::UNKNOWN` → 0 字节
+- `DType::INT32` → 4 字节
 
 #### `std::string dtype_to_string(DType dtype)`
 将DType枚举转换为其字符串表示。
@@ -69,13 +69,14 @@ enum class DType : int32_t {
 
 **为什么这样设计**：支持配置文件和用户输入的解析，同时通过验证保持类型安全。
 
-**快速失败实现**：对于无法识别的字符串抛出`std::invalid_argument`，而不是静默转换为默认类型。
+**快速失败实现**：对于无法识别的字符串抛出`TRException`，而不是静默转换为默认类型。
 
 **支持的字符串**：
-- `"fp32"`, `"float32"` → `DType::FP32`
-- `"int8"` → `DType::INT8`
+- `"FP32"`, `"FLOAT32"`, `"fp32"`, `"float32"` → `DType::FP32`
+- `"INT8"`, `"int8"` → `DType::INT8`
+- `"INT32"`, `"int32"` → `DType::INT32`
 
-**错误处理**：对于无效输入抛出`std::invalid_argument`并附带详细消息。
+**错误处理**：对于无效输入抛出`TRException`并附带详细消息。
 
 ## 设计决策和原理
 
@@ -91,11 +92,12 @@ enum class DType : int32_t {
 
 ### 有限类型集合
 
-**决策**：最初只支持FP32和INT8。
+**决策**：支持FP32、INT8和INT32三种类型。
 
 **原理**：
 - FP32是深度学习训练的标准
 - INT8对量化推理至关重要
+- INT32支持整数运算和标签处理，为分类任务提供精确表示
 - 有限的集合减少了复杂性，同时覆盖了主要用例
 - 可以根据需要添加其他类型，而不会破坏现有代码
 
@@ -111,11 +113,11 @@ enum class DType : int32_t {
 
 ### 一致的字符串表示
 
-**决策**：类型名称使用小写字符串。
+**决策**：类型名称支持多种格式，大小写不敏感。
 
 **原理**：
 - 与主流框架（PyTorch、TensorFlow）保持一致
-- 大小写不敏感的解析改善用户体验
+- 支持多种格式（"FP32"、"fp32"、"FLOAT32"等）改善用户体验
 - 在配置文件中易于阅读和输入
 
 ## 使用示例
@@ -129,13 +131,16 @@ using namespace tr;
 // 创建类型变量
 DType float_type = DType::FP32;
 DType quantized_type = DType::INT8;
+DType integer_type = DType::INT32;
 
 // 类型信息
-std::cout << "FP32大小: " << dtype_size(DType::FP32) << " 字节" << std::endl;  // 4
-std::cout << "INT8大小: " << dtype_size(DType::INT8) << " 字节" << std::endl;   // 1
+std::cout << "FP32大小: " << dtype_size(DType::FP32) << " 字节" << std::endl;   // 4
+std::cout << "INT8大小: " << dtype_size(DType::INT8) << " 字节" << std::endl;    // 1
+std::cout << "INT32大小: " << dtype_size(DType::INT32) << " 字节" << std::endl;  // 4
 
 // 字符串转换
-std::cout << "类型名称: " << dtype_to_string(DType::FP32) << std::endl;  // "fp32"
+std::cout << "类型名称: " << dtype_to_string(DType::FP32) << std::endl;  // "FP32"
+std::cout << "类型名称: " << dtype_to_string(DType::INT32) << std::endl;  // "INT32"
 ```
 
 ### 字符串解析
@@ -143,15 +148,17 @@ std::cout << "类型名称: " << dtype_to_string(DType::FP32) << std::endl;  // 
 ```cpp
 // 解析配置字符串
 try {
-    DType type1 = string_to_dtype("fp32");
+    DType type1 = string_to_dtype("FP32");
     DType type2 = string_to_dtype("float32");  // 大小写不敏感
     DType type3 = string_to_dtype("int8");
+    DType type4 = string_to_dtype("INT32");
 
     std::cout << "解析的类型: "
               << dtype_to_string(type1) << ", "
               << dtype_to_string(type2) << ", "
-              << dtype_to_string(type3) << std::endl;
-} catch (const std::invalid_argument& e) {
+              << dtype_to_string(type3) << ", "
+              << dtype_to_string(type4) << std::endl;
+} catch (const TRException& e) {
     std::cerr << "无效的dtype: " << e.what() << std::endl;
 }
 ```
@@ -162,14 +169,14 @@ try {
 // 快速失败行为
 try {
     DType invalid = string_to_dtype("fp16");  // 不支持
-} catch (const std::invalid_argument& e) {
+} catch (const TRException& e) {
     std::cout << "预期错误: " << e.what() << std::endl;
-    // 输出: 不支持的dtype字符串: 'fp16'。支持的类型有: 'fp32', 'float32', 'int8'
+    // 输出: [string_to_dtype] Unsupported dtype string: 'fp16'. Supported types are: 'FP32', 'FLOAT32', 'fp32', 'float32', 'INT8', 'int8', 'INT32', 'int32'
 }
 
 try {
     DType invalid = string_to_dtype("invalid_type");
-} catch (const std::invalid_argument& e) {
+} catch (const TRException& e) {
     std::cout << "预期错误: " << e.what() << std::endl;
 }
 ```
@@ -183,13 +190,16 @@ int64_t elements = shape.numel();
 
 DType fp32_type = DType::FP32;
 DType int8_type = DType::INT8;
+DType int32_type = DType::INT32;
 
-size_t fp32_memory = elements * dtype_size(fp32_type);  // 4,000,000 字节
-size_t int8_memory = elements * dtype_size(int8_type);  // 1,000,000 字节
+size_t fp32_memory = elements * dtype_size(fp32_type);   // 4,000,000 字节
+size_t int8_memory = elements * dtype_size(int8_type);   // 1,000,000 字节
+size_t int32_memory = elements * dtype_size(int32_type); // 4,000,000 字节
 
 std::cout << "FP32内存: " << fp32_memory << " 字节" << std::endl;
 std::cout << "INT8内存: " << int8_memory << " 字节" << std::endl;
-std::cout << "内存减少: " << (1.0 - (double)int8_memory / fp32_memory) * 100 << "%" << std::endl;
+std::cout << "INT32内存: " << int32_memory << " 字节" << std::endl;
+std::cout << "INT8相比FP32内存减少: " << (1.0 - (double)int8_memory / fp32_memory) * 100 << "%" << std::endl;
 ```
 
 ### 与Tensor的集成
@@ -197,12 +207,16 @@ std::cout << "内存减少: " << (1.0 - (double)int8_memory / fp32_memory) * 100
 ```cpp
 // 创建不同数据类型的张量
 Shape image_shape(1, 3, 224, 224);
+Shape label_shape(1000);  // 分类标签
 
 // 训练张量（高精度）
 Tensor training_tensor(image_shape, DType::FP32, tr::CPU);
 
 // 推理张量（量化）
 Tensor inference_tensor(image_shape, DType::INT8, tr::CUDA[0]);
+
+// 标签张量（整数）
+Tensor label_tensor(label_shape, DType::INT32, tr::CPU);
 
 // 检查类型
 if (training_tensor.dtype() == DType::FP32) {
@@ -211,6 +225,10 @@ if (training_tensor.dtype() == DType::FP32) {
 
 if (inference_tensor.dtype() == DType::INT8) {
     std::cout << "推理张量使用INT8量化" << std::endl;
+}
+
+if (label_tensor.dtype() == DType::INT32) {
+    std::cout << "标签张量使用INT32类型" << std::endl;
 }
 ```
 
@@ -237,7 +255,7 @@ std::string config_type = get_config_value("dtype");
 try {
     DType model_dtype = string_to_dtype(config_type);
     create_model(model_dtype);
-} catch (const std::invalid_argument& e) {
+} catch (const TRException& e) {
     std::cerr << "配置中的无效dtype: " << e.what() << std::endl;
     exit(1);
 }
@@ -269,11 +287,12 @@ void process_tensor(const Tensor& tensor) {
 ```cpp
 // 无效类型字符串
 string_to_dtype("invalid_type")
-// 输出: 不支持的dtype字符串: 'invalid_type'。支持的类型有: 'fp32', 'float32', 'int8'
+// 输出: [string_to_dtype] Unsupported dtype string: 'invalid_type'. Supported types are: 'FP32', 'FLOAT32', 'fp32', 'float32', 'INT8', 'int8', 'INT32', 'int32'
 
 // 处理大小写变化
 string_to_dtype("FLOAT32")  // 有效（大小写不敏感）
 string_to_dtype("Int8")     // 有效（大小写不敏感）
+string_to_dtype("int32")    // 有效（大小写不敏感）
 ```
 
 ## 线程安全
@@ -323,7 +342,6 @@ DType loaded_dtype = string_to_dtype(dtype_str);           // 从文件加载
 - `BF16`（BFloat16）
 - `FP64`（64位浮点数）
 - `UINT8`（8位无符号整数）
-- `INT32`（32位整数）
 
 ### 类型提升规则
 
@@ -358,18 +376,16 @@ DType type = DType::FP32;
 try {
     DType dtype = string_to_dtype(user_input);
     use_dtype(dtype);
-} catch (const std::invalid_argument& e) {
+} catch (const TRException& e) {
     handle_invalid_dtype(e.what());
 }
 ```
 
 ### 使用前验证
 
-```cpp
+// 注意：当前实现中没有UNKNOWN类型，所有有效的DType都是已知类型
 DType dtype = get_tensor_dtype();
-if (dtype == DType::UNKNOWN) {
-    throw std::runtime_error("张量具有未知数据类型");
-}
+// 可以直接使用dtype，无需检查UNKNOWN状态
 ```
 
 ### 一致的类型使用
@@ -378,12 +394,13 @@ if (dtype == DType::UNKNOWN) {
 // 在整个应用中保持一致的类型命名
 const DType MODEL_PRECISION = DType::FP32;
 const DType INFERENCE_PRECISION = DType::INT8;
+const DType LABEL_PRECISION = DType::INT32;
 ```
 
 ---
 
 ## 版本信息
 
-- **版本**：1.18.01
-- **更新日期**：2025-10-28
+- **版本**：1.31.01
+- **更新日期**：2025-11-02
 - **作者**：技术觉醒团队

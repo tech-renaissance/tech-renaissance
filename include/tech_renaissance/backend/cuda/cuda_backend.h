@@ -47,6 +47,12 @@ public:
     // 填充操作
     void fill(Tensor& dst, float value) override;
     void fill(Tensor& dst, int8_t value) override;
+    void fill(Tensor& dst, int32_t value) override;
+
+    // fill方法别名
+    void fill_fp32(Tensor& dst, float value) override;
+    void fill_int8(Tensor& dst, int8_t value) override;
+    void fill_int32(Tensor& dst, int32_t value) override;
 
     // 基本运算
     void add(Tensor& result, const Tensor& a, const Tensor& b) override;

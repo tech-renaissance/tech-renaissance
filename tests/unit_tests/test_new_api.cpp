@@ -10,8 +10,8 @@ int main() {
     auto cpu_backend = BackendManager::get_cpu_backend();
 
     // 使用二维Shape创建随机张量
-    Tensor cpu_a = Tensor::randn(Shape(1024, 2048), time(nullptr));  // 1024 x 2048矩阵，种子22
-    Tensor cpu_b = Tensor::randn(Shape(2048, 512), time(nullptr));  // 2048 x 512矩阵，种子22
+    Tensor cpu_a = cpu_backend->randn(Shape(1024, 2048), time(nullptr));  // 1024 x 2048矩阵，种子22
+    Tensor cpu_b = cpu_backend->randn(Shape(2048, 512), time(nullptr));  // 2048 x 512矩阵，种子22
 
     // // CPU到CUDA转换
     Tensor cuda_a = cuda_backend->from_cpu(cpu_a);

@@ -30,7 +30,7 @@ void test_pad_2d() {
 
     // 创建随机2D张量 (H=3, W=4)
     Shape input_shape(3, 4);
-    Tensor input = Tensor::randn(input_shape, 42, DType::FP32, tr::CPU);
+    Tensor input = cpu_backend->randn(input_shape, 42);
     print_tensor_info(input, "Input 2D tensor");
 
     // 测试pad函数，padding=2
@@ -80,7 +80,7 @@ void test_pad_3d() {
 
     // 创建随机3D张量 (C=2, H=3, W=4)
     Shape input_shape(2, 3, 4);
-    Tensor input = Tensor::randn(input_shape, 123, DType::FP32, tr::CPU);
+    Tensor input = cpu_backend->randn(input_shape, 123);
     print_tensor_info(input, "Input 3D tensor");
 
     // 测试pad函数，padding=1
@@ -107,7 +107,7 @@ void test_pad_4d() {
 
     // 创建随机4D张量 (N=2, C=3, H=4, W=5)
     Shape input_shape(2, 3, 4, 5);
-    Tensor input = Tensor::randn(input_shape, 456, DType::FP32, tr::CPU);
+    Tensor input = cpu_backend->randn(input_shape, 456);
     print_tensor_info(input, "Input 4D tensor");
 
     // 测试pad函数，padding=2
@@ -134,10 +134,10 @@ void test_pad_int8() {
 
     // 创建随机INT8张量 (H=3, W=4)
     Shape input_shape(3, 4);
-    Tensor input = Tensor::randint(0, 100, input_shape, 789, tr::CPU);
+    Tensor input = cpu_backend->randint(input_shape, 0, 100, DType::FP32, 789);
 
     // 转换为INT8类型
-    Tensor input_int8 = Tensor::empty(input_shape, DType::INT8, tr::CPU);
+    Tensor input_int8 = cpu_backend->empty(input_shape, DType::INT8);
     const float* input_data = static_cast<const float*>(input.data_ptr());
     int8_t* int8_data = static_cast<int8_t*>(input_int8.data_ptr());
     for (int64_t i = 0; i < input.numel(); ++i) {
@@ -169,14 +169,14 @@ void test_pad_into() {
 
     // 创建随机输入张量 (H=3, W=4)
     Shape input_shape(3, 4);
-    Tensor input = Tensor::randn(input_shape, 321, DType::FP32, tr::CPU);
+    Tensor input = cpu_backend->randn(input_shape, 321);
     print_tensor_info(input, "Input tensor");
 
     // 测试pad_into函数
     int32_t padding = 1;
     Shape expected_shape = Shape(input_shape.dim(0) + 2 * padding,
                                  input_shape.dim(1) + 2 * padding);
-    Tensor output = Tensor::empty(expected_shape, DType::FP32, tr::CPU);
+    Tensor output = cpu_backend->empty(expected_shape, DType::FP32);
 
     cpu_backend->pad_into(input, padding, output);
     print_tensor_info(output, "Result of pad_into");
@@ -216,7 +216,7 @@ void test_error_cases() {
 
     try {
         // 测试1D张量（应该失败）
-        Tensor tensor_1d = Tensor::randn(Shape(5), 999, DType::FP32, tr::CPU);
+        Tensor tensor_1d = cpu_backend->randn(Shape(5), 999);
         cpu_backend->pad(tensor_1d, 1);
         std::cout << "FAIL: 1D tensor should have failed" << std::endl;
     } catch (const TRException& e) {
@@ -225,7 +225,7 @@ void test_error_cases() {
 
     try {
         // 测试负padding（应该失败）
-        Tensor tensor_2d = Tensor::randn(Shape(3, 3), 888, DType::FP32, tr::CPU);
+        Tensor tensor_2d = cpu_backend->randn(Shape(3, 3), 888);
         cpu_backend->pad(tensor_2d, -1);
         std::cout << "FAIL: Negative padding should have failed" << std::endl;
     } catch (const TRException& e) {
@@ -234,8 +234,8 @@ void test_error_cases() {
 
     try {
         // 测试形状不匹配的pad_into（应该失败）
-        Tensor input = Tensor::randn(Shape(2, 2), 777, DType::FP32, tr::CPU);
-        Tensor output = Tensor::empty(Shape(4, 5), DType::FP32, tr::CPU);  // 应该是(4, 4)
+        Tensor input = cpu_backend->randn(Shape(2, 2), 777);
+        Tensor output = cpu_backend->empty(Shape(4, 5), DType::FP32);  // 应该是(4, 4)
         cpu_backend->pad_into(input, 1, output);
         std::cout << "FAIL: Shape mismatch should have failed" << std::endl;
     } catch (const TRException& e) {

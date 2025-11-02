@@ -70,7 +70,7 @@ void test_full_inplace() {
 
     // 测试基本full_inplace功能
     Shape shape(2, 3);
-    Tensor tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->fill(tensor, 1.0f);  // 初始化
     print_tensor_info(tensor, "original tensor");
 
@@ -148,7 +148,7 @@ void test_randn_inplace() {
 
     // 测试基本randn_inplace功能
     Shape shape(2, 3);
-    Tensor tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->fill(tensor, 0.0f);  // 初始化
     print_tensor_info(tensor, "original tensor");
 
@@ -162,7 +162,7 @@ void test_randn_inplace() {
     }
 
     // 验证可重现性
-    Tensor tensor2 = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor2 = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->randn_inplace(tensor2, 123);
     const float* data1 = static_cast<const float*>(tensor.data_ptr());
     const float* data2 = static_cast<const float*>(tensor2.data_ptr());
@@ -225,7 +225,7 @@ void test_uniform_inplace() {
 
     // 测试基本uniform_inplace功能
     Shape shape(2, 3);
-    Tensor tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->fill(tensor, 0.0f);  // 初始化
 
     cpu_backend->uniform_inplace(tensor, -5.0f, 5.0f, 789);  // 范围[-5, 5)
@@ -257,7 +257,7 @@ void test_randint() {
 
     // 测试基本randint功能
     Shape shape(3, 4);
-    Tensor result = cpu_backend->randint(shape, 1, 5, 321);  // 范围[1, 5)
+    Tensor result = cpu_backend->randint(shape, 1, 5, DType::FP32, 321);  // 范围[1, 5)
     print_tensor_info(result, "randint tensor in range [1, 5)");
 
     // 验证形状
@@ -286,7 +286,7 @@ void test_randint() {
 
     // 测试参数错误
     try {
-        Tensor error_result = cpu_backend->randint(shape, 5, 1, 123);  // low >= high
+        Tensor error_result = cpu_backend->randint(shape, 5, 1, DType::FP32, 123);  // low >= high
         std::cout << "FAIL: Invalid parameters should cause error" << std::endl;
     } catch (const TRException& e) {
         std::cout << "PASS: Invalid parameters correctly throw exception" << std::endl;
@@ -301,10 +301,10 @@ void test_randint_inplace() {
 
     // 测试基本randint_inplace功能
     Shape shape(2, 3);
-    Tensor tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->fill(tensor, 0.0f);  // 初始化
 
-    cpu_backend->randint_inplace(tensor, 10, 15, 654);  // 范围[10, 15)
+    cpu_backend->randint_inplace(tensor, 10, 15, DType::FP32, 654);  // 范围[10, 15)
     print_tensor_info(tensor, "randint_inplace in range [10, 15)");
 
     // 验证范围和整数性质
@@ -394,7 +394,7 @@ void test_randbool_inplace() {
 
     // 测试基本randbool_inplace功能
     Shape shape(3, 4);
-    Tensor tensor = Tensor::empty(shape, DType::FP32, tr::CPU);
+    Tensor tensor = cpu_backend->empty(shape, DType::FP32);
     cpu_backend->fill(tensor, 0.5f);  // 初始化
 
     cpu_backend->randbool_inplace(tensor, 0.8f, 246);  // 80% zeros

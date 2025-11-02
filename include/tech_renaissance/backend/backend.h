@@ -80,6 +80,34 @@ public:
      */
     virtual void fill(Tensor& dst, int8_t value) = 0;
 
+    /**
+     * @brief 填充张量（INT32）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill(Tensor& dst, int32_t value) = 0;
+
+    /**
+     * @brief 填充张量（FP32，别名方法）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill_fp32(Tensor& dst, float value) = 0;
+
+    /**
+     * @brief 填充张量（INT8，别名方法）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill_int8(Tensor& dst, int8_t value) = 0;
+
+    /**
+     * @brief 填充张量（INT32，别名方法）
+     * @param dst 目标张量
+     * @param value 填充值
+     */
+    virtual void fill_int32(Tensor& dst, int32_t value) = 0;
+
     // ===== 基本运算 =====
 
     /**

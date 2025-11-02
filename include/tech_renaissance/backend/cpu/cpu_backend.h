@@ -34,6 +34,12 @@ public:
     // 填充操作
     void fill(Tensor& dst, float value) override;
     void fill(Tensor& dst, int8_t value) override;
+    void fill(Tensor& dst, int32_t value) override;
+
+    // fill方法别名
+    void fill_fp32(Tensor& dst, float value) override;
+    void fill_int8(Tensor& dst, int8_t value) override;
+    void fill_int32(Tensor& dst, int32_t value) override;
 
     // 基本运算
     void add(Tensor& result, const Tensor& a, const Tensor& b) override;
@@ -54,17 +60,20 @@ public:
     int32_t get_scalar_int32(const Tensor& tensor) override;
     int8_t get_scalar_int8(const Tensor& tensor) override;
 
+    Tensor empty(const Shape& shape, DType dtype);
+    Tensor zeros(const Shape& shape, DType dtype);
+    Tensor ones(const Shape& shape, DType dtype);
     // 张量创建函数（V1.29.4新增）
     Tensor full(const Shape& shape, float value, DType dtype = DType::FP32);
-    void full_inplace(Tensor& tensor_a, float value);
+    static void full_inplace(Tensor& tensor_a, float value);
     Tensor randn(const Shape& shape, unsigned int seed = 0);
-    void randn_inplace(Tensor& tensor_a, unsigned int seed = 0);
+    static void randn_inplace(Tensor& tensor_a, unsigned int seed = 0);
     Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
-    void uniform_inplace(Tensor& tensor_a, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
-    Tensor randint(const Shape& shape, int low, int high, unsigned int seed = 0, DType dtype = DType::FP32);
-    void randint_inplace(Tensor& tensor_a, int low, int high, unsigned int seed = 0);
+    static void uniform_inplace(Tensor& tensor_a, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
+    Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0);
+    static void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0);
     Tensor randbool(const Shape& shape, float rate_of_zeros, unsigned int seed = 0, DType dtype = DType::FP32);
-    void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0);
+    static void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0);
 
     // 张量IO算子（CPU后端独有功能）
     void export_tensor(const Tensor& tensor, const std::string& filename) const;

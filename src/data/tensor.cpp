@@ -120,8 +120,19 @@ Tensor Tensor::view() const {
 std::string Tensor::to_string() const {
     std::ostringstream oss;
     Device current_device = this->device();
+    std::string dtype_str;
+    if (dtype_ == DType::FP32) {
+        dtype_str = "FP32";
+    } else if (dtype_ == DType::INT8) {
+        dtype_str = "INT8";
+    } else if (dtype_ == DType::INT32) {
+        dtype_str = "INT32";
+    } else {
+        dtype_str = "UNKNOWN";
+    }
+
     oss << "Tensor(shape=" << shape_.to_string()
-        << ", dtype=" << (dtype_ == DType::FP32 ? "FP32" : "INT8")
+        << ", dtype=" << dtype_str
         << ", device=" << current_device.to_string();
 
     if (is_empty()) {
@@ -173,9 +184,11 @@ void Tensor::print(const std::string& name, int precision) const {
         oss << ", device='cuda:" << current_device.index << "'";
     }
 
-    // 只有INT8类型才显示dtype信息（FP32是默认的）
+    // 只有非FP32类型才显示dtype信息（FP32是默认的）
     if (dtype_ == DType::INT8) {
         oss << ", dtype=INT8";
+    } else if (dtype_ == DType::INT32) {
+        oss << ", dtype=INT32";
     }
 
     oss << ")";
@@ -260,8 +273,8 @@ const void* Tensor::data_ptr() const noexcept {
 
 void Tensor::validate_shape_dtype() const {
     // 检查数据类型是否有效
-    if (dtype_ != DType::FP32 && dtype_ != DType::INT8) {
-        throw TRException("[Tensor::validate_shape_dtype] Tensor dtype must be FP32 or INT8");
+    if (dtype_ != DType::FP32 && dtype_ != DType::INT8 && dtype_ != DType::INT32) {
+        throw TRException("[Tensor::validate_shape_dtype] Tensor dtype must be FP32, INT8, or INT32");
     }
 
     // 检查元素总数是否合理
@@ -330,6 +343,8 @@ Tensor Tensor::zeros(const Shape& shape, DType dtype, const Device& device) {
         backend->fill(result, 0.0f);
     } else if (dtype == DType::INT8) {
         backend->fill(result, static_cast<int8_t>(0));
+    } else if (dtype == DType::INT32) {
+        backend->fill(result, static_cast<int32_t>(0));
     }
 
     return result;
@@ -344,6 +359,8 @@ Tensor Tensor::ones(const Shape& shape, DType dtype, const Device& device) {
         backend->fill(result, 1.0f);
     } else if (dtype == DType::INT8) {
         backend->fill(result, static_cast<int8_t>(1));
+    } else if (dtype == DType::INT32) {
+        backend->fill(result, static_cast<int32_t>(1));
     }
 
     return result;
@@ -358,6 +375,8 @@ Tensor Tensor::full(const Shape& shape, float value, DType dtype, const Device& 
         backend->fill(result, value);
     } else if (dtype == DType::INT8) {
         backend->fill(result, static_cast<int8_t>(value));
+    } else if (dtype == DType::INT32) {
+        backend->fill(result, static_cast<int32_t>(value));
     }
 
     return result;
@@ -365,101 +384,6 @@ Tensor Tensor::full(const Shape& shape, float value, DType dtype, const Device& 
 
 Tensor Tensor::empty(const Shape& shape, DType dtype, const Device& device) {
     return create_and_allocate(shape, dtype, device);
-}
-
-// ===== 随机数生成静态工厂方法实现 =====
-
-Tensor Tensor::randn(const Shape& shape, unsigned int seed,
-                     DType dtype, const Device& device) {
-    if (dtype != DType::FP32) {
-        throw TRException("randn only supports FP32 data type");
-    }
-
-    Tensor result = empty(shape, dtype, device);
-
-    // 在CPU上生成随机数据，然后如果需要再移动到目标设备
-    Tensor cpu_tensor = result.device().is_cpu() ? result : empty(shape, dtype, tr::CPU);
-
-    // 使用C++11随机数生成器
-    std::mt19937 engine(seed);
-    std::normal_distribution<float> dist(0.0f, 1.0f);
-
-    float* data = static_cast<float*>(cpu_tensor.data_ptr());
-    int64_t numel = cpu_tensor.numel();
-
-    for (int64_t i = 0; i < numel; ++i) {
-        data[i] = dist(engine);
-    }
-
-    // 如果目标设备不是CPU，转移数据
-    if (!result.device().is_cpu()) {
-        auto backend = BackendManager::get_backend_static(device);
-        result = backend->from_cpu(cpu_tensor);
-    }
-
-    return result;
-}
-
-Tensor Tensor::uniform(const Shape& shape, float min_val, float max_val,
-                      unsigned int seed, DType dtype, const Device& device) {
-    if (dtype != DType::FP32) {
-        throw TRException("uniform only supports FP32 data type");
-    }
-
-    Tensor result = empty(shape, dtype, device);
-
-    // 在CPU上生成随机数据，然后如果需要再移动到目标设备
-    Tensor cpu_tensor = result.device().is_cpu() ? result : empty(shape, dtype, tr::CPU);
-
-    // 使用C++11随机数生成器
-    std::mt19937 engine(seed);
-    std::uniform_real_distribution<float> dist(min_val, max_val);
-
-    float* data = static_cast<float*>(cpu_tensor.data_ptr());
-    int64_t numel = cpu_tensor.numel();
-
-    for (int64_t i = 0; i < numel; ++i) {
-        data[i] = dist(engine);
-    }
-
-    // 如果目标设备不是CPU，转移数据
-    if (!result.device().is_cpu()) {
-        auto backend = BackendManager::get_backend_static(device);
-        result = backend->from_cpu(cpu_tensor);
-    }
-
-    return result;
-}
-
-Tensor Tensor::randint(int low, int high, const Shape& shape,
-                      unsigned int seed, const Device& device) {
-    if (low >= high) {
-        throw TRException("randint: low must be less than high");
-    }
-
-    Tensor result = empty(shape, DType::FP32, device);
-
-    // 在CPU上生成随机数据，然后如果需要再移动到目标设备
-    Tensor cpu_tensor = result.device().is_cpu() ? result : empty(shape, DType::FP32, tr::CPU);
-
-    // 使用C++11随机数生成器
-    std::mt19937 engine(seed);
-    std::uniform_int_distribution<int> dist(low, high - 1);
-
-    float* data = static_cast<float*>(cpu_tensor.data_ptr());
-    int64_t numel = cpu_tensor.numel();
-
-    for (int64_t i = 0; i < numel; ++i) {
-        data[i] = static_cast<float>(dist(engine));
-    }
-
-    // 如果目标设备不是CPU，转移数据
-    if (!result.device().is_cpu()) {
-        auto backend = BackendManager::get_backend_static(device);
-        result = backend->from_cpu(cpu_tensor);
-    }
-
-    return result;
 }
 
 bool Tensor::operator==(const Tensor& other) const noexcept {
@@ -483,12 +407,15 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
     // 获取数据到CPU
     std::vector<float> data(numel());
     std::vector<int8_t> int8_data(numel());
+    std::vector<int32_t> int32_data(numel());
 
     try {
         if (dtype_ == DType::FP32) {
             to_cpu_data(data.data(), data.size() * sizeof(float));
         } else if (dtype_ == DType::INT8) {
             to_cpu_data(int8_data.data(), int8_data.size() * sizeof(int8_t));
+        } else if (dtype_ == DType::INT32) {
+            to_cpu_data(int32_data.data(), int32_data.size() * sizeof(int32_t));
         }
     } catch (...) {
         oss << "[...data unavailable...]";
@@ -500,8 +427,10 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
         // 标量
         if (dtype_ == DType::FP32) {
             oss << std::fixed << std::setprecision(precision) << data[0];
-        } else {
+        } else if (dtype_ == DType::INT8) {
             oss << static_cast<int>(int8_data[0]);
+        } else if (dtype_ == DType::INT32) {
+            oss << int32_data[0];
         }
     } else if (ndim() == 1) {
         // 1D张量
@@ -510,8 +439,10 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
             if (i > 0) oss << ", ";
             if (dtype_ == DType::FP32) {
                 oss << std::fixed << std::setprecision(precision) << data[i];
-            } else {
+            } else if (dtype_ == DType::INT8) {
                 oss << static_cast<int>(int8_data[i]);
+            } else if (dtype_ == DType::INT32) {
+                oss << int32_data[i];
             }
         }
         oss << "]";
@@ -525,8 +456,10 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
                 int32_t idx = i * dim_size(1) + j;
                 if (dtype_ == DType::FP32) {
                     oss << std::fixed << std::setprecision(precision) << data[idx];
-                } else {
+                } else if (dtype_ == DType::INT8) {
                     oss << static_cast<int>(int8_data[idx]);
+                } else if (dtype_ == DType::INT32) {
+                    oss << int32_data[idx];
                 }
             }
             oss << "]";
@@ -547,8 +480,10 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
                     int32_t idx = i * dim_size(1) * dim_size(2) + j * dim_size(2) + k;
                     if (dtype_ == DType::FP32) {
                         oss << std::fixed << std::setprecision(precision) << data[idx];
-                    } else {
+                    } else if (dtype_ == DType::INT8) {
                         oss << static_cast<int>(int8_data[idx]);
+                    } else if (dtype_ == DType::INT32) {
+                        oss << int32_data[idx];
                     }
                 }
                 oss << "]";
@@ -580,8 +515,10 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
                         int32_t idx = n * C * H * W + c * H * W + h * W + w;
                         if (dtype_ == DType::FP32) {
                             oss << std::fixed << std::setprecision(precision) << data[idx];
-                        } else {
+                        } else if (dtype_ == DType::INT8) {
                             oss << static_cast<int>(int8_data[idx]);
+                        } else if (dtype_ == DType::INT32) {
+                            oss << int32_data[idx];
                         }
                     }
                     oss << "]";

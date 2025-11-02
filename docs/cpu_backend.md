@@ -4,7 +4,7 @@
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.29.4
+**版本**: V1.31.1
 **更新日期**: 2025-11-02
 **作者**: 技术觉醒团队
 
@@ -253,9 +253,27 @@ tr::Tensor tensor(tr::Shape(2, 3), tr::DType::INT8, tr::CPU);
 backend->fill(tensor, 42);  // 所有元素设为42
 ```
 
-### 张量创建函数 (V1.29.4新增)
+### 张量创建函数 (V1.31.1扩展)
 
 张量创建函数提供了多种方式生成具有特定值、随机分布和模式的张量。
+
+#### `Tensor empty(const Shape& shape, DType dtype)`
+
+创建未初始化的新张量。
+
+**参数：**
+- `shape` - 目标张量形状
+- `dtype` - 数据类型（支持FP32、INT8、INT32）
+
+**返回值：** 新的张量对象
+
+**设备：** CPU
+
+**示例：**
+```cpp
+tr::Tensor tensor = backend->empty(tr::Shape(2, 3), tr::DType::FP32);
+tr::Tensor int8_tensor = backend->empty(tr::Shape(2, 3), tr::DType::INT8);
+```
 
 #### `Tensor full(const Shape& shape, float value, DType dtype = DType::FP32)`
 
@@ -274,6 +292,33 @@ backend->fill(tensor, 42);  // 所有元素设为42
 ```cpp
 auto cpu_backend = BackendManager::get_cpu_backend();
 Tensor ones = cpu_backend->full(Shape(3, 4), 1.0f);  // 3x4张量，所有元素为1.0
+```
+
+#### `Tensor ones(const Shape& shape, DType dtype = DType::FP32)`
+
+创建填充1值的新张量。
+
+**参数：**
+- `shape` - 目标张量形状
+- `dtype` - 数据类型（支持FP32、INT8、INT32）
+
+**返回：** 所有元素为1的新张量
+
+**优化：** 当启用Eigen时使用`setConstant()`进行高度优化的内存填充
+
+**数据类型支持：**
+- **FP32**: 填充1.0f
+- **INT8**: 填充int8_t(1)
+- **INT32**: 填充int32_t(1)
+
+**示例：**
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+
+// 创建不同数据类型的全1张量
+Tensor fp32_ones = cpu_backend->ones(Shape(3, 4), DType::FP32);   // 1.0f
+Tensor int8_ones = cpu_backend->ones(Shape(3, 4), DType::INT8);    // int8_t(1)
+Tensor int32_ones = cpu_backend->ones(Shape(3, 4), DType::INT32);  // int32_t(1)
 ```
 
 #### `void full_inplace(Tensor& tensor_a, float value)`
@@ -358,7 +403,7 @@ Tensor tensor = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
 cpu_backend->uniform_inplace(tensor, -5.0f, 5.0f, 789);  // [-5,5)
 ```
 
-#### `Tensor randint(const Shape& shape, int low, int high, unsigned int seed = 0, DType dtype = DType::FP32)`
+#### `Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0)`
 
 创建随机整数张量。
 
@@ -366,33 +411,41 @@ cpu_backend->uniform_inplace(tensor, -5.0f, 5.0f, 789);  // [-5,5)
 - `shape` - 目标张量形状
 - `low` - 最小整数（包含）
 - `high` - 最大整数（不包含）
+- `dtype` - 数据类型（支持FP32、INT8、INT32）
 - `seed` - 随机种子（默认0）
-- `dtype` - 数据类型（仅支持FP32，INT8抛出TODO异常）
 
-**返回：** 随机整数张量（以浮点数形式）
+**返回：** 随机整数张量
 
 **范围：** 值在[low, high)区间
 
-**验证：** 当low >= high时抛出异常
+**验证：**
+- 当low >= high时抛出异常
+- 不支持的数据类型抛出异常
+- INT8类型验证范围[-128, 127]
 
 **示例：**
 ```cpp
-Tensor integers = cpu_backend->randint(Shape(2, 3), 1, 10, 321);  // [1,10)
+Tensor fp32_integers = cpu_backend->randint(Shape(2, 3), 1, 10, DType::FP32, 321);  // [1,10)
+Tensor int8_integers = cpu_backend->randint(Shape(2, 3), 0, 100, DType::INT8, 456);   // [0,100)
+Tensor int32_integers = cpu_backend->randint(Shape(2, 3), 0, 1000, DType::INT32, 789);  // [0,1000)
 ```
 
-#### `void randint_inplace(Tensor& tensor_a, int low, int high, unsigned int seed = 0)`
+#### `void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0)`
 
 原地填充随机整数到现有张量。
 
 **参数：**
-- `tensor_a` - 目标张量
+- `tensor_a` - 目标张量（必须与dtype匹配）
 - `low` - 最小整数（包含）
 - `high` - 最大整数（不包含）
+- `dtype` - 数据类型（必须与tensor_a.dtype()匹配）
 - `seed` - 随机种子（默认0）
 
 **范围：** 值在[low, high)区间
 
-**验证：** 当low >= high时抛出异常
+**验证：**
+- 当low >= high时抛出异常
+- 张量数据类型与输入dtype不匹配时抛出异常
 
 **示例：**
 ```cpp

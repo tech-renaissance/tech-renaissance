@@ -6,18 +6,21 @@ This document describes the implementation of tensor creation functions in the C
 
 ## Version Information
 
-- **Version**: V1.29.4
+- **Version**: V1.31.1
 - **Date**: 2025-11-02
 - **Author**: 技术觉醒团队
 
 ## Supported Operations
 
-The CPU backend implements 10 creation functions across 5 operation types:
+The CPU backend implements 12 creation functions across 5 operation types:
 
 ### Value-based Creation
 1. **Full**: `full`, `full_inplace`
    - Creates tensors filled with a specified value
    - Supports FP32 only (INT8 planned for future)
+2. **Ones**: `ones`
+   - Creates tensors filled with 1 values
+   - Supports FP32, INT8, INT32
 
 ### Random Number Creation
 2. **Normal Distribution**: `randn`, `randn_inplace`
@@ -30,7 +33,8 @@ The CPU backend implements 10 creation functions across 5 operation types:
 
 4. **Integer Distribution**: `randint`, `randint_inplace`
    - Creates tensors with random integers in specified range
-   - Outputs as float values with integer precision
+   - Supports FP32, INT8, INT32 data types
+   - INT8 includes range validation [-128, 127]
 
 5. **Boolean Distribution**: `randbool`, `randbool_inplace`
    - Creates tensors with random 0.0f and 1.0f values
@@ -44,6 +48,15 @@ The CPU backend implements 10 creation functions across 5 operation types:
 ## Creation Rules and Behavior
 
 ### Full Operations
+
+#### `Tensor empty(const Shape& shape, DType dtype)`
+- **Purpose**: Creates an uninitialized tensor with specified shape and data type
+- **Parameters**:
+  - `shape`: Shape of the tensor
+  - `dtype`: Data type (FP32, INT8, INT32)
+- **Returns**: New empty tensor
+- **Device**: CPU
+- **Example**: `Tensor t = cpu_backend->empty(Shape(3, 4), DType::FP32);`
 
 #### `Tensor full(const Shape& shape, float value, DType dtype = DType::FP32)`
 - **Purpose**: Creates a tensor filled with the specified value
@@ -60,6 +73,26 @@ The CPU backend implements 10 creation functions across 5 operation types:
   - `tensor_a`: Target tensor (must be allocated, non-empty, on CPU)
   - `value`: Fill value for all elements
 - **Optimization**: Uses Eigen `setConstant()` when available
+
+#### `Tensor ones(const Shape& shape, DType dtype = DType::FP32)`
+- **Purpose**: Creates a tensor filled with 1 values
+- **Parameters**:
+  - `shape`: Target tensor shape
+  - `dtype`: Data type (FP32, INT8, INT32 supported)
+- **Returns**: New tensor with all elements equal to 1
+- **Device**: CPU
+- **Data Type Values**:
+  - FP32: Fills with 1.0f
+  - INT8: Fills with int8_t(1)
+  - INT32: Fills with int32_t(1)
+- **Optimization**: Uses Eigen `setConstant()` when available
+- **Implementation**: Dual support for Eigen optimization and naive implementation
+- **Example**:
+  ```cpp
+  Tensor fp32_ones = cpu_backend->ones(Shape(2, 3), DType::FP32);   // 1.0f
+  Tensor int8_ones = cpu_backend->ones(Shape(2, 3), DType::INT8);    // int8_t(1)
+  Tensor int32_ones = cpu_backend->ones(Shape(2, 3), DType::INT32);  // int32_t(1)
+  ```
 
 ### Normal Distribution Operations
 
@@ -98,27 +131,29 @@ The CPU backend implements 10 creation functions across 5 operation types:
 
 ### Integer Distribution Operations
 
-#### `Tensor randint(const Shape& shape, int low, int high, unsigned int seed = 0, DType dtype = DType::FP32)`
+#### `Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0)`
 - **Purpose**: Creates tensor with random integers in specified range
 - **Parameters**:
   - `shape`: Target tensor shape
   - `low`: Minimum integer (inclusive)
   - `high`: Maximum integer (exclusive)
+  - `dtype`: Data type (FP32, INT8, INT32 supported)
   - `seed`: Random seed for reproducibility (default: 0)
-  - `dtype`: Data type (FP32 supported, INT8 throws TODO exception)
-- **Returns**: New tensor with integer values as floats
+- **Returns**: New tensor with integer values
 - **Range**: Values in [low, high)
-- **Validation**: Throws exception if low >= high
+- **Validation**: Throws exception if low >= high or dtype unsupported
+- **INT8 Range Check**: Validates range [-128, 127] for INT8 dtype
 
-#### `void randint_inplace(Tensor& tensor_a, int low, int high, unsigned int seed = 0)`
+#### `void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0)`
 - **Purpose**: Fills existing tensor with random integers
 - **Parameters**:
-  - `tensor_a`: Target tensor
+  - `tensor_a`: Target tensor (must match dtype)
   - `low`: Minimum integer (inclusive)
   - `high`: Maximum integer (exclusive)
+  - `dtype`: Data type (must match tensor_a.dtype())
   - `seed`: Random seed for reproducibility (default: 0)
+- **Validation**: Throws exception if tensor dtype != input dtype or range invalid
 - **Range**: Values in [low, high)
-- **Validation**: Throws exception if low >= high
 
 ### Boolean Distribution Operations
 
