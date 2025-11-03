@@ -74,6 +74,7 @@ public:
     float get_scalar_float(const Tensor& tensor) override;
     int32_t get_scalar_int32(const Tensor& tensor) override;
     int8_t get_scalar_int8(const Tensor& tensor) override;
+    int64_t get_memory_size(const Tensor& tensor) override;
 
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;

@@ -221,6 +221,14 @@ public:
      */
     virtual int8_t get_scalar_int8(const Tensor& tensor) = 0;
 
+    /**
+     * @brief 获取张量占用的内存空间字节数
+     * @param tensor 输入张量
+     * @return 张量占用的内存字节数
+     * @throws std::runtime_error 如果张量为空或无效
+     */
+    virtual int64_t get_memory_size(const Tensor& tensor) = 0;
+
 protected:
     Backend() = default;
 };

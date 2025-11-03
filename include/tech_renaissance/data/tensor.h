@@ -262,6 +262,12 @@ public:
     std::string to_string() const;
 
     /**
+     * @brief 张量是否已分配内存
+     * @return 是否已分配内存
+     */
+    bool storage_allocated() const {return storage_ != nullptr;}
+
+    /**
      * @brief 打印张量内容和元数据
      * @param name 张量名称
      */

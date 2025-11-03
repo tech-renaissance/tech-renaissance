@@ -318,6 +318,16 @@ int8_t CpuBackend::get_scalar_int8(const Tensor& tensor) {
     }
 }
 
+int64_t CpuBackend::get_memory_size(const Tensor& tensor) {
+    // 首先检查张量是否已分配内存
+    if (!tensor.storage_allocated()) {
+        return 0;  // 未分配内存，返回0字节
+    }
+
+    // 已分配内存，计算实际占用大小
+    return static_cast<int64_t>(tensor.numel()) * static_cast<int64_t>(tensor.dtype_size());
+}
+
 // ===== 张量IO算子实现（CPU后端独有功能） =====
 
 void CpuBackend::export_tensor(const Tensor& tensor, const std::string& filename) const {

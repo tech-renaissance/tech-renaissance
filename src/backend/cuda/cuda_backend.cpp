@@ -460,6 +460,19 @@ int8_t CudaBackend::get_scalar_int8(const Tensor& tensor) {
     return host_value;
 }
 
+int64_t CudaBackend::get_memory_size(const Tensor& tensor) {
+    // 首先检查张量是否已分配内存
+    if (!tensor.storage_allocated()) {
+        return 0;  // 未分配内存，返回0字节
+    }
+
+    // 验证设备一致性
+    validate_same_device(tensor.device());
+
+    // 已分配内存，计算实际占用大小
+    return static_cast<int64_t>(tensor.numel()) * static_cast<int64_t>(tensor.dtype_size());
+}
+
 // ===== 矩阵乘法实现 =====
 // 注意：CudaBackend::mm 方法的实现已分离到 cuda_mm_fp32.cpp 文件中
 
