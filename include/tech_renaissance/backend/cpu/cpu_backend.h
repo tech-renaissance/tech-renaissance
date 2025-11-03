@@ -13,6 +13,7 @@
 
 #include "tech_renaissance/backend/backend.h"
 #include "tech_renaissance/data/shape.h"
+#include "tech_renaissance/data/offset.h"
 #define EXPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->export_tensor
 #define IMPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->import_tensor
 
@@ -146,6 +147,10 @@ public:
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;
     void copy_into(const Tensor& src, Tensor& dst) const override;
+
+    // 张量切片操作（V1.33.2新增）
+    Tensor slice(const Tensor& tensor_a, const Offset& offset);
+    void slice_into(const Tensor& tensor_a, Tensor& result, const Offset& offset);
 
     // 标量运算（V1.28.1新增）
     // 乘法：tensor * scalar

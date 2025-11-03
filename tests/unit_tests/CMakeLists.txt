@@ -119,6 +119,11 @@ configure_simple_test(test_cpu_conv test_cpu_conv.cpp)
 configure_simple_test(test_cpu_gemm test_cpu_gemm.cpp)
 
 # =============================================================================
+# CPU切片测试
+# =============================================================================
+configure_simple_test(test_cpu_slice test_cpu_slice.cpp)
+
+# =============================================================================
 # 简单算法测试
 # =============================================================================
 configure_simple_test(test_naive_conv test_naive_conv.cpp)
@@ -205,6 +210,9 @@ register_test(test_cpu_mm "CPU Matrix Multiplication Test")
 # 注册卷积测试
 register_test(test_cpu_conv "CPU Convolution Test")
 register_test(test_cpu_gemm "CPU GEMM Test")
+
+# 注册切片测试
+register_test(test_cpu_slice "CPU Slice Test")
 
 # 注册简单算法测试
 register_test(test_naive_conv "Naive Convolution Test")
