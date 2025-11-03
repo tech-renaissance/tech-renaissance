@@ -220,6 +220,23 @@ public:
     Tensor pad(const Tensor& tensor_a, int32_t padding) const;
     void pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tensor_b) const;
 
+    // Softmax操作（V1.34.0新增）
+    Tensor softmax(const Tensor& tensor_a, int32_t dim);
+    void softmax_inplace(Tensor& tensor_a, int32_t dim);
+    void softmax_into(const Tensor& tensor_a, Tensor& result, int32_t dim);
+
+    // Max操作（V1.34.0新增）
+    Tensor max(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+    void max_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
+
+    // Sum操作（V1.34.0新增）
+    Tensor sum(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+    void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
+
+    // ArgMax操作（V1.34.0新增）
+    Tensor argmax(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+    void argmax_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

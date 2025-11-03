@@ -1,376 +1,492 @@
-# CPU Backend Dimension Operations
+# CPU后端张量维度操作功能文档
 
-## Overview
+## 概述
 
-This document describes the implementation of tensor dimension operations in the CPU backend of Tech Renaissance. The dimension operations support adding and removing size-1 dimensions, as well as padding tensors with zeros around their spatial dimensions.
+CPU后端张量维度操作功能是Tech Renaissance框架V1.34.1版本新增的重要特性，提供了丰富的张量维度变换和reduction操作。该功能支持多种数据类型、负数维度索引，以及与PyTorch兼容的API设计。
 
-## Version Information
+## 版本信息
 
-- **Version**: V1.29.4
-- **Date**: 2025-11-02
-- **Author**: 技术觉醒团队
+- **版本号**: V1.34.1
+- **发布日期**: 2025-11-03
+- **作者**: 技术觉醒团队
+- **所属系列**: backend
 
-## Supported Operations
+## 功能特性
 
-The CPU backend implements 9 dimension functions across 3 operation types:
+### 维度变换操作
 
-### Unsqueeze Operations (Adding Dimensions)
-1. **Unsqueeze**: `unsqueeze`, `unsqueeze_inplace`, `unsqueeze_into`
-   - Inserts a size-1 dimension at the specified position
-   - Increases tensor dimensionality by 1
+#### 1. Unsqueeze操作
+在指定位置插入大小为1的维度。
 
-### Squeeze Operations (Removing Dimensions)
-2. **Squeeze**: `squeeze`, `squeeze_inplace`, `squeeze_into`
-   - Removes a size-1 dimension at the specified position
-   - Decreases tensor dimensionality by 1
-
-### Pad Operations (Zero Padding)
-3. **Pad**: `pad`, `pad_into`
-   - Adds zero padding around the H and W dimensions of tensors
-   - Expands spatial dimensions while preserving original data in the center
-
-### Function Modes
-- **Regular Mode**: Returns a new tensor with modified dimensions
-- **Inplace Mode**: Modifies the tensor in place (creates new object internally)
-- **Into Mode**: Writes the result to a pre-allocated tensor
-
-## Dimension Manipulation Rules
-
-### Unsqueeze Rules
-
-1. **Valid Range**: `dim` must be in `[0, ndim]`
-   - `dim = 0`: Insert at the beginning
-   - `dim = ndim`: Insert at the end
-   - `dim < 0` or `dim > ndim`: Error
-
-2. **Shape Transformation**: `(d1, d2, ..., dn)` → `(d1, ..., dim, 1, dim+1, ..., dn)`
-   - Inserts a size-1 dimension at the specified position
-   - Total number of elements remains unchanged
-
-3. **Examples**:
-   - `scalar() unsqueeze(0)` → `(1,)`
-   - `(3,) unsqueeze(0)` → `(1, 3)`
-   - `(2, 3) unsqueeze(1)` → `(2, 1, 3)`
-   - `(2, 3) unsqueeze(2)` → `(2, 3, 1)`
-
-### Squeeze Rules
-
-1. **Valid Range**: `dim` must be in `[0, ndim-1]`
-   - `dim < 0` or `dim >= ndim`: Error
-
-2. **Size Requirement**: The dimension at `dim` must have size 1
-   - `tensor.shape()[dim] == 1`: Required
-   - Otherwise: Error
-
-3. **Shape Transformation**: `(d1, ..., dim, 1, dim+1, ..., dn)` → `(d1, ..., dim-1, dim+1, ..., dn)`
-   - Removes the size-1 dimension
-   - Total number of elements remains unchanged
-
-4. **Examples**:
-   - `(1,) squeeze(0)` → `scalar()`
-   - `(1, 3) squeeze(0)` → `(3,)`
-   - `(2, 1, 3) squeeze(1)` → `(2, 3)`
-   - `(2, 3, 1) squeeze(2)` → `(2, 3)`
-
-### Pad Rules
-
-1. **Dimension Requirement**: Tensors must have at least 2 dimensions
-   - Supports 2D, 3D, and 4D tensors
-   - 1D tensors are not supported for padding
-
-2. **Shape Transformation**:
-   - **2D**: `(H, W)` → `(H+2p, W+2p)`
-   - **3D**: `(C, H, W)` → `(C, H+2p, W+2p)`
-   - **4D**: `(N, C, H, W)` → `(N, C, H+2p, W+2p)`
-   where `p` is the padding size
-
-3. **Padding Behavior**:
-   - Adds `p` rows/columns of zeros around each spatial dimension
-   - Original data is placed in the center of the expanded tensor
-   - All boundary elements are filled with zeros
-
-4. **Examples**:
-   - `(3, 4) pad(1)` → `(5, 6)`
-   - `(2, 3, 4) pad(2)` → `(2, 7, 8)`
-   - `(2, 3, 4, 5) pad(1)` → `(2, 3, 6, 7)`
-
-## Implementation Details
-
-### Core Components
-
-#### 1. Shape Calculation Functions
 ```cpp
-static Shape calculate_unsqueeze_shape(const Shape& original_shape, int32_t dim)
-static Shape calculate_squeeze_shape(const Shape& original_shape, int32_t dim)
-static Shape calculate_pad_shape(const Shape& original_shape, int32_t padding)
-```
-- Calculate the resulting shape after dimension operations
-- Validate dimension indices and sizes
-- Construct new Shape objects with appropriate dimensions
-
-#### 2. Core Operation Functions
-```cpp
-static void unsqueeze_operation_core(const Tensor& input, Tensor& result)
-static void squeeze_operation_core(const Tensor& input, Tensor& result)
-static void pad_operation_core_fp32(const Tensor& input, Tensor& result, int32_t padding)
-static void pad_operation_core_int8(const Tensor& input, Tensor& result, int32_t padding)
-```
-- Perform the actual data transfer between tensors
-- Unsqueeze/squeeze: Memory copying for reshape operations
-- Pad: Zero filling and centering of original data
-
-#### 3. Validation Functions
-- `validate_tensor_dtype_and_device`: Ensures FP32/INT8 and CPU compatibility
-- `validate_tensor_not_empty`: Prevents operations on empty tensors
-- Element count validation for `into` operations
-- Padding value validation for pad operations
-
-### Execution Modes
-
-#### Memory Copy Implementation
-- **Data Preservation**: Unsqueeze/squeeze operations preserve data values through memory copying
-- **Efficient Transfer**: Uses `memcpy` for optimal performance
-- **Shape Independence**: Data layout remains compatible across dimension changes
-
-#### Padding Implementation
-- **Zero Initialization**: Complete output tensor filled with zeros using `memset`
-- **Centered Copy**: Original data copied to center position with proper offset calculations
-- **Type Support**: Separate optimized implementations for FP32 and INT8
-- **Memory Alignment**: Optimized for aligned memory access patterns
-
-#### Shape Reconstruction
-- **Dynamic Shape Building**: Constructs new shapes using vector operations
-- **Multi-dimensional Support**: Handles up to 4 dimensions (current framework limit)
-- **Automatic Detection**: Creates appropriate Shape objects based on dimension count
-
-## API Reference
-
-### Functions
-
-#### `Tensor unsqueeze(const Tensor& tensor_a, int32_t dim) const`
-Inserts a size-1 dimension at the specified position, returning a new tensor.
-
-#### `void unsqueeze_inplace(Tensor& tensor_a, int32_t dim) const`
-Modifies the tensor by inserting a size-1 dimension at the specified position.
-
-#### `void unsqueeze_into(const Tensor& tensor_a, Tensor& tensor_b) const`
-Copies tensor_a into tensor_b, assuming tensor_b has the target unsqueezed shape.
-
-#### `Tensor squeeze(const Tensor& tensor_a, int32_t dim) const`
-Removes a size-1 dimension at the specified position, returning a new tensor.
-
-#### `void squeeze_inplace(Tensor& tensor_a, int32_t dim) const`
-Modifies the tensor by removing a size-1 dimension at the specified position.
-
-#### `void squeeze_into(const Tensor& tensor_a, Tensor& tensor_b) const`
-Copies tensor_a into tensor_b, assuming tensor_b has the target squeezed shape.
-
-#### `Tensor pad(const Tensor& tensor_a, int32_t padding) const`
-Adds zero padding around H and W dimensions, returning a new tensor.
-
-#### `void pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tensor_b) const`
-Writes padded tensor to pre-allocated tensor_b with correct expanded shape.
-
-### Error Handling
-
-All functions throw `TRException` with descriptive error messages for:
-- Empty tensors
-- Data type mismatches (only FP32 and INT8 supported)
-- Device mismatches (only CPU supported)
-- Dimension index out of range
-- Invalid squeeze targets (dimension size ≠ 1)
-- Invalid padding values (must be non-negative)
-- Tensor dimensions < 2 for padding operations
-- Element count mismatches in `into` operations
-- Shape mismatches in `pad_into` operations
-
-## Usage Examples
-
-### Basic Unsqueeze Operations
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-
-// Scalar to 1D
-Tensor scalar = Tensor::full(Shape(), 3.14f);
-Tensor vec = cpu_backend->unsqueeze(scalar, 0);  // Shape: (1,)
-
-// 1D to 2D
-Tensor vec1d = Tensor::full(Shape(3), 2.0f);
-Tensor mat = cpu_backend->unsqueeze(vec1d, 0);  // Shape: (1, 3)
-
-// 2D to 3D (insert at position 1)
-Tensor mat2d = Tensor::full(Shape(2, 3), 1.0f);
-Tensor tensor3d = cpu_backend->unsqueeze(mat2d, 1);  // Shape: (2, 1, 3)
+Tensor unsqueeze(const Tensor& tensor_a, int32_t dim) const;
+void unsqueeze_inplace(Tensor& tensor_a, int32_t dim) const;
+void unsqueeze_into(const Tensor& tensor_a, Tensor& tensor_b) const;
 ```
 
-### Basic Squeeze Operations
+**特性**:
+- 支持负数维度索引
+- 自动处理维度范围验证
+- 保持原有数据不变，仅改变形状
+
+#### 2. Squeeze操作
+移除大小为1的指定维度。
+
 ```cpp
-// 1D to scalar
-Tensor vec = Tensor::full(Shape(1), 5.0f);
-Tensor scalar = cpu_backend->squeeze(vec, 0);  // Shape: ()
-
-// 2D to 1D
-Tensor mat = Tensor::full(Shape(1, 4), 2.0f);
-Tensor squeezed = cpu_backend->squeeze(mat, 0);  // Shape: (4,)
-
-// 3D to 2D
-Tensor tensor3d = Tensor::full(Shape(2, 1, 3), 3.0f);
-Tensor mat2d = cpu_backend->squeeze(tensor3d, 1);  // Shape: (2, 3)
+Tensor squeeze(const Tensor& tensor_a, int32_t dim) const;
+void squeeze_inplace(Tensor& tensor_a, int32_t dim) const;
+void squeeze_into(const Tensor& tensor_a, Tensor& tensor_b) const;
 ```
 
-### Basic Pad Operations
+**特性**:
+- 验证指定维度大小必须为1
+- 支持多维度张量压缩
+- 自动调整数据布局
+
+#### 3. Pad操作
+在张量的H和W维度周围补零。
+
 ```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-
-// 2D padding
-Tensor input2d = Tensor::randn(Shape(3, 4), 42, DType::FP32, tr::CPU);
-Tensor padded2d = cpu_backend->pad(input2d, 1);  // Shape: (5, 6)
-
-// 3D padding (channel-first format)
-Tensor input3d = Tensor::randn(Shape(2, 3, 4), 123, DType::FP32, tr::CPU);
-Tensor padded3d = cpu_backend->pad(input3d, 2);  // Shape: (2, 7, 8)
-
-// 4D padding (batch, channel, height, width)
-Tensor input4d = Tensor::randn(Shape(2, 3, 4, 5), 456, DType::FP32, tr::CPU);
-Tensor padded4d = cpu_backend->pad(input4d, 1);  // Shape: (2, 3, 6, 7)
-
-// INT8 padding
-Tensor input_int8 = Tensor::randint(0, 100, Shape(3, 4), 789, tr::CPU);
-// Convert to INT8 and pad...
+Tensor pad(const Tensor& tensor_a, int32_t padding) const;
+void pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tensor_b) const;
 ```
 
-### Into Operations
-```cpp
-// Unsqueeze into pre-allocated tensor
-Tensor input = Tensor::full(Shape(2, 3), 1.0f);
-Tensor output = Tensor::empty(Shape(2, 1, 3), DType::FP32, tr::CPU);
-cpu_backend->unsqueeze_into(input, output);  // Output gets the unsqueezed data
+**特性**:
+- 支持2D、3D、4D张量
+- 只在高度和宽度维度补零
+- 支持多种数据类型
 
-// Pad into pre-allocated tensor
-Tensor pad_input = Tensor::randn(Shape(3, 4), 321, DType::FP32, tr::CPU);
-Tensor pad_output = Tensor::empty(Shape(5, 6), DType::FP32, tr::CPU);
-cpu_backend->pad_into(pad_input, 1, pad_output);  // Output gets padded data
+### Reduction操作（V1.34.1新增）
+
+#### 1. Softmax操作
+沿指定维度计算softmax值，提供数值稳定性保证。
+
+```cpp
+Tensor softmax(const Tensor& tensor_a, int32_t dim);
+void softmax_inplace(Tensor& tensor_a, int32_t dim);
+void softmax_into(const Tensor& tensor_a, Tensor& result, int32_t dim);
 ```
 
-### Inplace Operations
-```cpp
-// Unsqueeze inplace
-Tensor tensor = Tensor::full(Shape(2, 3), 1.0f);
-cpu_backend->unsqueeze_inplace(tensor, 1);  // tensor.shape() becomes (2, 1, 3)
+**特性**:
+- **数据类型**: 仅支持FP32
+- **数值稳定性**: 使用减最大值的方法避免指数溢出
+- **API兼容**: 与PyTorch的softmax行为一致
+- **维度支持**: 支持1D到4D张量
+- **负数索引**: 支持`dim=-1`等负数维度索引
 
-// Squeeze inplace
-Tensor tensor2 = Tensor::full(Shape(1, 4), 2.0f);
-cpu_backend->squeeze_inplace(tensor2, 0);  // tensor2.shape() becomes (4,)
+**数值稳定性实现**:
+```cpp
+// 对每个切片先减去最大值，再计算softmax
+float max_val = input_data[slice_start];
+for (int32_t i = 1; i < slice_size; ++i) {
+    max_val = std::max(max_val, input_data[slice_start + i * dim_stride]);
+}
+
+// 计算 exp(x - max_val) 并归一化
+float sum = 0.0f;
+for (int32_t i = 0; i < slice_size; ++i) {
+    float exp_val = std::exp(input_data[idx] - max_val);
+    sum += exp_val;
+    result_data[idx] = exp_val / sum;
+}
 ```
 
-### Complex Operations
-```cpp
-// Multiple dimension operations
-Tensor original = Tensor::randn(Shape(3, 4), 42, DType::FP32, tr::CPU);
-Tensor step1 = cpu_backend->unsqueeze(original, 0);    // (1, 3, 4)
-Tensor step2 = cpu_backend->squeeze(step1, 0);       // (3, 4) - back to original
-Tensor step3 = cpu_backend->pad(original, 1);         // (5, 6)
+#### 2. Max操作
+沿指定维度找最大值，支持keep_dim参数控制输出形状。
 
-// Combine operations for complex transformations
-Tensor img_2d = Tensor::randn(Shape(224, 224), 100, DType::FP32, tr::CPU);
-Tensor img_3d = cpu_backend->unsqueeze(img_2d, 0);    // (1, 224, 224) - add channel dim
-Tensor img_4d = cpu_backend->unsqueeze(img_3d, 0);    // (1, 1, 224, 224) - add batch dim
-Tensor padded_img = cpu_backend->pad(img_4d, 2);      // (1, 1, 228, 228) - add zero padding
+```cpp
+Tensor max(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+void max_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
 ```
 
-## Performance Characteristics
+**特性**:
+- **数据类型**: 支持FP32、INT8、INT32
+- **keep_dim参数**:
+  - `true`: 保留reduction维度，大小设为1
+  - `false`: 移除reduction维度（默认）
+- **输出类型**: 与输入张量相同的数据类型
 
-Based on benchmark tests:
+**形状变换示例**:
+```cpp
+// 输入: (2, 3, 4), dim=1
+Tensor result = cpu->max(input, 1, false);  // 输出: (2, 4)
+Tensor result = cpu->max(input, 1, true);   // 输出: (2, 1, 4)
+```
 
-### Unsqueeze/Squeeze Operations
-- **Large Tensor Unsqueeze**: ~441 microseconds for 1M elements
-- **Large Tensor Squeeze**: ~436 microseconds for 1M elements
-- **Memory Copy Operations**: Efficient data transfer using `memcpy`
-- **Shape Calculation**: Minimal overhead for dimension manipulation
+#### 3. Sum操作
+沿指定维度求和，支持keep_dim参数控制输出形状。
 
-### Pad Operations
-- **Memory Initialization**: Fast zero filling using `memset`
-- **Centered Copy**: Efficient memory copy with proper indexing
-- **Type Optimization**: Separate optimized paths for FP32 and INT8
-- **Cache Efficiency**: Sequential memory access patterns for better performance
+```cpp
+Tensor sum(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
+```
 
-## Testing
+**特性**:
+- **数据类型**: 仅支持FP32
+- **keep_dim参数**: 同max操作
+- **输出类型**: 总是FP32类型
+- **累加精度**: 不考虑溢出问题
 
-The implementation includes comprehensive test coverage:
+#### 4. ArgMax操作
+沿指定维度寻找最大值所在的索引，返回第一个出现的最大值位置。
 
-### Test Categories
-1. **Basic Operations**: Core unsqueeze, squeeze, and padding functionality
-2. **Dimension Variations**: Different tensor dimensions and positions
-3. **Edge Cases**: Error conditions and boundary cases
-4. **Into Operations**: Pre-allocated tensor writing
-5. **Inplace Operations**: Direct tensor modification
-6. **Complex Scenarios**: Multiple operations and inverse operations
-7. **Data Types**: Testing both FP32 and INT8 support
-8. **Padding Verification**: Boundary checking and centering validation
+```cpp
+Tensor argmax(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
+void argmax_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
+```
 
-### Running Tests
+**特性**:
+- **数据类型**: 输入支持FP32、INT8、INT32
+- **输出类型**: 总是INT32类型
+- **索引规则**: 返回指定维度内的相对索引（0-based）
+- **重复值处理**: 返回第一个出现的最大值索引
+- **keep_dim参数**: 同max操作
+
+## 核心算法实现
+
+### 维度索引规范化
+
+支持负数维度索引，与PyTorch完全兼容：
+
+```cpp
+static int32_t normalize_dim(int32_t dim, int32_t ndim) {
+    if (dim < 0) {
+        dim += ndim;  // 负数索引转换为正数
+    }
+    if (dim < 0 || dim >= ndim) {
+        throw TRException("[CPU Dim] Dimension index out of range");
+    }
+    return dim;
+}
+```
+
+### 输出形状计算
+
+统一的reduction形状计算逻辑：
+
+```cpp
+static Shape calculate_reduction_shape(const Shape& input_shape, int32_t dim, bool keep_dim) {
+    int32_t ndim = input_shape.ndim();
+    std::vector<int32_t> output_dims;
+
+    for (int32_t i = 0; i < ndim; ++i) {
+        if (i == dim) {
+            if (keep_dim) {
+                output_dims.push_back(1);  // 保留维度，大小为1
+            }
+            // keep_dim=false时跳过该维度
+        } else {
+            output_dims.push_back(input_shape.dim(i));
+        }
+    }
+
+    return create_shape_from_dims(output_dims);
+}
+```
+
+### 索引映射算法
+
+针对keep_dim参数的优化索引映射：
+
+```cpp
+if (keep_dim) {
+    // keep_dim=true: 输出维度数与输入相同
+    for (int32_t i = 0; i < ndim; ++i) {
+        if (i == dim) {
+            coord = 0;  // reduction维度坐标总是0
+        } else {
+            coord = temp_out_idx / result_strides[i];
+            temp_out_idx %= result_strides[i];
+        }
+        input_idx += coord * input_strides[i];
+    }
+} else {
+    // keep_dim=false: 输出维度数比输入少1
+    for (int32_t i = 0; i < ndim; ++i) {
+        if (i == dim) {
+            continue;  // 跳过reduction维度
+        }
+        int32_t result_dim = i;
+        if (i > dim) {
+            result_dim = i - 1;  // 调整输出维度索引
+        }
+        coord = temp_out_idx / result_strides[result_dim];
+        temp_out_idx %= result_strides[result_dim];
+        input_idx += coord * input_strides[i];
+    }
+}
+```
+
+## 参数验证机制
+
+### 统一验证框架
+
+```cpp
+static void validate_dim_operation(const Tensor& tensor, int32_t dim, const std::string& operation_name) {
+    // 设备验证
+    if (tensor.device() != tr::CPU) {
+        throw TRException("[CPU " + operation_name + "] Device must be CPU");
+    }
+
+    // 内存验证
+    if (!tensor.storage_allocated()) {
+        throw TRException("[CPU " + operation_name + "] Tensor storage not allocated");
+    }
+
+    // 标量验证
+    if (tensor.shape().ndim() == 0) {
+        throw TRException("[CPU " + operation_name + "] Cannot perform operation on scalar tensor");
+    }
+
+    // 维度索引验证
+    dim = normalize_dim(dim, tensor.shape().ndim());
+
+    // 零维度验证
+    if (tensor.shape().dim(dim) == 0) {
+        throw TRException("[CPU " + operation_name + "] Cannot perform operation on dimension with size 0");
+    }
+}
+```
+
+### 数据类型验证
+
+每个操作都有相应的数据类型限制：
+
+```cpp
+// Softmax示例
+if (tensor_a.dtype() != DType::FP32) {
+    throw TRException("[CPU Softmax] Only supports FP32 tensor");
+}
+
+// Max/ArgMax示例 - 支持多种类型
+if (tensor_a.dtype() == DType::FP32) {
+    max_operation_core<float>(tensor_a, result, dim, keep_dim);
+} else if (tensor_a.dtype() == DType::INT8) {
+    max_operation_core<int8_t>(tensor_a, result, dim, keep_dim);
+} else if (tensor_a.dtype() == DType::INT32) {
+    max_operation_core<int32_t>(tensor_a, result, dim, keep_dim);
+}
+```
+
+## 使用示例
+
+### 基本Reduction操作
+
+```cpp
+auto cpu = BackendManager::get_cpu_backend();
+
+// 创建测试张量
+Tensor tensor = cpu->randint(Shape(2, 3, 4), 0, 10, DType::FP32);
+
+// Softmax操作
+Tensor softmax_result = cpu->softmax(tensor, 1);  // 沿维度1
+Tensor softmax_neg = cpu->softmax(tensor, -1); // 负数索引
+
+// Max操作
+Tensor max_false = cpu->max(tensor, 1, false);  // (2, 4)
+Tensor max_true = cpu->max(tensor, 1, true);   // (2, 1, 4)
+
+// Sum操作
+Tensor sum_false = cpu->sum(tensor, 2, false);  // (2, 3)
+Tensor sum_true = cpu->sum(tensor, 2, true);   // (2, 3, 1)
+
+// ArgMax操作
+Tensor argmax_false = cpu->argmax(tensor, 1, false);  // (2, 4) - INT32类型
+Tensor argmax_true = cpu->argmax(tensor, 1, true);   // (2, 1, 4) - INT32类型
+```
+
+### _into操作示例
+
+```cpp
+// 预分配输出张量
+Tensor result = cpu->empty(expected_shape, DType::FP32);
+
+// 使用_into操作避免额外内存分配
+cpu->softmax_into(tensor, result, 1);
+cpu->max_into(tensor, result, 1, true);
+cpu->sum_into(tensor, result, 2, false);
+cpu->argmax_into(tensor, result, 1, false);  // result必须为INT32类型
+```
+
+### 多数据类型支持
+
+```cpp
+// FP32张量
+Tensor fp32_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::FP32);
+Tensor fp32_max = cpu->max(fp32_tensor, 1);  // FP32输出
+
+// INT8张量
+Tensor int8_tensor = cpu->randint(Shape(2, 3), -10, 10, DType::INT8);
+Tensor int8_max = cpu->max(int8_tensor, 1);  // INT8输出
+Tensor int8_argmax = cpu->argmax(int8_tensor, 1);  // INT32输出
+```
+
+## 性能特性
+
+### 时间复杂度
+
+- **Softmax**: O(N × D) - N为元素总数，D为reduction维度大小
+- **Max/ArgMax**: O(N × D) - 需要遍历每个reduction组
+- **Sum**: O(N × D) - 线性累加操作
+
+### 空间复杂度
+
+- **非原地操作**: O(N) - 需要分配输出张量
+- **原地操作**: O(1) - 在原张量上操作
+- **_into操作**: O(1) - 写入预分配张量
+
+### 内存优化
+
+1. **模板特化**: 针对不同数据类型优化实现
+2. **原地操作**: 减少内存分配开销
+3. **步长计算**: 高效的多维索引映射
+4. **数值稳定性**: Softmax避免指数溢出
+
+## 错误处理
+
+### 常见错误类型
+
+1. **维度索引超出范围**
+   ```cpp
+   // 错误示例
+   Tensor result = cpu->max(tensor, 10);  // 超出张量维度范围
+
+   // 异常信息
+   // TRException: [CPU Dim] Dimension index out of range
+   ```
+
+2. **标量张量操作**
+   ```cpp
+   // 错误示例
+   Tensor scalar = cpu->ones(Shape(), DType::FP32);
+   Tensor result = cpu->max(scalar, 0);
+
+   // 异常信息
+   // TRException: [CPU Max] Cannot perform operation on scalar tensor
+   ```
+
+3. **零维度操作**
+   ```cpp
+   // 错误示例
+   Tensor zero_dim = cpu->ones(Shape(2, 0, 3), DType::FP32);
+   Tensor result = cpu->max(zero_dim, 1);
+
+   // 异常信息
+   // TRException: [CPU Max] Cannot perform operation on dimension with size 0
+   ```
+
+4. **数据类型不匹配**
+   ```cpp
+   // 错误示例
+   Tensor fp32_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::FP32);
+   cpu->softmax(fp32_tensor, 1);  // OK
+   Tensor int8_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::INT8);
+   cpu->softmax(int8_tensor, 1);  // 错误！
+
+   // 异常信息
+   // TRException: [CPU Softmax] Only supports FP32 tensor
+   ```
+
+## 兼容性
+
+### PyTorch兼容性
+
+所有reduction操作都与PyTorch的对应函数保持行为一致：
+
+| PyTorch函数 | CPU后端函数 | 行为一致性 |
+|-------------|-------------|-----------|
+| `torch.softmax(x, dim)` | `cpu->softmax(x, dim)` | ✅ 完全一致 |
+| `torch.max(x, dim)` | `cpu->max(x, dim)` | ✅ 完全一致 |
+| `torch.sum(x, dim)` | `cpu->sum(x, dim)` | ✅ 完全一致 |
+| `torch.argmax(x, dim)` | `cpu->argmax(x, dim)` | ✅ 完全一致 |
+
+### 数据类型支持
+
+| 操作 | FP32 | INT8 | INT32 |
+|------|------|------|-------|
+| Softmax | ✅ | ❌ | ❌ |
+| Max | ✅ | ✅ | ✅ |
+| Sum | ✅ | ❌ | ❌ |
+| ArgMax | ✅ | ✅ | ✅ |
+| Unsqueeze | ✅ | ✅ | ✅ |
+| Squeeze | ✅ | ✅ | ✅ |
+| Pad | ✅ | ✅ | ✅ |
+
+## 最佳实践
+
+### 1. 选择合适的操作类型
+
+```cpp
+// 推荐：使用_into操作避免额外内存分配
+auto result = cpu->empty(expected_shape, DType::FP32);
+cpu->max_into(tensor, result, 1, keep_dim);
+
+// 避免重复内存分配
+// Tensor result = cpu->max(tensor, 1, keep_dim);  // 每次都分配新内存
+```
+
+### 2. 利用负数索引提高可读性
+
+```cpp
+// 推荐：使用负数索引
+Tensor result = cpu->softmax(tensor, -1);  // 最后一维
+Tensor result = cpu->max(tensor, -2);     // 倒数第二维
+
+// 不推荐：硬编码正数索引
+Tensor result = cpu->softmax(tensor, tensor.shape().ndim() - 1);
+```
+
+### 3. 注意数据类型转换
+
+```cpp
+// INT8张量进行ArgMax时输出为INT32
+Tensor int8_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::INT8);
+Tensor indices = cpu->argmax(int8_tensor, 1);  // 输出为INT32类型
+
+// Softmax只能用于FP32张量
+Tensor fp32_tensor = cpu->cast(int8_tensor, DType::FP32);
+Tensor softmax_result = cpu->softmax(fp32_tensor, 1);
+```
+
+### 4. 批量操作优化
+
+```cpp
+// 对多个张量进行相同操作时，重用内存
+Tensor buffer = cpu->empty(max_shape, DType::FP32);
+for (auto& tensor : tensor_list) {
+    cpu->softmax_into(tensor, buffer, 1);
+    // 处理buffer中的结果
+}
+```
+
+## 测试验证
+
+框架提供了完整的测试套件：
+
 ```bash
-# Build dimension tests
-cmake --build . --target test_cpu_dimension
+# 构建测试
+cd build && cmake --build . --config Release --target test_cpu_dim_ops
 
-# Build padding tests
-cmake --build . --target test_cpu_pad
-
-# Run dimension tests
-bin/tests/Release/test_cpu_dimension.exe
-
-# Run padding tests
-bin/tests/Release/test_cpu_pad.exe
+# 运行测试
+./bin/tests/Release/test_cpu_dim_ops.exe
 ```
 
-## Design Considerations
+测试覆盖：
+- ✅ 基本功能测试
+- ✅ keep_dim参数验证
+- ✅ 负数维度索引
+- ✅ 多数据类型支持
+- ✅ _into和_inplace操作
+- ✅ 错误处理验证
+- ✅ 数值稳定性验证
 
-### Data Integrity
-- **No Data Loss**: All operations preserve data values completely
-- **Memory Safety**: Proper bounds checking and validation
-- **Shape Consistency**: Accurate shape calculation and verification
-- **Padding Precision**: Exact boundary handling for padding operations
+## 相关文档
 
-### Performance Optimization
-- **Efficient Memory Operations**: Direct memory copying for data transfer
-- **Zero Initialization**: Optimized `memset` for padding operations
-- **Type Specialization**: Separate implementations for different data types
-- **Minimal Computation**: Focus on shape manipulation rather than data processing
+- [CPU后端文档](cpu_backend.md) - 了解其他CPU操作
+- [张量操作文档](tensor_operations.md) - 了解张量基础操作
+- [形状类文档](shape.md) - 了解张量形状操作
+- [数据类型文档](dtype.md) - 了解支持的数据类型
 
-### API Consistency
-- **Uniform Interface**: Consistent with other CPU backend operations
-- **Error Handling**: Standardized exception handling across all functions
-- **Documentation**: Clear function signatures and behavior descriptions
-- **English Output**: All user-facing messages in English, comments in Chinese
+---
 
-## Dependencies
-
-- **Standard Library**: `<vector>`, `<string>`, `<algorithm>`, `<stdexcept>`, `<cstring>`
-- **Internal Modules**: cpu_backend.h, tensor.h, tr_exception.h, logger.h
-- **Memory Operations**: `memcpy`, `memset` for efficient data transfer
-
-## Future Improvements
-
-1. **Extended Dimension Support**: Support for more than 4 dimensions
-2. **Advanced Shape Manipulation**: Support for multiple dimension operations
-3. **GPU Backend**: Implement CUDA-based dimension operations
-4. **Broadcast Integration**: Better integration with broadcasting operations
-5. **Memory Optimization**: In-place memory operations where possible
-6. **Validation Enhancement**: More comprehensive shape compatibility checking
-7. **Padding Variants**: Support for different padding modes (reflect, replicate, etc.)
-8. **Performance Optimization**: SIMD optimizations for large tensor operations
-
-## Files
-
-- **Implementation**: `src/backend/cpu/cpu_dimension.cpp`
-- **Header**: `include/tech_renaissance/backend/cpu/cpu_backend.h`
-- **Dimension Tests**: `tests/unit_tests/test_cpu_dimension.cpp`
-- **Padding Tests**: `tests/unit_tests/test_cpu_pad.cpp`
-- **Build Configuration**: `src/backend/CMakeLists.txt`, `tests/unit_tests/CMakeLists.txt`
-
-## Related Documentation
-
-- [CPU Backend Broadcast Operations](cpu_broadcast.md) - Broadcasting operations that work well with dimension manipulation
-- [CPU Backend Unary Operations](cpu_unary.md) - Single-tensor operations
-- [Tensor Class Documentation](tensor.md) - Core tensor functionality
-- [Backend Architecture](backend.md) - Overall backend system design
+*本文档最后更新时间: 2025-11-03*
