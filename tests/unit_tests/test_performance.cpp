@@ -211,9 +211,9 @@ int main() {
     }
 
     {
-        auto cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 1);
+        auto cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 0);
         for (int i = 0; i < warmup_iterations; ++i) {
-            cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 1);
+            cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 0);
         }
 
         cuda_backend->synchronize();
@@ -226,12 +226,12 @@ int main() {
 
         if (using_into_form) {
             for (int i = 0; i < iterations_cuda; ++i) {
-                cuda_backend->conv_into(input_cuda, kernel_1_cuda, cuda_result, 1, 1);  // FAST
+                cuda_backend->conv_into(input_cuda, kernel_1_cuda, cuda_result, 1, 0);  // FAST (现在已优化)
             }
         }
         else {
             for (int i = 0; i < iterations_cuda; ++i) {
-                cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 1);  // SLOW
+                cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 1);  // SLOW (现在已优化)
             }
         }
 

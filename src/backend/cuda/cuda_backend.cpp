@@ -808,12 +808,14 @@ std::shared_ptr<CudaBackend::ConvConfigCacheEntry> CudaBackend::get_conv_config(
     // 启用Tensor Core支持（如果可用）
     CUDNN_CHECK(cudnnSetConvolutionMathType(static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc), CUDNN_TENSOR_OP_MATH));
 
-    // 5. 查找最优算法（修复：为1×1卷积使用更保守的算法选择）
+    // 5. 查找最优算法（专家修复：解决1×1卷积性能问题）
     int returned_algo_count = 0;
-    cudnnConvolutionFwdAlgoPerf_t perf_result;
 
-    // 对于1×1卷积，使用更保守的算法选择
-    int requested_count = (k_shape.h() == 1 && k_shape.w() == 1) ? 1 : 3;
+    // 修复：请求足够多的算法（例如5-7个），以便cuDNN评估需要工作空间的快速算法
+    int requested_count = 5;
+
+    // 修复：声明一个*数组*来接收性能结果
+    cudnnConvolutionFwdAlgoPerf_t perf_results[5];
 
     CUDNN_CHECK(cudnnFindConvolutionForwardAlgorithm(
         cudnn_handle_,
@@ -821,17 +823,19 @@ std::shared_ptr<CudaBackend::ConvConfigCacheEntry> CudaBackend::get_conv_config(
         static_cast<cudnnFilterDescriptor_t>(new_entry->filter_desc),
         static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc),
         static_cast<cudnnTensorDescriptor_t>(new_entry->output_desc),
-        requested_count, &returned_algo_count, &perf_result));
+        requested_count, &returned_algo_count, perf_results)); // 修复：传入数组
 
     if (returned_algo_count == 0) {
         throw TRException("Failed to find any convolution algorithm");
     }
 
-    new_entry->algo = static_cast<int>(perf_result.algo);
-    new_entry->workspace_size = perf_result.memory;
+    // 修复：使用返回的第一个（即最快的）算法
+    // cuDNN保证返回的数组是按性能（最快）排序的
+    new_entry->algo = static_cast<int>(perf_results[0].algo);
+    new_entry->workspace_size = perf_results[0].memory;
 
     Logger::get_instance().info("Best algorithm found: " + std::to_string(new_entry->algo) +
-                                ", time: " + std::to_string(perf_result.time) + " ms" +
+                                ", time: " + std::to_string(perf_results[0].time) + " ms" +
                                 ", workspace: " + std::to_string(new_entry->workspace_size) + " bytes");
 
     // 6. 存入缓存
