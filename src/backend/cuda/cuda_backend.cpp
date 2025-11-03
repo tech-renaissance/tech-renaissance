@@ -12,10 +12,13 @@
 #include "tech_renaissance/backend/cuda/cuda_backend.h"
 #include "tech_renaissance/backend/cuda/cuda_common.h"
 #include "tech_renaissance/data/tensor.h"
+#include "tech_renaissance/data/storage.h"
 #include "tech_renaissance/utils/tr_exception.h"
 #include "tech_renaissance/utils/logger.h"
 #include <sstream>
 #include <vector>
+#include <random>
+#include <ctime>
 
 #ifdef TR_USE_CUDA
 
@@ -628,6 +631,72 @@ bool CudaBackend::is_close(const Tensor& tensor_a, const Tensor& tensor_b, float
     synchronize();
 
     return max_diff <= eps;
+}
+
+// ===== 张量创建方法 =====
+
+Tensor CudaBackend::empty(const Shape& shape, DType dtype) {
+    set_device();
+    Tensor result(shape, dtype, tr::CUDA[device_id_]);
+
+    // 分配CUDA内存
+    auto memory_holder = this->allocate(result.numel() * result.dtype_size());
+    result.storage_ = std::make_shared<Storage>(result.numel() * result.dtype_size(), tr::CUDA[device_id_]);
+    result.storage_->set_data_ptr(this->get_data_ptr(memory_holder), memory_holder);
+
+    return result;
+}
+
+Tensor CudaBackend::zeros(const Shape& shape, DType dtype) {
+    Tensor result = empty(shape, dtype);
+
+    // 使用CUDA将内存设置为零
+    CUDA_CHECK(cudaMemsetAsync(result.data_ptr(), 0,
+                               result.numel() * result.dtype_size(), stream_));
+
+    return result;
+}
+
+Tensor CudaBackend::ones(const Shape& shape, DType dtype) {
+    Tensor result = empty(shape, dtype);
+
+    if (dtype == DType::FP32) {
+        // 使用cuBLAS设置为一
+        float alpha = 1.0f;
+        cublasSscal(cublas_handle_, result.numel(), &alpha,
+                   static_cast<float*>(result.data_ptr()), 1);
+    } else {
+        // 对于其他数据类型，在CPU上填充后复制到GPU
+        throw TRException("[CudaBackend::ones] Only FP32 is currently supported");
+    }
+
+    return result;
+}
+
+Tensor CudaBackend::randn(const Shape& shape, unsigned int seed) {
+    if (seed == 0) {
+        seed = static_cast<unsigned int>(std::time(nullptr));
+    }
+
+    Tensor result = empty(shape, DType::FP32);
+
+    // 生成CPU上的随机数然后复制到GPU
+    std::mt19937 gen(seed);
+    std::normal_distribution<float> dist(0.0f, 1.0f);
+
+    size_t num_elements = result.numel();
+    std::vector<float> host_data(num_elements);
+
+    for (size_t i = 0; i < num_elements; ++i) {
+        host_data[i] = dist(gen);
+    }
+
+    // 复制到GPU
+    CUDA_CHECK(cudaMemcpyAsync(result.data_ptr(), host_data.data(),
+                               num_elements * sizeof(float),
+                               cudaMemcpyHostToDevice, stream_));
+
+    return result;
 }
 
 } // namespace tr

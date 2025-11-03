@@ -129,8 +129,8 @@ int main() {
 #endif
 
 {
-    Tensor input = cpu_backend->randn(Shape(256, 3, 9, 9), time(nullptr));
-    Tensor kernel_3 = cpu_backend->randn(Shape(128, 3, 3, 3), time(nullptr));
+    Tensor input = cpu_backend->randn(Shape(32, 512, 7, 7), time(nullptr));
+    Tensor kernel_3 = cpu_backend->randn(Shape(512, 512, 3, 3), time(nullptr));
 
     std::cout << std::endl;
     std::cout << "****************************************" << std::endl;

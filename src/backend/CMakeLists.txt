@@ -38,6 +38,15 @@ target_include_directories(backend
 if(TR_USE_EIGEN)
     # 添加Eigen包含目录（已由全局配置处理）
     target_include_directories(backend PUBLIC ${EIGEN_INCLUDE_DIR})
+
+    # 添加Eigen源码目录（用于更优化的配置）
+    target_include_directories(backend PUBLIC ${EIGEN_INCLUDE_DIR}/src)
+
+    # 设置Eigen高性能配置
+    target_compile_definitions(backend PRIVATE
+        EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+    )
+
     message(STATUS "Eigen optimizations: ENABLED for backend (global config)")
 else()
     message(STATUS "Eigen optimizations: DISABLED for backend (global config)")
@@ -45,6 +54,52 @@ endif()
 
 # 链接数据模块
 target_link_libraries(backend PUBLIC data)
+
+# 查找OpenMP支持
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    set(BACKEND_OPENMP_AVAILABLE TRUE)
+    message(STATUS "Backend: OpenMP found for high-performance compilation")
+else()
+    set(BACKEND_OPENMP_AVAILABLE FALSE)
+    message(WARNING "Backend: OpenMP not found, performance may be reduced")
+endif()
+
+# 启用高性能编译器优化
+if(MSVC)
+    # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_options(backend PRIVATE
+            /O2              # 最高级优化
+            /arch:AVX2        # 启用AVX2指令集
+            /openmp          # 启用OpenMP支持
+        )
+    else()
+        target_compile_options(backend PRIVATE
+            /openmp          # 在Debug模式下只启用OpenMP
+        )
+    endif()
+    # 链接OpenMP库
+    if(BACKEND_OPENMP_AVAILABLE)
+        target_link_libraries(backend PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+else()
+    # GCC/Clang编译器优化
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_options(backend PRIVATE
+            -O3              # 最高级优化
+            -march=native    # 针对当前CPU架构优化
+            -fopenmp         # 启用OpenMP
+        )
+    else()
+        target_compile_options(backend PRIVATE
+            -fopenmp         # 在Debug模式下只启用OpenMP
+        )
+    endif()
+    if(BACKEND_OPENMP_AVAILABLE)
+        target_link_libraries(backend PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+endif()
 
 # 设置编译选项
 target_compile_definitions(backend PRIVATE

@@ -21,7 +21,18 @@
 
 namespace tr {
 
-void CpuBackend::mm(Tensor& result, const Tensor& tensor_a, const Tensor& tensor_b) {
+Tensor CpuBackend::mm(const Tensor& tensor_a, const Tensor& tensor_b) {
+    const auto shape_a = tensor_a.shape();
+    const auto shape_b = tensor_b.shape();
+    const auto result_h = shape_a.h();
+    const auto result_w = shape_b.w();
+    const auto shape_result = Shape(result_h, result_w);
+    Tensor result = this->empty(shape_result, DType::FP32);
+    this->mm_into(tensor_a, tensor_b, result);
+    return result;
+}
+
+void CpuBackend::mm_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) {
     // 1. 验证输入张量都在CPU设备上
     validate_same_device(tensor_a.device());
     validate_same_device(tensor_b.device());

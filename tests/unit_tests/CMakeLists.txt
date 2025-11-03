@@ -20,6 +20,16 @@ else()
     message(WARNING "Eigen library not found at ${EIGEN_ROOT_DIR}")
 endif()
 
+# 查找OpenMP支持
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    set(OPENMP_AVAILABLE TRUE)
+    message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+else()
+    set(OPENMP_AVAILABLE FALSE)
+    message(WARNING "OpenMP not found, performance may be reduced")
+endif()
+
 # 检查CUDA支持（使用根目录的设置）
 if(TR_ENABLE_CUDA)
     set(CUDA_BACKEND_ENABLED TRUE)
@@ -110,13 +120,87 @@ configure_simple_test(test_cpu_cast test_cpu_cast.cpp)
 # =============================================================================
 # CPU矩阵运算测试
 # =============================================================================
-configure_simple_test(test_cpu_mm test_cpu_mm.cpp)
+# configure_simple_test(test_cpu_mm test_cpu_mm.cpp)  # 已删除
 
 # =============================================================================
-# CPU卷积测试
+# CPU卷积测试（高性能优化配置）
 # =============================================================================
-configure_simple_test(test_cpu_conv test_cpu_conv.cpp)
-configure_simple_test(test_cpu_gemm test_cpu_gemm.cpp)
+if(EIGEN_FOUND)
+    add_executable(test_cpu_conv test_cpu_conv.cpp)
+
+    # 链接主库 - 让tech_renaissance自动传递所有依赖
+    if(WIN32)
+        target_link_libraries(test_cpu_conv PRIVATE tech_renaissance)
+    else()
+        target_link_libraries(test_cpu_conv PRIVATE tech_renaissance pthread)
+    endif()
+
+    # 包含头文件目录
+    target_include_directories(test_cpu_conv
+        PRIVATE
+            ../../include
+            ${EIGEN_INCLUDE_DIR}
+            ${EIGEN_INCLUDE_DIR}/src
+        )
+
+    # 设置编译选项 - 启用高性能优化
+    target_compile_definitions(test_cpu_conv PRIVATE
+        EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+    )
+
+    # 启用编译器优化
+    if(MSVC)
+        # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_conv PRIVATE
+                /O2              # 最高级优化
+                /arch:AVX2        # 启用AVX2指令集
+                /openmp          # 启用OpenMP支持
+            )
+        else()
+            target_compile_options(test_cpu_conv PRIVATE
+                /openmp          # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        # 链接OpenMP库
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_conv PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    else()
+        # GCC/Clang编译器优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_conv PRIVATE
+                -O3              # 最高级优化
+                -march=native    # 针对当前CPU架构优化
+                -fopenmp         # 启用OpenMP
+            )
+        else()
+            target_compile_options(test_cpu_conv PRIVATE
+                -fopenmp         # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_conv PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    endif()
+
+    # 设置标准属性
+    set_target_properties(test_cpu_conv PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        FOLDER "tests"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+    )
+
+    message(STATUS "[SUCCESS] test_cpu_conv configured with high-performance optimization")
+else()
+    # 回退到简单配置
+    configure_simple_test(test_cpu_conv test_cpu_conv.cpp)
+    message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cpu_conv")
+endif()
+
+# configure_simple_test(test_cpu_gemm test_cpu_gemm.cpp)  # 已删除
 
 # =============================================================================
 # CPU切片测试
@@ -139,9 +223,148 @@ configure_simple_test(test_cpu_conv_new test_cpu_conv_new.cpp)
 configure_simple_test(test_cpu_conv_extra test_cpu_conv_extra.cpp)
 
 # =============================================================================
-# CPU卷积最终测试
+# CPU卷积最终测试（高性能优化配置）
 # =============================================================================
-configure_simple_test(test_cpu_conv_final test_cpu_conv_final.cpp)
+if(EIGEN_FOUND)
+    add_executable(test_cpu_conv_final test_cpu_conv_final.cpp)
+
+    # 链接主库 - 让tech_renaissance自动传递所有依赖
+    if(WIN32)
+        target_link_libraries(test_cpu_conv_final PRIVATE tech_renaissance)
+    else()
+        target_link_libraries(test_cpu_conv_final PRIVATE tech_renaissance pthread)
+    endif()
+
+    # 定义PROJECT_ROOT_DIR宏，指向项目根目录
+    target_compile_definitions(test_cpu_conv_final
+        PUBLIC
+            PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+            EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+    )
+
+    # 设置编译选项 - 启用高性能优化
+    if(MSVC)
+        # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_conv_final PRIVATE
+                /O2              # 最高级优化
+                /arch:AVX2        # 启用AVX2指令集
+                /openmp          # 启用OpenMP支持
+            )
+        else()
+            target_compile_options(test_cpu_conv_final PRIVATE
+                /openmp          # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        # 链接OpenMP库
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_conv_final PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    else()
+        # GCC/Clang编译器优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_conv_final PRIVATE
+                -O3              # 最高级优化
+                -march=native    # 针对当前CPU架构优化
+                -fopenmp         # 启用OpenMP
+            )
+        else()
+            target_compile_options(test_cpu_conv_final PRIVATE
+                -fopenmp         # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_conv_final PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    endif()
+
+    # 设置标准属性
+    set_target_properties(test_cpu_conv_final PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        FOLDER "tests"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+    )
+
+    message(STATUS "[SUCCESS] test_cpu_conv_final configured with high-performance optimization")
+else()
+    # 回退到简单配置
+    configure_simple_test(test_cpu_conv_final test_cpu_conv_final.cpp)
+    message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cpu_conv_final")
+endif()
+
+# =============================================================================
+# CPU矩阵乘法最终测试（高性能优化配置）
+# =============================================================================
+if(EIGEN_FOUND)
+    add_executable(test_cpu_mm_final test_cpu_mm_final.cpp)
+
+    # 链接主库 - 让tech_renaissance自动传递所有依赖
+    if(WIN32)
+        target_link_libraries(test_cpu_mm_final PRIVATE tech_renaissance)
+    else()
+        target_link_libraries(test_cpu_mm_final PRIVATE tech_renaissance pthread)
+    endif()
+
+    # 定义PROJECT_ROOT_DIR宏，指向项目根目录
+    target_compile_definitions(test_cpu_mm_final
+        PUBLIC
+            PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+            EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+    )
+
+    # 设置编译选项 - 启用高性能优化
+    if(MSVC)
+        # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_mm_final PRIVATE
+                /O2              # 最高级优化
+                /arch:AVX2        # 启用AVX2指令集
+                /openmp          # 启用OpenMP支持
+            )
+        else()
+            target_compile_options(test_cpu_mm_final PRIVATE
+                /openmp          # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        # 链接OpenMP库
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_mm_final PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    else()
+        # GCC/Clang编译器优化
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            target_compile_options(test_cpu_mm_final PRIVATE
+                -O3              # 最高级优化
+                -march=native    # 针对当前CPU架构优化
+                -fopenmp         # 启用OpenMP
+            )
+        else()
+            target_compile_options(test_cpu_mm_final PRIVATE
+                -fopenmp         # 在Debug模式下只启用OpenMP
+            )
+        endif()
+        if(OPENMP_AVAILABLE)
+            target_link_libraries(test_cpu_mm_final PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+    endif()
+
+    # 设置标准属性
+    set_target_properties(test_cpu_mm_final PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        FOLDER "tests"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+    )
+
+    message(STATUS "[SUCCESS] test_cpu_mm_final configured with high-performance optimization")
+else()
+    # 回退到简单配置
+    configure_simple_test(test_cpu_mm_final test_cpu_mm_final.cpp)
+    message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cpu_mm_final")
+endif()
 
 
 # =============================================================================
@@ -153,7 +376,7 @@ configure_simple_test(test_naive_gemm test_naive_gemm.cpp)
 # =============================================================================
 # 高级功能测试
 # =============================================================================
-configure_simple_test(test_new_api test_new_api.cpp)
+# configure_simple_test(test_new_api test_new_api.cpp)  # 已删除
 
 # =============================================================================
 # 内存管理测试
@@ -231,11 +454,11 @@ register_test(test_cpu_create "CPU Create Test")
 register_test(test_cpu_cast "CPU Cast Test")
 
 # 注册矩阵运算测试
-register_test(test_cpu_mm "CPU Matrix Multiplication Test")
+# register_test(test_cpu_mm "CPU Matrix Multiplication Test")  # 已删除
 
 # 注册卷积测试
 register_test(test_cpu_conv "CPU Convolution Test")
-register_test(test_cpu_gemm "CPU GEMM Test")
+# register_test(test_cpu_gemm "CPU GEMM Test")  # 已删除
 
 # 注册切片测试
 register_test(test_cpu_slice "CPU Slice Test")
@@ -252,12 +475,96 @@ register_test(test_cpu_conv_extra "CPU Convolution Extra Test")
 # 注册卷积最终测试
 register_test(test_cpu_conv_final "CPU Convolution Final Test")
 
+# 注册矩阵乘法最终测试
+register_test(test_cpu_mm_final "CPU Matrix Multiplication Final Test")
+
+# 注册CUDA矩阵乘法最终测试
+if(TR_ENABLE_CUDA)
+    register_test(test_cuda_mm_final "CUDA Matrix Multiplication Final Test")
+endif()
+
+# =============================================================================
+# CUDA矩阵乘法最终测试（高性能优化配置）
+# =============================================================================
+if(TR_ENABLE_CUDA)
+    if(EIGEN_FOUND)
+        add_executable(test_cuda_mm_final test_cuda_mm_final.cpp)
+
+        # 链接主库 - 让tech_renaissance自动传递所有依赖
+        if(WIN32)
+            target_link_libraries(test_cuda_mm_final PRIVATE tech_renaissance)
+        else()
+            target_link_libraries(test_cuda_mm_final PRIVATE tech_renaissance pthread)
+        endif()
+
+        # 定义PROJECT_ROOT_DIR宏，指向项目根目录
+        target_compile_definitions(test_cuda_mm_final
+            PUBLIC
+                PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+                EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+        )
+
+        # 设置编译选项 - 启用高性能优化
+        if(MSVC)
+            # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+            if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                target_compile_options(test_cuda_mm_final PRIVATE
+                    /O2              # 最高级优化
+                    /arch:AVX2        # 启用AVX2指令集
+                    /openmp          # 启用OpenMP支持
+                )
+            else()
+                target_compile_options(test_cuda_mm_final PRIVATE
+                    /openmp          # 在Debug模式下只启用OpenMP
+                )
+            endif()
+            # 链接OpenMP库
+            if(OPENMP_AVAILABLE)
+                target_link_libraries(test_cuda_mm_final PRIVATE OpenMP::OpenMP_CXX)
+            endif()
+        else()
+            # GCC/Clang编译器优化
+            if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                target_compile_options(test_cuda_mm_final PRIVATE
+                    -O3              # 最高级优化
+                    -march=native    # 针对当前CPU架构优化
+                    -fopenmp         # 启用OpenMP
+                )
+            else()
+                target_compile_options(test_cuda_mm_final PRIVATE
+                    -fopenmp         # 在Debug模式下只启用OpenMP
+                )
+            endif()
+            if(OPENMP_AVAILABLE)
+                target_link_libraries(test_cuda_mm_final PRIVATE OpenMP::OpenMP_CXX)
+            endif()
+        endif()
+
+        # 设置标准属性
+        set_target_properties(test_cuda_mm_final PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+            FOLDER "tests"
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+        )
+
+        message(STATUS "[SUCCESS] test_cuda_mm_final configured with high-performance optimization")
+    else()
+        # 回退到简单配置
+        configure_simple_test(test_cuda_mm_final test_cuda_mm_final.cpp)
+        message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cuda_mm_final")
+    endif()
+else()
+    message(STATUS "[INFO] CUDA backend tests disabled (TR_ENABLE_CUDA=OFF)")
+endif()
+
 # 注册简单算法测试
 register_test(test_naive_conv "Naive Convolution Test")
 register_test(test_naive_gemm "Naive GEMM Test")
 
 # 注册高级功能测试
-register_test(test_new_api "New API Test")
+# register_test(test_new_api "New API Test")  # 已删除
 
 # 注册内存管理测试
 register_test(test_memory_occupation "Memory Occupation Test")

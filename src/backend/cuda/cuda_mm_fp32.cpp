@@ -19,7 +19,18 @@
 
 namespace tr {
 
-void CudaBackend::mm(Tensor& result, const Tensor& a, const Tensor& b) {
+Tensor CudaBackend::mm(const Tensor& tensor_a, const Tensor& tensor_b) {
+    const auto shape_a = tensor_a.shape();
+    const auto shape_b = tensor_b.shape();
+    const auto result_h = shape_a.h();
+    const auto result_w = shape_b.w();
+    const auto shape_result = Shape(result_h, result_w);
+    Tensor result = this->empty(shape_result, DType::FP32);
+    this->mm_into(tensor_a, tensor_b, result);
+    return result;
+}
+
+void CudaBackend::mm_into(const Tensor& a, const Tensor& b, Tensor& result) {
     // 检查设备
     validate_same_device(a.device());
     validate_same_device(b.device());

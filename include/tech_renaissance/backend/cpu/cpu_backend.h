@@ -45,7 +45,8 @@ public:
     // 基本运算
     void add(Tensor& result, const Tensor& a, const Tensor& b) override;
     void mul(Tensor& result, const Tensor& a, const Tensor& b) override;
-    void mm(Tensor& result, const Tensor& tensor_a, const Tensor& tensor_b) override;
+    Tensor mm(const Tensor& tensor_a, const Tensor& tensor_b) override;
+    void mm_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) override;
 
     // 设备转换方法
     Tensor to(const Tensor& tensor, const Device& device) const override;
@@ -73,13 +74,13 @@ public:
     // 这个方法会创建一个大小为(0, 0, 0, 0)的空张量，不占用内存，是本框架建议的销毁张量的方式
     static Tensor null_tensor();
 
-    Tensor empty(const Shape& shape, DType dtype);
-    Tensor zeros(const Shape& shape, DType dtype);
-    Tensor ones(const Shape& shape, DType dtype);
+    Tensor empty(const Shape& shape, DType dtype) override;
+    Tensor zeros(const Shape& shape, DType dtype) override;
+    Tensor ones(const Shape& shape, DType dtype) override;
     // 张量创建函数（V1.29.4新增）
     Tensor full(const Shape& shape, float value, DType dtype = DType::FP32);
     static void full_inplace(Tensor& tensor_a, float value);
-    Tensor randn(const Shape& shape, unsigned int seed = 0);
+    Tensor randn(const Shape& shape, unsigned int seed = 0) override;
     static void randn_inplace(Tensor& tensor_a, unsigned int seed = 0);
     Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
     static void uniform_inplace(Tensor& tensor_a, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);

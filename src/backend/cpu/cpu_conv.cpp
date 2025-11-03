@@ -22,7 +22,10 @@
 #include <cmath>
 #include <numeric>
 
+#ifdef TR_USE_EIGEN
 #include "Core"
+#include <omp.h>
+#endif
 
 namespace tr {
 
@@ -296,9 +299,127 @@ static void conv_operation_core_naive(const Tensor& input, const Tensor& kernel,
  */
 static void conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
                                      Tensor& result, int32_t stride, int32_t padding) {
-    // 对于当前实现，Eigen版本使用相同的朴素算法
-    // 未来可以用Eigen::Map和Eigen::Reducer进行优化
+#ifdef TR_USE_EIGEN
+    // 使用Eigen优化的实现
+    Logger::get_instance().debug("Using Eigen for CPU convolution");
+
+    // 设置Eigen多线程配置
+    Eigen::setNbThreads(omp_get_max_threads());
+
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    const float* kernel_data = static_cast<const float*>(kernel.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    const Shape& input_shape = input.shape();
+    const Shape& kernel_shape = kernel.shape();
+    const Shape& result_shape = result.shape();
+    int32_t input_ndim = input_shape.ndim();
+
+    // 获取输入和输出维度
+    int32_t input_h = input_shape.h();
+    int32_t input_w = input_shape.w();
+    int32_t kernel_h = kernel_shape.h();
+    int32_t kernel_w = kernel_shape.w();
+    int32_t output_h = result_shape.h();
+    int32_t output_w = result_shape.w();
+
+    // 获取通道和批次信息
+    int32_t batch_size = (input_ndim == 4) ? input_shape.n() : 1;
+    int32_t in_channels = (input_ndim >= 3) ? input_shape.c() : 1;
+    int32_t out_channels = kernel_shape.n();
+
+    // im2col + GEMM 优化
+    int32_t col_rows = in_channels * kernel_h * kernel_w;
+    int32_t col_cols = output_h * output_w;
+
+    // 创建权重矩阵 W [out_channels x col_rows]
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> W(out_channels, col_rows);
+    for (int oc = 0; oc < out_channels; ++oc) {
+        for (int ic = 0; ic < in_channels; ++ic) {
+            for (int kh = 0; kh < kernel_h; ++kh) {
+                for (int kw = 0; kw < kernel_w; ++kw) {
+                    int col = ic * kernel_h * kernel_w + kh * kernel_w + kw;
+                    // kernel_shape: (out_channels, in_channels, kernel_h, kernel_w)
+                    int kernel_idx = oc * (in_channels * kernel_h * kernel_w) +
+                                   ic * (kernel_h * kernel_w) +
+                                   kh * kernel_w + kw;
+                    W(oc, col) = kernel_data[kernel_idx];
+                }
+            }
+        }
+    }
+
+    // 对每个batch执行im2col + GEMM
+    for (int b = 0; b < batch_size; ++b) {
+        // 创建im2col矩阵 [col_rows x col_cols]
+        Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> col(col_rows, col_cols);
+
+        // im2col变换
+        for (int oh = 0; oh < output_h; ++oh) {
+            for (int ow = 0; ow < output_w; ++ow) {
+                int col_idx = oh * output_w + ow;
+                int ih_start = oh * stride - padding;
+                int iw_start = ow * stride - padding;
+
+                for (int ic = 0; ic < in_channels; ++ic) {
+                    for (int kh = 0; kh < kernel_h; ++kh) {
+                        for (int kw = 0; kw < kernel_w; ++kw) {
+                            int ih = ih_start + kh;
+                            int iw = iw_start + kw;
+                            float val = 0.0f;
+
+                            if (ih >= 0 && ih < input_h && iw >= 0 && iw < input_w) {
+                                // 计算输入索引
+                                int input_idx = 0;
+                                if (input_ndim == 4) {
+                                    input_idx = b * in_channels * input_h * input_w +
+                                              ic * input_h * input_w +
+                                              ih * input_w + iw;
+                                } else if (input_ndim == 3) {
+                                    input_idx = ic * input_h * input_w + ih * input_w + iw;
+                                } else { // ndim == 2
+                                    input_idx = ih * input_w + iw;
+                                }
+                                val = input_data[input_idx];
+                            }
+
+                            int row = ic * kernel_h * kernel_w + kh * kernel_w + kw;
+                            col(row, col_idx) = val;
+                        }
+                    }
+                }
+            }
+        }
+
+        // GEMM计算: output = W * col
+        Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> output_mat = W * col;
+
+        // 将结果复制回输出张量
+        for (int oc = 0; oc < out_channels; ++oc) {
+            for (int oh = 0; oh < output_h; ++oh) {
+                for (int ow = 0; ow < output_w; ++ow) {
+                    int mat_idx = oh * output_w + ow;
+                    int result_idx = 0;
+                    if (input_ndim == 4) {
+                        result_idx = b * out_channels * output_h * output_w +
+                                  oc * output_h * output_w +
+                                  oh * output_w + ow;
+                    } else if (input_ndim == 3) {
+                        result_idx = oc * output_h * output_w + oh * output_w + ow;
+                    } else { // ndim == 2
+                        result_idx = oh * output_w + ow;
+                    }
+                    result_data[result_idx] = output_mat(oc, mat_idx);
+                }
+            }
+        }
+    }
+
+#else
+    // 使用朴素实现
+    Logger::get_instance().debug("Using naive implementation for CPU convolution");
     conv_operation_core_naive(input, kernel, result, stride, padding);
+#endif
 }
 
 // ===== 转置卷积朴素实现 =====
@@ -409,9 +530,16 @@ static void transposed_conv_operation_core_naive(const Tensor& input, const Tens
  */
 static void transposed_conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
                                                  Tensor& result, int32_t stride, int32_t padding) {
-    // 对于当前实现，Eigen版本使用相同的朴素算法
+#ifdef TR_USE_EIGEN
+    // 对于当前实现，转置卷积Eigen版本使用相同的朴素算法
     // 未来可以用Eigen::Map和更高效的稀疏操作进行优化
+    Logger::get_instance().debug("Using Eigen for CPU transposed convolution (naive implementation)");
     transposed_conv_operation_core_naive(input, kernel, result, stride, padding);
+#else
+    // 使用朴素实现
+    Logger::get_instance().debug("Using naive implementation for CPU transposed convolution");
+    transposed_conv_operation_core_naive(input, kernel, result, stride, padding);
+#endif
 }
 
 // ===== 公共API实现 =====

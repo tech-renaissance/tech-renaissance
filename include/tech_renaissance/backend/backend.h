@@ -18,6 +18,10 @@
 
 namespace tr {
 
+// 前向声明
+class Tensor;
+class Shape;
+
 // ########## 关键修改 ##########
 // 不包含 "tech_renaissance/data/tensor.h"
 // 仅使用前向声明，彻底解耦
@@ -128,12 +132,19 @@ public:
 
     /**
      * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N)
-     * @param result 结果张量，形状应为(M,N,1,1)
-     * @param a 输入张量A，形状应为(M,K,1,1)
-     * @param b 输入张量B，形状应为(N,K,1,1)
-     * @note 仅支持FP32数据类型
+     * @param a 输入张量A
+     * @param b 输入张量B
+     * @return 结果张量
      */
-    virtual void mm(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+    virtual Tensor mm(const Tensor& a, const Tensor& b) = 0;
+
+    /**
+     * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N) (指定输出张量)
+     * @param a 输入张量A
+     * @param b 输入张量B
+     * @param result 结果张量
+     */
+    virtual void mm_into(const Tensor& a, const Tensor& b, Tensor& result) = 0;
 
     // ===== 设备转换方法 =====
 
@@ -172,6 +183,40 @@ public:
      * @return 设备标识
      */
     virtual Device device() const = 0;
+
+    // ===== 张量创建操作 =====
+
+    /**
+     * @brief 创建空张量
+     * @param shape 张量形状
+     * @param dtype 数据类型
+     * @return 空张量
+     */
+    virtual Tensor empty(const Shape& shape, DType dtype) = 0;
+
+    /**
+     * @brief 创建零张量
+     * @param shape 张量形状
+     * @param dtype 数据类型
+     * @return 零张量
+     */
+    virtual Tensor zeros(const Shape& shape, DType dtype) = 0;
+
+    /**
+     * @brief 创建一张量
+     * @param shape 张量形状
+     * @param dtype 数据类型
+     * @return 一张量
+     */
+    virtual Tensor ones(const Shape& shape, DType dtype) = 0;
+
+    /**
+     * @brief 创建正态分布随机张量
+     * @param shape 张量形状
+     * @param seed 随机种子
+     * @return 随机张量
+     */
+    virtual Tensor randn(const Shape& shape, unsigned int seed = 0) = 0;
 
     // ===== 张量复制操作 =====
 

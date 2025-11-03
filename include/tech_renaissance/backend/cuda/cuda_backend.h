@@ -59,7 +59,8 @@ public:
     void mul(Tensor& result, const Tensor& a, const Tensor& b) override;
 
     // 矩阵乘法
-    void mm(Tensor& result, const Tensor& a, const Tensor& b) override;
+    Tensor mm(const Tensor& a, const Tensor& b) override;
+    void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override;
 
     // 设备转换方法
     Tensor to(const Tensor& tensor, const Device& device) const override;
@@ -75,6 +76,12 @@ public:
     int32_t get_scalar_int32(const Tensor& tensor) override;
     int8_t get_scalar_int8(const Tensor& tensor) override;
     int64_t get_memory_size(const Tensor& tensor) override;
+
+    // 张量创建操作
+    Tensor empty(const Shape& shape, DType dtype) override;
+    Tensor zeros(const Shape& shape, DType dtype) override;
+    Tensor ones(const Shape& shape, DType dtype) override;
+    Tensor randn(const Shape& shape, unsigned int seed = 0) override;
 
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;
