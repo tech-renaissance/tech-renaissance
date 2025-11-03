@@ -9,6 +9,7 @@
 set(DATA_SOURCES
     device.cpp
     dtype.cpp
+    offset.cpp
     shape.cpp
     storage.cpp
     tensor.cpp
