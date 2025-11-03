@@ -44,7 +44,7 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.32.3
+**版本**: V1.33.0
 **更新日期**: 2025-11-03
 **作者**: 技术觉醒团队
 
@@ -1126,6 +1126,123 @@ EXPORT_TENSOR(tensor, "output.tsr");
 // 使用便捷宏导入张量
 tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 ```
+
+## 元素级数据访问方法
+
+CPU后端提供了完整的元素级数据访问功能，支持线性索引直接访问张量中的单个元素。这些方法提供了高性能的直接内存访问能力，同时包含完整的安全检查机制。
+
+### 核心方法
+
+#### FP32数据访问
+
+```cpp
+// 获取FP32张量中指定线性索引的元素值
+float get_item_fp32(const Tensor& tensor_a, int64_t element_index);
+
+// 设置FP32张量中指定线性索引的元素值
+void set_item_fp32(Tensor& tensor_a, int64_t element_index, float value);
+```
+
+#### INT8数据访问
+
+```cpp
+// 获取INT8张量中指定线性索引的元素值
+int8_t get_item_int8(const Tensor& tensor_a, int64_t element_index);
+
+// 设置INT8张量中指定线性索引的元素值
+void set_item_int8(Tensor& tensor_a, int64_t element_index, int8_t value);
+```
+
+#### INT32数据访问
+
+```cpp
+// 获取INT32张量中指定线性索引的元素值
+int32_t get_item_int32(const Tensor& tensor_a, int64_t element_index);
+
+// 设置INT32张量中指定线性索引的元素值
+void set_item_int32(Tensor& tensor_a, int64_t element_index, int32_t value);
+```
+
+### 使用示例
+
+```cpp
+auto backend = BackendManager::get_cpu_backend();
+
+// 创建不同类型的张量
+Tensor fp32_tensor = backend->zeros({2, 3, 4}, DType::FP32);
+Tensor int8_tensor = backend->zeros({2, 3, 4}, DType::INT8);
+Tensor int32_tensor = backend->zeros({2, 3, 4}, DType::INT32);
+
+// 设置和获取FP32值
+backend->set_item_fp32(fp32_tensor, 0, 1.5f);      // 第一个元素
+backend->set_item_fp32(fp32_tensor, 23, 8.9f);    // 最后一个元素
+float value1 = backend->get_item_fp32(fp32_tensor, 0);   // 返回 1.5f
+float value2 = backend->get_item_fp32(fp32_tensor, 23);  // 返回 8.9f
+
+// 设置和获取INT8值
+backend->set_item_int8(int8_tensor, 5, 42);       // 第六个元素
+int8_t int8_value = backend->get_item_int8(int8_tensor, 5); // 返回 42
+
+// 设置和获取INT32值
+backend->set_item_int32(int32_tensor, 10, 1000);     // 第十一个元素
+int32_t int32_value = backend->get_item_int32(int32_tensor, 10); // 返回 1000
+```
+
+### 线性索引说明
+
+**索引计算**：线性索引是张量在内存中的连续位置，计算方式：
+```cpp
+// 对于形状为(N, C, H, W)的张量
+int64_t linear_index = n * C * H * W + c * H * W + h * W + w;
+
+// 总元素数量
+int64_t total_elements = tensor.numel();
+// 有效索引范围：[0, total_elements-1]
+```
+
+**优势**：
+- **高性能**：直接内存访问，避免多层索引计算开销
+- **简洁性**：单索引访问所有维度，简化复杂操作
+- **通用性**：支持任意形状的张量，自动适配维度
+
+### 安全检查机制
+
+所有元素访问方法都包含完整的安全检查：
+
+1. **设备验证**：确保张量位于CPU设备
+2. **内存检查**：验证张量已分配内存
+3. **类型验证**：确保数据类型与方法匹配
+4. **边界检查**：验证索引在有效范围内
+5. **异常处理**：提供详细的错误信息
+
+**错误处理示例**：
+```cpp
+try {
+    backend->get_item_fp32(tensor, -1);  // 负索引
+} catch (const TRException& e) {
+    // 错误信息：get_item_fp32: element index -1 out of range [0, 24]
+}
+
+try {
+    backend->get_item_int8(fp32_tensor, 0); // 类型不匹配
+} catch (const TRException& e) {
+    // 错误信息：get_item_int8: tensor dtype must be INT8, got FP32
+}
+```
+
+### 性能优化
+
+- **内存对齐**：所有访问都考虑了内存对齐优化
+- **直接访问**：使用`static_cast`进行类型转换，避免运行时开销
+- **缓存友好**：线性访问模式对CPU缓存友好
+
+### 应用场景
+
+1. **逐元素处理**：循环处理张量中的每个元素
+2. **随机访问**：根据业务逻辑访问特定位置的元素
+3. **边界条件**：快速访问张量边缘或特定位置的值
+4. **调试分析**：检查张量中特定位置的数据内容
+5. **算法实现**：实现需要直接元素访问的自定义算法
 
 ## 关键设计原则总结（V1.23.1）
 

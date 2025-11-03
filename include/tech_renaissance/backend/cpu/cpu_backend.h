@@ -61,6 +61,14 @@ public:
     int8_t get_scalar_int8(const Tensor& tensor) override;
     int64_t get_memory_size(const Tensor& tensor) override;
 
+    // 元素级数据访问（线性索引）
+    float get_item_fp32(const Tensor& tensor_a, int64_t element_index);
+    void set_item_fp32(Tensor& tensor_a, int64_t element_index, float value);
+    int8_t get_item_int8(const Tensor& tensor_a, int64_t element_index);
+    void set_item_int8(Tensor& tensor_a, int64_t element_index, int8_t value);
+    int32_t get_item_int32(const Tensor& tensor_a, int64_t element_index);
+    void set_item_int32(Tensor& tensor_a, int64_t element_index, int32_t value);
+
     // 这个方法会创建一个大小为(0, 0, 0, 0)的空张量，不占用内存，是本框架建议的销毁张量的方式
     static Tensor null_tensor();
 

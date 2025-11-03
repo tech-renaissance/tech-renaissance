@@ -136,6 +136,11 @@ configure_simple_test(test_memory_occupation test_memory_occupation.cpp)
 configure_simple_test(test_get_memory_size test_get_memory_size.cpp)
 
 # =============================================================================
+# 元素访问测试
+# =============================================================================
+configure_simple_test(test_item_access test_item_access.cpp)
+
+# =============================================================================
 # Python接口测试（如果启用）
 # =============================================================================
 if(TR_BUILD_PYTHON_SESSION)
@@ -211,6 +216,9 @@ register_test(test_new_api "New API Test")
 # 注册内存管理测试
 register_test(test_memory_occupation "Memory Occupation Test")
 register_test(test_get_memory_size "Get Memory Size Test")
+
+# 注册元素访问测试
+register_test(test_item_access "Item Access Test")
 
 # 注册Python接口测试
 if(TR_BUILD_PYTHON_SESSION)

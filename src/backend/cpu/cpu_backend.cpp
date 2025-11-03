@@ -747,4 +747,176 @@ Tensor CpuBackend::from_cpu(const Tensor& tensor) const {
     return tensor;
 }
 
+// =============================================================================
+// 元素级数据访问方法（线性索引）
+// =============================================================================
+
+float CpuBackend::get_item_fp32(const Tensor& tensor_a, int64_t element_index) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("get_item_fp32: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("get_item_fp32: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("get_item_fp32: tensor dtype must be FP32, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("get_item_fp32: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并返回元素（考虑内存对齐优化）
+    const float* data = static_cast<const float*>(tensor_a.data_ptr());
+    return data[element_index];
+}
+
+void CpuBackend::set_item_fp32(Tensor& tensor_a, int64_t element_index, float value) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("set_item_fp32: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("set_item_fp32: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("set_item_fp32: tensor dtype must be FP32, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("set_item_fp32: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并设置元素（考虑内存对齐优化）
+    float* data = static_cast<float*>(tensor_a.data_ptr());
+    data[element_index] = value;
+}
+
+int8_t CpuBackend::get_item_int8(const Tensor& tensor_a, int64_t element_index) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("get_item_int8: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("get_item_int8: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::INT8) {
+        throw TRException("get_item_int8: tensor dtype must be INT8, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("get_item_int8: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并返回元素（考虑内存对齐优化）
+    const int8_t* data = static_cast<const int8_t*>(tensor_a.data_ptr());
+    return data[element_index];
+}
+
+void CpuBackend::set_item_int8(Tensor& tensor_a, int64_t element_index, int8_t value) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("set_item_int8: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("set_item_int8: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::INT8) {
+        throw TRException("set_item_int8: tensor dtype must be INT8, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("set_item_int8: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并设置元素（考虑内存对齐优化）
+    int8_t* data = static_cast<int8_t*>(tensor_a.data_ptr());
+    data[element_index] = value;
+}
+
+int32_t CpuBackend::get_item_int32(const Tensor& tensor_a, int64_t element_index) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("get_item_int32: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("get_item_int32: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::INT32) {
+        throw TRException("get_item_int32: tensor dtype must be INT32, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("get_item_int32: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并返回元素（考虑内存对齐优化）
+    const int32_t* data = static_cast<const int32_t*>(tensor_a.data_ptr());
+    return data[element_index];
+}
+
+void CpuBackend::set_item_int32(Tensor& tensor_a, int64_t element_index, int32_t value) {
+    // 检查设备
+    if (!tensor_a.device().is_cpu()) {
+        throw TRException("set_item_int32: tensor must be on CPU device");
+    }
+
+    // 检查内存是否已分配
+    if (!tensor_a.storage_allocated()) {
+        throw TRException("set_item_int32: tensor storage not allocated");
+    }
+
+    // 检查数据类型
+    if (tensor_a.dtype() != DType::INT32) {
+        throw TRException("set_item_int32: tensor dtype must be INT32, got " + dtype_to_string(tensor_a.dtype()));
+    }
+
+    // 检查索引范围
+    const int64_t num_elements = tensor_a.numel();
+    if (element_index < 0 || element_index >= num_elements) {
+        throw TRException("set_item_int32: element index " + std::to_string(element_index) +
+                          " out of range [0, " + std::to_string(num_elements) + ")");
+    }
+
+    // 获取数据指针并设置元素（考虑内存对齐优化）
+    int32_t* data = static_cast<int32_t*>(tensor_a.data_ptr());
+    data[element_index] = value;
+}
+
 } // namespace tr
