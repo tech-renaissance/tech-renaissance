@@ -44,7 +44,7 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.31.2
+**版本**: V1.32.3
 **更新日期**: 2025-11-03
 **作者**: 技术觉醒团队
 
@@ -308,6 +308,11 @@ backend->fill(tensor, 42);  // 所有元素设为42
 **返回值：** 新的张量对象
 
 **设备：** CPU
+
+**重要说明**：
+- **此方法会分配内存但未初始化数据**
+- 这与Tensor构造函数不同，构造函数只创建元数据不分配内存
+- 适用于后续会填充数据的场景
 
 **示例：**
 ```cpp
@@ -773,6 +778,122 @@ Tensor src = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
 Tensor dst = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
 cpu_backend->copy_into(src, dst);  // 深拷贝到dst
 ```
+
+## 张量销毁最佳实践
+
+### # 推荐的张量销毁方法
+
+在Tech Renaissance框架中，对于大型张量的销毁，我们强烈建议结合以下两种方法：
+
+#### 方法1：RAII作用域管理（推荐用于局部张量）
+
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+
+{
+    // 在大括号内创建大型张量
+    Tensor temp_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+    // 使用temp_tensor进行计算
+    // ...
+
+}  // temp_tensor在这里自动析构，内存立即释放
+```
+
+**优点：**
+- 自动内存管理，符合RAII原则
+- 作用域清晰，内存释放时机明确
+- 代码简洁，无需手动管理
+
+#### 方法2：显式后端null_tensor()方法（推荐用于需要灵活控制的场景）
+
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+
+// 创建大型张量
+Tensor large_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+// 使用large_tensor进行计算
+// ...
+
+// 显式销毁，立即释放内存
+large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null张量
+```
+
+**优点：**
+- 显式操作，代码意图清晰
+- 灵活控制释放时机
+- 符合"后端管理存储"的设计原则
+
+#### `Tensor null_tensor()`
+
+**功能**：返回一个空的null张量，不占用任何内存。
+
+**参数**：无
+
+**返回值**：null张量（无内存分配）
+
+**示例**：
+```cpp
+// 显式销毁张量
+tensor = cpu_backend->null_tensor();
+
+// 检查张量是否为null
+if (tensor.is_empty()) {
+    // 张量是null，没有内存
+}
+```
+
+### 为什么推荐这两种方法？
+
+1. **避免构造函数误用**：防止用户直接调用`Tensor()`构造函数
+   ```cpp
+   // ❌ 危险：违反后端解耦原则
+   tensor = Tensor();  // 用户不清楚这个操作的含义
+
+   // ✅ 安全：显式使用后端方法
+   tensor = cpu_backend->null_tensor();  // 明确：通过CPU后端设为null
+   ```
+
+2. **API明确性**：`null_tensor()`比`empty()`更无歧义
+   - **Tensor构造函数**：只创建元数据，**不分配内存**（段错误！）
+   - **Backend::empty()**：**分配内存但未初始化数据**
+   - **Backend::null_tensor()**：真正的空张量，**不占用内存**
+
+3. **符合框架设计**：所有操作都通过后端，保持一致性
+
+### 实际案例参考
+
+参见 `tests/unit_tests/test_memory_occupation.cpp` 中的完整测试案例，该测试验证了：
+- RAII作用域管理的有效性
+- `null_tensor()`方法的正确性
+- 不同销毁方式的内存释放效果
+
+### 组合使用建议
+
+```cpp
+void process_large_data() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 方法1：对于临时使用的张量，使用RAII
+    {
+        Tensor temp_data = cpu_backend->zeros(Shape(1000, 1000));
+        // 处理temp_data
+    }  // 自动释放
+
+    // 方法2：对于需要长期存在但可能提前释放的张量
+    Tensor persistent_tensor = cpu_backend->zeros(Shape(2000, 2000));
+
+    // 在某些条件下提前释放
+    if (some_condition) {
+        persistent_tensor = cpu_backend->null_tensor();
+    }
+
+    // 继续使用persistent_tensor（如果没被释放）
+}
+```
+
+**核心原则**：无论使用哪种方法，都要避免直接调用Tensor类的构造函数进行销毁操作。
 
 ### 单目运算操作
 

@@ -25,6 +25,10 @@
 
 namespace tr {
 
+Tensor CpuBackend::null_tensor() {
+    return Tensor();
+}
+
 Tensor CpuBackend::empty(const Shape& shape, DType dtype) {
     Tensor result(shape, dtype, CPU);
     auto memory_holder = this->allocate(result.numel() * result.dtype_size());

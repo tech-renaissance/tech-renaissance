@@ -6,6 +6,11 @@
 
 在Tech Renaissance框架中，Tensor构造函数只创建元数据，不分配实际内存。所有张量必须通过Backend类的方法来创建，因为Backend会在创建后立即分配内存。
 
+**重要区别**：
+- **Tensor构造函数**：创建Tensor对象但**不分配内存**（段错误！）
+- **Backend::empty()**：**分配内存但未初始化数据**
+- **Backend::null_tensor()**：真正的空张量，**不占用内存**
+
 **正确的张量创建流程：**
 1. 获取Backend子类实例：`BackendManager::instance().get_backend(CPU)`
 2. 转换为具体的Backend子类：`std::dynamic_pointer_cast<CpuBackend>(backend)`
@@ -24,7 +29,7 @@ The Tensor-Backend system in Tech Renaissance framework adopts a layered decoupl
 
 ## Version Information
 
-- **Version**: V1.31.2
+- **Version**: V1.32.3
 - **Date**: 2025-11-03
 - **Author**: 技术觉醒团队
 
@@ -644,6 +649,67 @@ The Tech Renaissance framework's Tensor-Backend system through the innovative "B
 **Key Innovations**:
 - **Backend-Managed Storage Principle**: Each backend selects optimal memory layout
 - **Transparent Conversion Layers**: Automatically handle conversions between different storage formats
+
+## 张量销毁最佳实践
+
+### # 推荐的张量销毁方法
+
+在Tech Renaissance框架中，对于大型张量的销毁，我们强烈建议结合以下两种方法：
+
+#### 方法1：RAII作用域管理（推荐用于局部张量）
+
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+{
+    // 在大括号内创建大型张量
+    Tensor temp_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+    // 使用temp_tensor进行计算
+    // ...
+
+}  // temp_tensor在这里自动析构，内存立即释放
+```
+
+#### 方法2：显式后端null_tensor()方法（推荐用于需要灵活控制的场景）
+
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+// 创建大型张量
+Tensor large_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+// 使用large_tensor进行计算
+// ...
+
+// 显式销毁，立即释放内存
+large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null张量
+```
+
+### 内存分配的重要区别
+
+**关键理解不同方法的内存行为：**
+
+1. **Tensor构造函数**：只创建元数据，**不分配内存**（段错误！）
+2. **Backend::empty()**：**分配内存但未初始化数据**
+3. **Backend::null_tensor()**：真正的空张量，**不占用内存**
+
+### 为什么推荐这两种方法？
+
+1. **避免构造函数误用**：防止用户直接调用`Tensor()`构造函数
+2. **API明确性**：`null_tensor()`比`empty()`更无歧义
+3. **符合框架设计**：所有操作都通过后端，保持一致性
+
+### 实际案例参考
+
+参见 `tests/unit_tests/test_memory_occupation.cpp` 中的完整测试案例，该测试验证了：
+- RAII作用域管理的有效性
+- `null_tensor()`方法的正确性
+- 不同销毁方式的内存释放效果
+
+**核心原则**：无论使用哪种方法，都要避免直接调用Tensor类的构造函数进行销毁操作。
 - **Consistent Access Interface**: Users always see row-major data access
 - **Operation Delegation**: Computational and shape operations delegated to specialized backend implementations
 

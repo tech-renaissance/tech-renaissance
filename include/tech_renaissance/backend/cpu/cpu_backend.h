@@ -60,6 +60,9 @@ public:
     int32_t get_scalar_int32(const Tensor& tensor) override;
     int8_t get_scalar_int8(const Tensor& tensor) override;
 
+    // 这个方法会创建一个大小为(0, 0, 0, 0)的空张量，不占用内存，是本框架建议的销毁张量的方式
+    static Tensor null_tensor();
+
     Tensor empty(const Shape& shape, DType dtype);
     Tensor zeros(const Shape& shape, DType dtype);
     Tensor ones(const Shape& shape, DType dtype);

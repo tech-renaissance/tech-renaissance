@@ -48,7 +48,7 @@ This document describes the implementation of tensor creation functions in the C
 
 ## Version Information
 
-- **Version**: V1.31.2
+- **Version**: V1.32.3
 - **Date**: 2025-11-03
 - **Author**: 技术觉醒团队
 
@@ -98,7 +98,10 @@ The CPU backend implements 12 creation functions across 5 operation types:
   - `dtype`: Data type (FP32, INT8, INT32)
 - **Returns**: New empty tensor
 - **Device**: CPU
+- **Important**: **This method allocates memory but leaves data uninitialized**
 - **Example**: `Tensor t = cpu_backend->empty(Shape(3, 4), DType::FP32);`
+
+**Note**: Unlike Tensor constructors which don't allocate memory, `empty()` actually allocates memory but doesn't initialize the data values.
 
 #### `Tensor full(const Shape& shape, float value, DType dtype = DType::FP32)`
 - **Purpose**: Creates a tensor filled with the specified value
@@ -439,6 +442,113 @@ PASS: randn function test
 - **Header**: `include/tech_renaissance/backend/cpu/cpu_backend.h`
 - **Tests**: `tests/unit_tests/test_cpu_create.cpp`
 - **Build Configuration**: `src/backend/CMakeLists.txt`, `tests/unit_tests/CMakeLists.txt`
+
+## 张量销毁最佳实践
+
+### # 推荐的张量销毁方法
+
+在Tech Renaissance框架中，对于大型张量的销毁，我们强烈建议结合以下两种方法：
+
+#### 方法1：RAII作用域管理（推荐用于局部张量）
+
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+{
+    // 在大括号内创建大型张量
+    Tensor temp_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+    // 使用temp_tensor进行计算
+    // ...
+
+}  // temp_tensor在这里自动析构，内存立即释放
+```
+
+**优点：**
+- 自动内存管理，符合RAII原则
+- 作用域清晰，内存释放时机明确
+- 代码简洁，无需手动管理
+
+#### 方法2：显式后端null_tensor()方法（推荐用于需要灵活控制的场景）
+
+```cpp
+auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+    BackendManager::instance().get_backend(CPU));
+
+// 创建大型张量
+Tensor large_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
+
+// 使用large_tensor进行计算
+// ...
+
+// 显式销毁，立即释放内存
+large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null张量
+```
+
+**优点：**
+- 显式操作，代码意图清晰
+- 灵活控制释放时机
+- 符合"后端管理存储"的设计原则
+
+### 内存分配的重要区别
+
+**关键理解不同方法的内存行为：**
+
+1. **Tensor构造函数**：只创建元数据，**不分配内存**（段错误！）
+   ```cpp
+   Tensor tensor(shape, dtype, device);  // 危险！没有内存
+   ```
+
+2. **Backend::empty()**：**分配内存但未初始化数据**
+   ```cpp
+   Tensor tensor = cpu_backend->empty(shape, dtype);  // 有内存，数据未初始化
+   ```
+
+3. **Backend::null_tensor()**：真正的空张量，**不占用内存**
+   ```cpp
+   tensor = cpu_backend->null_tensor();  // 真正的空张量
+   ```
+
+### 为什么推荐这两种方法？
+
+1. **避免构造函数误用**：防止用户直接调用`Tensor()`构造函数
+2. **API明确性**：`null_tensor()`比`empty()`更无歧义
+3. **符合框架设计**：所有操作都通过后端，保持一致性
+
+### 实际案例参考
+
+参见 `tests/unit_tests/test_memory_occupation.cpp` 中的完整测试案例，该测试验证了：
+- RAII作用域管理的有效性
+- `null_tensor()`方法的正确性
+- 不同销毁方式的内存释放效果
+
+### 内存管理最佳实践总结
+
+```cpp
+void optimal_memory_usage_example() {
+    auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
+        BackendManager::instance().get_backend(CPU));
+
+    // 方法1：临时张量使用RAII
+    {
+        Tensor temp_data = cpu_backend->zeros(Shape(1000, 1000));
+        // 处理temp_data
+    }  // 自动释放
+
+    // 方法2：需要长期存在但可能提前释放的张量
+    Tensor persistent_tensor = cpu_backend->zeros(Shape(2000, 2000));
+
+    // 在某些条件下提前释放
+    if (some_condition) {
+        persistent_tensor = cpu_backend->null_tensor();
+    }
+
+    // 继续使用persistent_tensor（如果没被释放）
+}
+```
+
+**核心原则**：无论使用哪种方法，都要避免直接调用Tensor类的构造函数进行销毁操作。
 
 ## Related Documentation
 
