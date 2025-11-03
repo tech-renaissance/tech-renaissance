@@ -478,11 +478,6 @@ register_test(test_cpu_conv_final "CPU Convolution Final Test")
 # 注册矩阵乘法最终测试
 register_test(test_cpu_mm_final "CPU Matrix Multiplication Final Test")
 
-# 注册CUDA矩阵乘法最终测试
-if(TR_ENABLE_CUDA)
-    register_test(test_cuda_mm_final "CUDA Matrix Multiplication Final Test")
-endif()
-
 # =============================================================================
 # CUDA矩阵乘法最终测试（高性能优化配置）
 # =============================================================================
@@ -554,6 +549,64 @@ if(TR_ENABLE_CUDA)
         # 回退到简单配置
         configure_simple_test(test_cuda_mm_final test_cuda_mm_final.cpp)
         message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cuda_mm_final")
+    endif()
+
+    # =============================================================================
+    # CUDA卷积最终测试（高性能优化配置）
+    # =============================================================================
+    if(EIGEN_FOUND)
+        add_executable(test_cuda_conv_final test_cuda_conv_final.cpp)
+
+        # 链接主库 - 让tech_renaissance自动传递所有依赖
+        if(WIN32)
+            target_link_libraries(test_cuda_conv_final PRIVATE tech_renaissance)
+        else()
+            target_link_libraries(test_cuda_conv_final PRIVATE tech_renaissance pthread)
+        endif()
+
+        # 包含头文件目录
+        target_include_directories(test_cuda_conv_final
+            PRIVATE
+                ../../include
+                ${EIGEN_INCLUDE_DIR}
+                ${EIGEN_INCLUDE_DIR}/src
+        )
+
+        # 设置编译选项 - 启用高性能优化
+        target_compile_definitions(test_cuda_conv_final PRIVATE
+            EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+        )
+
+        # 启用编译器优化
+        if(MSVC)
+            # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+            if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                target_compile_options(test_cuda_conv_final PRIVATE
+                    /O2              # 最高级优化
+                    /arch:AVX2        # 启用AVX2指令集
+                    /openmp          # 启用OpenMP支持
+                )
+            else()
+                target_compile_options(test_cuda_conv_final PRIVATE
+                    /openmp          # 在Debug模式下只启用OpenMP
+                )
+            endif()
+        endif()
+
+        # 设置标准属性
+        set_target_properties(test_cuda_conv_final PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+            FOLDER "tests"
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+        )
+
+        message(STATUS "[SUCCESS] test_cuda_conv_final configured with high-performance optimization")
+    else()
+        # 回退到简单配置
+        configure_simple_test(test_cuda_conv_final test_cuda_conv_final.cpp)
+        message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cuda_conv_final")
     endif()
 else()
     message(STATUS "[INFO] CUDA backend tests disabled (TR_ENABLE_CUDA=OFF)")

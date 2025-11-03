@@ -24,6 +24,31 @@
 
 namespace tr {
 
+// ConvConfigCacheEntry 实现
+CudaBackend::ConvConfigCacheEntry::ConvConfigCacheEntry()
+    : input_desc(nullptr), output_desc(nullptr), filter_desc(nullptr), conv_desc(nullptr), algo(0), workspace_size(0) {
+    cudnnTensorDescriptor_t idesc, odesc;
+    cudnnFilterDescriptor_t fdesc;
+    cudnnConvolutionDescriptor_t cdesc;
+
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&idesc));
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&odesc));
+    CUDNN_CHECK(cudnnCreateFilterDescriptor(&fdesc));
+    CUDNN_CHECK(cudnnCreateConvolutionDescriptor(&cdesc));
+
+    input_desc = idesc;
+    output_desc = odesc;
+    filter_desc = fdesc;
+    conv_desc = cdesc;
+}
+
+CudaBackend::ConvConfigCacheEntry::~ConvConfigCacheEntry() {
+    if (input_desc) cudnnDestroyTensorDescriptor(static_cast<cudnnTensorDescriptor_t>(input_desc));
+    if (output_desc) cudnnDestroyTensorDescriptor(static_cast<cudnnTensorDescriptor_t>(output_desc));
+    if (filter_desc) cudnnDestroyFilterDescriptor(static_cast<cudnnFilterDescriptor_t>(filter_desc));
+    if (conv_desc) cudnnDestroyConvolutionDescriptor(static_cast<cudnnConvolutionDescriptor_t>(conv_desc));
+}
+
 CudaBackend::CudaBackend(int device_id)
     : device_id_(device_id), stream_(nullptr),
       cublas_handle_(nullptr), cudnn_handle_(nullptr) {
@@ -65,6 +90,21 @@ void CudaBackend::init_cuda_context() {
 }
 
 void CudaBackend::cleanup_cuda_context() {
+    // 清理工作空间缓存
+    {
+        std::lock_guard<std::mutex> lock(workspace_cache_mutex_);
+        for (auto& pair : workspace_cache_) {
+            if (pair.second) {
+                void* ptr = pair.second.get();
+                if (ptr) {
+                    cudaFree(ptr);
+                }
+            }
+        }
+        workspace_cache_.clear();
+    }
+
+    // 清理cuDNN和cuBLAS句柄
     if (cudnn_handle_) {
         cudnnDestroy(cudnn_handle_);
         cudnn_handle_ = nullptr;
@@ -697,6 +737,136 @@ Tensor CudaBackend::randn(const Shape& shape, unsigned int seed) {
                                cudaMemcpyHostToDevice, stream_));
 
     return result;
+}
+
+// 卷积配置缓存实现
+std::shared_ptr<CudaBackend::ConvConfigCacheEntry> CudaBackend::get_conv_config(
+    const Tensor& input, const Tensor& kernel, const Tensor& result,
+    int32_t stride, int32_t padding) {
+
+    // 1. 创建一个完整的、正确的键 (N, C, H, W, K, kH, s, p)
+    const auto& in_shape = input.shape();
+    const auto& k_shape = kernel.shape();
+    ConvConfigKey key = std::make_tuple(
+        in_shape.n(), in_shape.c(), in_shape.h(), in_shape.w(),
+        k_shape.n(), k_shape.h(), stride, padding
+    );
+
+    // 2. 检查缓存
+    {
+        std::lock_guard<std::mutex> lock(conv_config_cache_mutex_);
+        auto it = conv_config_cache_.find(key);
+        if (it != conv_config_cache_.end()) {
+            return it->second; // 缓存命中
+        }
+    }
+
+    // 3. 缓存未命中：执行昂贵的操作
+    Logger::get_instance().info("CudaBackend::get_conv_config: Cache MISS. Finding best algorithm");
+
+    // 创建新条目（这会自动创建4个描述符）
+    auto new_entry = std::make_shared<ConvConfigCacheEntry>();
+
+    const auto& out_shape = result.shape();
+
+    // 4. 设置描述符
+    CUDNN_CHECK(cudnnSetTensor4dDescriptor(static_cast<cudnnTensorDescriptor_t>(new_entry->input_desc), CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT,
+                                           in_shape.n(), in_shape.c(), in_shape.h(), in_shape.w()));
+
+    CUDNN_CHECK(cudnnSetFilter4dDescriptor(static_cast<cudnnFilterDescriptor_t>(new_entry->filter_desc), CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+                                          k_shape.n(), k_shape.c(), k_shape.h(), k_shape.w()));
+
+    CUDNN_CHECK(cudnnSetTensor4dDescriptor(static_cast<cudnnTensorDescriptor_t>(new_entry->output_desc), CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT,
+                                           out_shape.n(), out_shape.c(), out_shape.h(), out_shape.w()));
+
+    CUDNN_CHECK(cudnnSetConvolution2dDescriptor(static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc), padding, padding,
+                                                stride, stride, 1, 1, // Dilation
+                                                CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+
+    // 启用Tensor Core支持（如果可用）
+    CUDNN_CHECK(cudnnSetConvolutionMathType(static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc), CUDNN_TENSOR_OP_MATH));
+
+    // 5. 查找最优算法（修复：为1×1卷积使用更保守的算法选择）
+    int returned_algo_count = 0;
+    cudnnConvolutionFwdAlgoPerf_t perf_result;
+
+    // 对于1×1卷积，使用更保守的算法选择
+    int requested_count = (k_shape.h() == 1 && k_shape.w() == 1) ? 1 : 3;
+
+    CUDNN_CHECK(cudnnFindConvolutionForwardAlgorithm(
+        cudnn_handle_,
+        static_cast<cudnnTensorDescriptor_t>(new_entry->input_desc),
+        static_cast<cudnnFilterDescriptor_t>(new_entry->filter_desc),
+        static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc),
+        static_cast<cudnnTensorDescriptor_t>(new_entry->output_desc),
+        requested_count, &returned_algo_count, &perf_result));
+
+    if (returned_algo_count == 0) {
+        throw TRException("Failed to find any convolution algorithm");
+    }
+
+    new_entry->algo = static_cast<int>(perf_result.algo);
+    new_entry->workspace_size = perf_result.memory;
+
+    Logger::get_instance().info("Best algorithm found: " + std::to_string(new_entry->algo) +
+                                ", time: " + std::to_string(perf_result.time) + " ms" +
+                                ", workspace: " + std::to_string(new_entry->workspace_size) + " bytes");
+
+    // 6. 存入缓存
+    {
+        std::lock_guard<std::mutex> lock(conv_config_cache_mutex_);
+        // 再次检查，防止双重计算
+        auto it = conv_config_cache_.find(key);
+        if (it == conv_config_cache_.end()) {
+            conv_config_cache_[key] = new_entry;
+        }
+        return conv_config_cache_[key];
+    }
+}
+
+/**
+ * @brief 获取或创建缓存的工作空间内存
+ * @details 工作空间按大小缓存，避免频繁的cudaMalloc/cudaFree操作
+ */
+std::shared_ptr<void> CudaBackend::get_workspace(size_t size) {
+    if (size == 0) {
+        return nullptr;
+    }
+
+    // 检查缓存
+    {
+        std::lock_guard<std::mutex> lock(workspace_cache_mutex_);
+        auto it = workspace_cache_.find(size);
+        if (it != workspace_cache_.end()) {
+            return it->second; // 缓存命中
+        }
+    }
+
+    // 缓存未命中，分配新的工作空间
+    void* ptr = nullptr;
+    try {
+        set_device();
+        CUDA_CHECK(cudaMalloc(&ptr, size));
+
+        // 创建shared_ptr，使用自定义删除器
+        auto workspace_ptr = std::shared_ptr<void>(ptr, [this](void* p) {
+            if (p) {
+                // 注意：工作空间不会被真正释放，而是保留在缓存中
+                // 真正的释放在CudaBackend析构时进行
+            }
+        });
+
+        // 存入缓存
+        {
+            std::lock_guard<std::mutex> lock(workspace_cache_mutex_);
+            workspace_cache_[size] = workspace_ptr;
+        }
+
+        return workspace_ptr;
+    } catch (const std::exception& e) {
+        throw TRException("Failed to allocate workspace of size " + std::to_string(size) +
+                         " bytes: " + std::string(e.what()));
+    }
 }
 
 } // namespace tr

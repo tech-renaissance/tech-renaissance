@@ -134,6 +134,7 @@ if(TR_ENABLE_CUDA AND CUDAToolkit_FOUND AND TARGET cudnn_static)
     set(CUDA_BACKEND_SOURCES
         cuda/cuda_backend.cpp
         cuda/cuda_mm_fp32.cpp
+        cuda/cuda_conv.cpp
     )
 
     # 创建CUDA后端库

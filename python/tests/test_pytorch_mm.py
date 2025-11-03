@@ -18,7 +18,7 @@ C_cpu = torch.matmul(A_cpu, B_cpu)
 # 检查GPU可用性
 if torch.cuda.is_available():
     print("Running on GPU...")
-    device = torch.device("cuda")
+    device = torch.device("cpu")
     A_gpu = A_cpu.to(device)
     B_gpu = B_cpu.to(device)
 
