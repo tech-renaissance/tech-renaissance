@@ -18,6 +18,8 @@ set(BACKEND_SOURCES
     cpu/cpu_create.cpp
     cpu/cpu_cast.cpp
     cpu/cpu_slice.cpp
+    cpu/cpu_pooling.cpp
+    cpu/cpu_conv.cpp
 )
 
 # 创建基础后端库

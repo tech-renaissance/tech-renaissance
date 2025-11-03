@@ -237,6 +237,18 @@ public:
     Tensor argmax(const Tensor& tensor_a, int32_t dim, bool keep_dim = false);
     void argmax_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false);
 
+    // Pooling操作（V1.35.0新增）
+    Tensor max_pool(const Tensor& input, int32_t kernel_size = 2, int32_t stride = 2);
+    void max_pool_into(const Tensor& input, Tensor& result, int32_t kernel_size = 2, int32_t stride = 2);
+    Tensor global_avg_pool(const Tensor& input);
+    void global_avg_pool_into(const Tensor& input, Tensor& result);
+
+    // Convolution操作（V1.35.0新增）
+    Tensor conv(const Tensor& input, const Tensor& kernel, int32_t stride = 1, int32_t padding = 0);
+    void conv_into(const Tensor& input, const Tensor& kernel, Tensor& result, int32_t stride = 1, int32_t padding = 0);
+    Tensor transposed_conv(const Tensor& input, const Tensor& kernel, int32_t stride = 1, int32_t padding = 0);
+    void transposed_conv_into(const Tensor& input, const Tensor& kernel, Tensor& result, int32_t stride = 1, int32_t padding = 0);
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

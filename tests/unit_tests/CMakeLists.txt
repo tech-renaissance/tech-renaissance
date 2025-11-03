@@ -124,6 +124,22 @@ configure_simple_test(test_cpu_gemm test_cpu_gemm.cpp)
 configure_simple_test(test_cpu_slice test_cpu_slice.cpp)
 
 # =============================================================================
+# CPU池化测试
+# =============================================================================
+configure_simple_test(test_cpu_pooling test_cpu_pooling.cpp)
+
+# =============================================================================
+# CPU卷积新测试
+# =============================================================================
+configure_simple_test(test_cpu_conv_new test_cpu_conv_new.cpp)
+
+# =============================================================================
+# CPU卷积扩展测试
+# =============================================================================
+configure_simple_test(test_cpu_conv_extra test_cpu_conv_extra.cpp)
+
+
+# =============================================================================
 # 简单算法测试
 # =============================================================================
 configure_simple_test(test_naive_conv test_naive_conv.cpp)
@@ -218,6 +234,12 @@ register_test(test_cpu_gemm "CPU GEMM Test")
 
 # 注册切片测试
 register_test(test_cpu_slice "CPU Slice Test")
+
+# 注册池化测试
+register_test(test_cpu_pooling "CPU Pooling Test")
+
+# 注册卷积新测试
+register_test(test_cpu_conv_new "CPU Convolution New Test")
 
 # 注册简单算法测试
 register_test(test_naive_conv "Naive Convolution Test")
