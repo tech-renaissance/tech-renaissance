@@ -27,7 +27,7 @@ public:
     void set_iterations(int iterations);
     double total_time() const;
     void describe_operation(const std::string& operation_type, Shape shape_a, Shape shape_b);
-    double get_performance();
+    double get_performance() const;
 private:
     bool timer_started_;
     int iterations_;

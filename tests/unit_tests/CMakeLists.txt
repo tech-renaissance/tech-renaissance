@@ -138,6 +138,11 @@ configure_simple_test(test_cpu_conv_new test_cpu_conv_new.cpp)
 # =============================================================================
 configure_simple_test(test_cpu_conv_extra test_cpu_conv_extra.cpp)
 
+# =============================================================================
+# CPU卷积最终测试
+# =============================================================================
+configure_simple_test(test_cpu_conv_final test_cpu_conv_final.cpp)
+
 
 # =============================================================================
 # 简单算法测试
@@ -240,6 +245,12 @@ register_test(test_cpu_pooling "CPU Pooling Test")
 
 # 注册卷积新测试
 register_test(test_cpu_conv_new "CPU Convolution New Test")
+
+# 注册卷积扩展测试
+register_test(test_cpu_conv_extra "CPU Convolution Extra Test")
+
+# 注册卷积最终测试
+register_test(test_cpu_conv_final "CPU Convolution Final Test")
 
 # 注册简单算法测试
 register_test(test_naive_conv "Naive Convolution Test")

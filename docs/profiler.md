@@ -1,7 +1,7 @@
 # Profiler性能分析器API文档
 
-**版本**: V1.25.1
-**日期**: 2025-10-31
+**版本**: V1.35.3
+**日期**: 2025-11-03
 **作者**: 技术觉醒团队
 **所属系列**: utils
 
@@ -12,10 +12,12 @@ Profiler类是技术觉醒框架的核心性能分析工具，专门用于深度
 ## 特性
 
 - **高精度计时**: 基于C++ `std::chrono::steady_clock`，提供微秒级精度
-- **自动FLOPS计算**: 支持矩阵乘法等常见操作的浮点运算次数自动计算
+- **自动FLOPS计算**: 支持矩阵乘法、卷积等常见操作的浮点运算次数自动计算
 - **多格式支持**: 同时支持2D和4D张量形状描述
 - **线程安全**: 支持多线程环境下的性能测试
 - **异常安全**: 完整的错误检查和异常处理机制
+- **简化API**: 提供直观的配置和结果获取接口
+- **多操作支持**: V1.35.3新增卷积操作性能分析支持
 
 ## 快速开始
 
@@ -116,11 +118,15 @@ profiler.set_iterations(100);
 描述要测试的操作类型和输入张量形状，用于自动计算FLOPS。
 
 ```cpp
+// 矩阵乘法性能测试
 profiler.describe_operation("mm", shape_a, shape_b);
+
+// 卷积性能测试
+profiler.describe_operation("conv", input_shape, kernel_shape);
 ```
 
 **参数**:
-- `operation_type` (const std::string&): 操作类型，目前支持 "mm"（矩阵乘法）
+- `operation_type` (const std::string&): 操作类型，支持 "mm"（矩阵乘法）和 "conv"（卷积）
 - `shape_a` (Shape): 第一个输入张量的形状
 - `shape_b` (Shape): 第二个输入张量的形状
 
@@ -129,10 +135,11 @@ profiler.describe_operation("mm", shape_a, shape_b);
 | 类型 | 描述 | FLOPS计算公式 |
 |------|------|---------------|
 | "mm" | 矩阵乘法 | 2 × M × K × N |
+| "conv" | 卷积操作 | N × C_out × H_out × W_out × K_h × K_w × C_in |
 
 **形状处理**:
 - **2D Shape**: 使用 `h()` 和 `w()` 方法获取维度
-- **4D Shape**: 使用 `n()` 和 `c()` 方法获取维度
+- **4D Shape**: 使用 `n()`, `c()`, `h()`, `w()` 方法获取维度
 
 **异常**:
 - `TRException`: 如果不支持的操作类型
@@ -280,6 +287,37 @@ void compare_operations() {
 }
 ```
 
+### 卷积性能测试
+
+```cpp
+void benchmark_convolution() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 创建卷积测试数据
+    Tensor input = cpu_backend->randn(Shape(256, 3, 9, 9), 42);
+    Tensor kernel = cpu_backend->randn(Shape(128, 3, 3, 3), 42);
+
+    Profiler profiler;
+    profiler.set_iterations(20);
+    profiler.describe_operation("conv", input.shape(), kernel.shape());
+
+    // 预热运行
+    for (int i = 0; i < 5; ++i) {
+        cpu_backend->conv(input, kernel, 1, 1);
+    }
+
+    // 性能测试
+    profiler.start();
+    for (int i = 0; i < 20; ++i) {
+        cpu_backend->conv(input, kernel, 1, 1);
+    }
+    profiler.stop();
+
+    std::cout << "Convolution Performance: " << profiler.get_performance() << " GFLOPS" << std::endl;
+    std::cout << "Average time: " << profiler.avg_time() << " ms" << std::endl;
+}
+```
+
 ---
 
 ## 最佳实践
@@ -344,7 +382,9 @@ double avg_performance = total_performance / test_runs;
 2. **设备同步**: 对于CUDA操作，请确保在调用 `stop()` 之前同步设备
 3. **线程安全**: 每个Profiler实例是线程安全的，但不要在多个线程间共享同一个实例
 4. **精度限制**: 时间精度受限于系统时钟，通常为微秒级
-5. **操作类型**: 目前仅支持矩阵乘法，后续版本将支持更多操作类型
+5. **操作类型**: 支持矩阵乘法和卷积操作，后续版本将支持更多操作类型
+6. **卷积参数**: 卷积性能测试假设使用标准stride=1, padding=1的配置
+7. **FLOPS计算**: 不同操作的FLOPS计算公式不同，详见操作类型说明
 
 ---
 
@@ -352,6 +392,7 @@ double avg_performance = total_performance / test_runs;
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| V1.35.3 | 2025-11-03 | **增强卷积性能分析支持**<br>- 新增卷积操作("conv")FLOPS计算<br>- 添加卷积性能测试示例代码<br>- 更新操作类型支持文档<br>- 完善注意事项和最佳实践 |
 | V1.25.1 | 2025-10-31 | 初始版本，支持矩阵乘法性能分析，简化API设计 |
 
 ---

@@ -372,7 +372,7 @@ static void transposed_conv_operation_core_naive(const Tensor& input, const Tens
                                     // 计算卷积核索引（旋转180度）
                                     int32_t kernel_idx = oc * (in_channels * kernel_h * kernel_w) +
                                                       ic * (kernel_h * kernel_w) +
-                                                      kh * kernel_w + kw;
+                                                      (kernel_h - 1 - kh) * kernel_w + (kernel_w - 1 - kw);
 
                                     // 计算结果索引
                                     int32_t result_idx = 0;
