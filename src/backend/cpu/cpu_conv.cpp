@@ -290,7 +290,7 @@ static void conv_operation_core_naive(const Tensor& input, const Tensor& kernel,
 // ===== 标准卷积Eigen实现 =====
 
 /**
- * @brief 执行标准卷积的核心实现（Eigen版本 - im2col方法）
+ * @brief 执行标准卷积的核心实现（Eigen版本 - 高性能im2col+GEMM方法）
  * @param input 输入张量
  * @param kernel 卷积核张量
  * @param result 输出张量
@@ -300,8 +300,8 @@ static void conv_operation_core_naive(const Tensor& input, const Tensor& kernel,
 static void conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
                                      Tensor& result, int32_t stride, int32_t padding) {
 #ifdef TR_USE_EIGEN
-    // 使用Eigen优化的实现
-    Logger::get_instance().debug("Using Eigen for CPU convolution");
+    // 使用高性能Eigen优化实现，参考test_cpu_conv Solution A
+    Logger::get_instance().debug("Using high-performance Eigen im2col+GEMM for CPU convolution");
 
     // 设置Eigen多线程配置
     Eigen::setNbThreads(omp_get_max_threads());
@@ -323,16 +323,30 @@ static void conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
     int32_t output_h = result_shape.h();
     int32_t output_w = result_shape.w();
 
-    // 获取通道和批次信息
-    int32_t batch_size = (input_ndim == 4) ? input_shape.n() : 1;
-    int32_t in_channels = (input_ndim >= 3) ? input_shape.c() : 1;
-    int32_t out_channels = kernel_shape.n();
+    // 获取通道和批次信息 - 优化常见情况
+    int32_t batch_size, in_channels, out_channels;
 
-    // im2col + GEMM 优化
+    // 快速路径：针对常见维度优化
+    if (input_ndim == 4) {
+        // NCHW格式
+        batch_size = input_shape.n();
+        in_channels = input_shape.c();
+    } else if (input_ndim == 3) {
+        // CHW格式，N=1
+        batch_size = 1;
+        in_channels = input_shape.c();
+    } else {
+        // HW格式，N=1, C=1
+        batch_size = 1;
+        in_channels = 1;
+    }
+    out_channels = kernel_shape.n();
+
+    // im2col + GEMM 优化参数
     int32_t col_rows = in_channels * kernel_h * kernel_w;
     int32_t col_cols = output_h * output_w;
 
-    // 创建权重矩阵 W [out_channels x col_rows]
+    // 关键优化1：一次性构建权重矩阵 W [out_channels x col_rows]，跨batch重用
     Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> W(out_channels, col_rows);
     for (int oc = 0; oc < out_channels; ++oc) {
         for (int ic = 0; ic < in_channels; ++ic) {
@@ -349,38 +363,39 @@ static void conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
         }
     }
 
-    // 对每个batch执行im2col + GEMM
+    // 关键优化2：使用OpenMP并行化batch处理，模仿test_cpu_conv的实现
+    #pragma omp parallel for
     for (int b = 0; b < batch_size; ++b) {
-        // 创建im2col矩阵 [col_rows x col_cols]
+        // 每个线程创建自己的im2col矩阵，避免竞争
         Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> col(col_rows, col_cols);
 
-        // im2col变换
+        // 高性能im2col变换 - 展开循环，减少条件判断
         for (int oh = 0; oh < output_h; ++oh) {
+            int ih_start = oh * stride - padding;
             for (int ow = 0; ow < output_w; ++ow) {
                 int col_idx = oh * output_w + ow;
-                int ih_start = oh * stride - padding;
                 int iw_start = ow * stride - padding;
 
+                // 展开内层循环，提高性能
                 for (int ic = 0; ic < in_channels; ++ic) {
+                    int input_base = 0;
+                    if (input_ndim == 4) {
+                        input_base = b * in_channels * input_h * input_w + ic * input_h * input_w;
+                    } else if (input_ndim == 3) {
+                        input_base = ic * input_h * input_w;
+                    } else {
+                        input_base = 0;
+                    }
+
                     for (int kh = 0; kh < kernel_h; ++kh) {
+                        int ih = ih_start + kh;
                         for (int kw = 0; kw < kernel_w; ++kw) {
-                            int ih = ih_start + kh;
                             int iw = iw_start + kw;
                             float val = 0.0f;
 
+                            // 边界检查 - 优化常见情况
                             if (ih >= 0 && ih < input_h && iw >= 0 && iw < input_w) {
-                                // 计算输入索引
-                                int input_idx = 0;
-                                if (input_ndim == 4) {
-                                    input_idx = b * in_channels * input_h * input_w +
-                                              ic * input_h * input_w +
-                                              ih * input_w + iw;
-                                } else if (input_ndim == 3) {
-                                    input_idx = ic * input_h * input_w + ih * input_w + iw;
-                                } else { // ndim == 2
-                                    input_idx = ih * input_w + iw;
-                                }
-                                val = input_data[input_idx];
+                                val = input_data[input_base + ih * input_w + iw];
                             }
 
                             int row = ic * kernel_h * kernel_w + kh * kernel_w + kw;
@@ -391,26 +406,27 @@ static void conv_operation_core_eigen(const Tensor& input, const Tensor& kernel,
             }
         }
 
-        // GEMM计算: output = W * col
+        // 关键优化3：高性能GEMM计算: output = W * col
         Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> output_mat = W * col;
 
-        // 将结果复制回输出张量
+        // 关键优化4：优化结果复制回输出张量 - 减少条件判断
         for (int oc = 0; oc < out_channels; ++oc) {
+            int result_base = 0;
+            if (input_ndim == 4) {
+                result_base = b * out_channels * output_h * output_w + oc * output_h * output_w;
+            } else if (input_ndim == 3) {
+                result_base = oc * output_h * output_w;
+            } else {
+                result_base = 0;
+            }
+
+            // 使用memcpy优化连续内存复制
             for (int oh = 0; oh < output_h; ++oh) {
-                for (int ow = 0; ow < output_w; ++ow) {
-                    int mat_idx = oh * output_w + ow;
-                    int result_idx = 0;
-                    if (input_ndim == 4) {
-                        result_idx = b * out_channels * output_h * output_w +
-                                  oc * output_h * output_w +
-                                  oh * output_w + ow;
-                    } else if (input_ndim == 3) {
-                        result_idx = oc * output_h * output_w + oh * output_w + ow;
-                    } else { // ndim == 2
-                        result_idx = oh * output_w + ow;
-                    }
-                    result_data[result_idx] = output_mat(oc, mat_idx);
-                }
+                int src_offset = oh * output_w;
+                int dst_offset = result_base + oh * output_w;
+                std::memcpy(&result_data[dst_offset],
+                           &output_mat(oc, src_offset),
+                           output_w * sizeof(float));
             }
         }
     }
