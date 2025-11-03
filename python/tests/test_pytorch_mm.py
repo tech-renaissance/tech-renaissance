@@ -18,7 +18,7 @@ C_cpu = torch.matmul(A_cpu, B_cpu)
 # 检查GPU可用性
 if torch.cuda.is_available():
     print("Running on GPU...")
-    device = torch.device("cpu")
+    device = torch.device("cuda")
     A_gpu = A_cpu.to(device)
     B_gpu = B_cpu.to(device)
 
@@ -61,6 +61,6 @@ if torch.cuda.is_available():
 
     # print(f"\n=== GPU Performance ===")
     # print(f"Time for matmul: {elapsed_ms:.3f} ms")
-    print(f"Performance: {20*gflops:.2f} GFLOPS")
+    print(f"Performance: {20*gflops:.2f}")
 else:
     print("CUDA not available, skipping GPU test.")

@@ -56,7 +56,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CPU MM Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -85,7 +85,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CPU 3x3 Conv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -114,7 +114,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CPU 1x1 Conv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -143,7 +143,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CPU 3x3 TConv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -175,7 +175,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CUDA MM Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -207,7 +207,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CUDA 3x3 Conv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -231,7 +231,7 @@ int main() {
         }
         else {
             for (int i = 0; i < iterations_cuda; ++i) {
-                cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 1);  // SLOW (现在已优化)
+                cuda_result = cuda_backend->conv(input_cuda, kernel_1_cuda, 1, 0);  // SLOW (现在已优化)
             }
         }
 
@@ -239,7 +239,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CUDA 1x1 Conv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     {
@@ -271,7 +271,7 @@ int main() {
         profiler.stop();
 
         std::cout << "CUDA 3x3 TConv Performance: " << std::fixed << std::setprecision(2)
-                  << profiler.get_performance() << " GFLOPS" << std::endl;
+        << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
     return 0;
