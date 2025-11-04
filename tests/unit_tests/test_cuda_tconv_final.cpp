@@ -21,9 +21,6 @@ int main() {
 
         double mean_abs_err_pytorch;
         double mean_rel_err_pytorch;
-        // 修复：转置卷积要求 input.c() == kernel.n()
-        // 原来的配置：input(2, 3, 9, 9) 与 kernel(1, 3, 3, 3) 不匹配 (3 != 1)
-        // 修复方案A：将input通道改为1，匹配kernel的K_out=1
         Tensor input = cpu_backend->randn(Shape(4, 3, 9, 9), time(nullptr)); // 修复：C=1 (匹配 K_out)
         Tensor kernel_3 = cpu_backend->randn(Shape(3, 2, 3, 3), time(nullptr)); // (K_out=1, C_in=3)
 
@@ -34,13 +31,10 @@ int main() {
         PythonSession ps("default", "verify", true);
         ps.start();
 
-        std::cout << "\nTEST 1: tconv_k3_s1_p1" << std::endl;
-        // 在下一行出错了：进程已结束，退出代码为 -1073740791 (0xC0000409)
-        auto tr_result_cuda = cuda_backend->transposed_conv(input_cuda, kernel_3_cuda, 1, 1);
-        // 在上一行出错了：进程已结束，退出代码为 -1073740791 (0xC0000409)
-
+        std::cout << "\nTEST 1: tconv_k3_s2_p1" << std::endl;
+        auto tr_result_cuda = cuda_backend->transposed_conv(input_cuda, kernel_3_cuda, 2, 1);
         auto tr_result = cuda_backend->to_cpu(tr_result_cuda);
-        auto pytorch_result = ps.calculate("tconv_k3_s1_p1", input, kernel_3);
+        auto pytorch_result = ps.calculate("tconv_k3_s2_p1", input, kernel_3);
 
         mean_abs_err_pytorch = cpu_backend->get_mean_abs_err(pytorch_result, tr_result);
         mean_rel_err_pytorch = cpu_backend->get_mean_rel_err(pytorch_result, tr_result);

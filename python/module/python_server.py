@@ -80,6 +80,18 @@ class SimpleHelloServer(TechRenaissanceServer):
                 except Exception as e:
                     print(f"[ERROR] Computation failed: {e}")
                     self.write_response('', 'invalid')
+        elif command.lower() == 'tconv_k3_s2_p1':
+            tensors = self.get_tensors(parameters, 2)
+            if tensors is None:
+                print(f"[ERROR] Failed to get tensors")
+                self.write_response('', 'invalid')
+            else:
+                try:
+                    result = F.conv_transpose2d(tensors[0], tensors[1], bias=None, stride=2, padding=1)
+                    self.send_tensors(result)
+                except Exception as e:
+                    print(f"[ERROR] Computation failed: {e}")
+                    self.write_response('', 'invalid')
         elif command.lower() == 'conv_k3_s1_p1':
             tensors = self.get_tensors(parameters, 2)
             if tensors is None:
