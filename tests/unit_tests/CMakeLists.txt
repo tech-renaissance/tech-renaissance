@@ -664,6 +664,62 @@ if(TR_ENABLE_CUDA)
         configure_simple_test(test_cuda_tconv_final test_cuda_tconv_final.cpp)
         message(WARNING "[WARNING] Eigen not found, using simple configuration for test_cuda_tconv_final")
     endif()
+
+    # 性能测试汇总
+    if(EIGEN_FOUND)
+        add_executable(test_performance test_performance.cpp)
+
+        # 链接主库 - 让tech_renaissance自动传递所有依赖
+        if(WIN32)
+            target_link_libraries(test_performance PRIVATE tech_renaissance)
+        else()
+            target_link_libraries(test_performance PRIVATE tech_renaissance pthread)
+        endif()
+
+        # 包含头文件目录
+        target_include_directories(test_performance
+                PRIVATE
+                ../../include
+                ${EIGEN_INCLUDE_DIR}
+                ${EIGEN_INCLUDE_DIR}/src
+        )
+
+        # 设置编译选项 - 启用高性能优化
+        target_compile_definitions(test_performance PRIVATE
+                EIGEN_DONT_PARALLELIZE  # 禁用自动并行化，使用OpenMP手动控制
+        )
+
+        # 启用编译器优化
+        if(MSVC)
+            # Visual Studio编译器优化 - 只在Release模式下启用高级优化
+            if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                target_compile_options(test_performance PRIVATE
+                        /O2              # 最高级优化
+                        /arch:AVX2        # 启用AVX2指令集
+                        /openmp          # 启用OpenMP支持
+                )
+            else()
+                target_compile_options(test_performance PRIVATE
+                        /openmp          # 在Debug模式下只启用OpenMP
+                )
+            endif()
+        endif()
+
+        # 设置标准属性
+        set_target_properties(test_performance PROPERTIES
+                CXX_STANDARD 17
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF
+                FOLDER "tests"
+                RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+        )
+
+        message(STATUS "[SUCCESS] test_performance configured with high-performance optimization")
+    else()
+        # 回退到简单配置
+        configure_simple_test(test_performance test_performance.cpp)
+        message(WARNING "[WARNING] Eigen not found, using simple configuration for test_performance")
+    endif()
 else()
     message(STATUS "[INFO] CUDA backend tests disabled (TR_ENABLE_CUDA=OFF)")
 endif()

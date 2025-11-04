@@ -91,6 +91,25 @@ namespace tr {
 
             flops_ = 2LL * input_n * kernel_n * kernel_c * input_h * input_w * kernel_h * kernel_w;
         }
+        else if (operation_type == "conv_k1_s1_p0") {
+            const int64_t input_w = shape_a.w();
+            const int64_t input_h = shape_a.h();
+            const int64_t input_c = shape_a.c();
+            const int64_t input_n = shape_a.n();
+            const int64_t kernel_w = shape_b.w();
+            const int64_t kernel_h = shape_b.h();
+            const int64_t kernel_c = shape_b.c();
+            const int64_t kernel_n = shape_b.n();
+
+            if (kernel_h != 1 || kernel_w != 1) {
+                throw TRException("[Profiler::describe_operation] Unsupported kernel size!");
+            }
+            if (input_c != kernel_c) {
+                throw TRException("[Profiler::describe_operation] Invalid kernel channel!");
+            }
+
+            flops_ = 2LL * input_n * kernel_n * kernel_c * input_h * input_w * kernel_h * kernel_w;
+        }
         else {
             throw TRException("[Profiler::describe_operation] Unsupported operation type!");
         }
