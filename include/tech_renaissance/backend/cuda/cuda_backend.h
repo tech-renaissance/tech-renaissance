@@ -133,6 +133,9 @@ private:
     // 卷积配置缓存键类型 (N, C, H, W, K, kH, s, p)
     using ConvConfigKey = std::tuple<int, int, int, int, int, int, int, int>;
 
+    // 转置卷积配置缓存键类型 (N, C, H, W, K, kH, s, p)
+    using TransposedConvConfigKey = std::tuple<int, int, int, int, int, int, int, int>;
+
     /**
      * @brief 缓存的卷积所需的所有对象
      */
@@ -155,9 +158,35 @@ private:
         ConvConfigCacheEntry& operator=(const ConvConfigCacheEntry&) = delete;
     };
 
+    /**
+     * @brief 缓存的转置卷积所需的所有对象
+     */
+    struct TransposedConvConfigCacheEntry {
+        void* input_desc;
+        void* output_desc;
+        void* filter_desc;
+        void* conv_desc;
+        int algo;
+        size_t workspace_size;
+
+        // 构造函数，确保所有句柄都已创建
+        TransposedConvConfigCacheEntry();
+
+        // 析构函数，自动清理
+        ~TransposedConvConfigCacheEntry();
+
+        // 禁用拷贝
+        TransposedConvConfigCacheEntry(const TransposedConvConfigCacheEntry&) = delete;
+        TransposedConvConfigCacheEntry& operator=(const TransposedConvConfigCacheEntry&) = delete;
+    };
+
     // 卷积配置缓存（替代原来的分散缓存）
     mutable std::mutex conv_config_cache_mutex_;
     std::map<ConvConfigKey, std::shared_ptr<ConvConfigCacheEntry>> conv_config_cache_;
+
+    // 转置卷积配置缓存
+    mutable std::mutex transposed_conv_config_cache_mutex_;
+    std::map<TransposedConvConfigKey, std::shared_ptr<TransposedConvConfigCacheEntry>> transposed_conv_config_cache_;
 
     // 工作空间缓存
     mutable std::mutex workspace_cache_mutex_;
@@ -166,6 +195,7 @@ private:
     // 卷积辅助函数
     void validate_conv_tensors(const Tensor& input, const Tensor& kernel) const;
     std::shared_ptr<ConvConfigCacheEntry> get_conv_config(const Tensor& input, const Tensor& kernel, const Tensor& result, int32_t stride, int32_t padding);
+    std::shared_ptr<TransposedConvConfigCacheEntry> get_transposed_conv_config(const Tensor& input, const Tensor& kernel, const Tensor& result, int32_t stride, int32_t padding);
     std::shared_ptr<void> get_workspace(size_t size); // 获取缓存的工作空间
     Shape calculate_conv_output_shape(const Shape& input_shape, const Shape& kernel_shape, int32_t stride, int32_t padding) const;
     Shape calculate_transposed_conv_output_shape(const Shape& input_shape, const Shape& kernel_shape, int32_t stride, int32_t padding) const;

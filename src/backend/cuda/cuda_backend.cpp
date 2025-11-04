@@ -49,6 +49,28 @@ CudaBackend::ConvConfigCacheEntry::~ConvConfigCacheEntry() {
     if (conv_desc) cudnnDestroyConvolutionDescriptor(static_cast<cudnnConvolutionDescriptor_t>(conv_desc));
 }
 
+CudaBackend::TransposedConvConfigCacheEntry::TransposedConvConfigCacheEntry()
+    : input_desc(nullptr), output_desc(nullptr), filter_desc(nullptr), conv_desc(nullptr), algo(0), workspace_size(0) {
+    cudnnTensorDescriptor_t idesc, odesc;
+    cudnnFilterDescriptor_t fdesc;
+    cudnnConvolutionDescriptor_t cdesc;
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&idesc));
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&odesc));
+    CUDNN_CHECK(cudnnCreateFilterDescriptor(&fdesc));
+    CUDNN_CHECK(cudnnCreateConvolutionDescriptor(&cdesc));
+    input_desc = idesc;
+    output_desc = odesc;
+    filter_desc = fdesc;
+    conv_desc = cdesc;
+}
+
+CudaBackend::TransposedConvConfigCacheEntry::~TransposedConvConfigCacheEntry() {
+    if (input_desc) cudnnDestroyTensorDescriptor(static_cast<cudnnTensorDescriptor_t>(input_desc));
+    if (output_desc) cudnnDestroyTensorDescriptor(static_cast<cudnnTensorDescriptor_t>(output_desc));
+    if (filter_desc) cudnnDestroyFilterDescriptor(static_cast<cudnnFilterDescriptor_t>(filter_desc));
+    if (conv_desc) cudnnDestroyConvolutionDescriptor(static_cast<cudnnConvolutionDescriptor_t>(conv_desc));
+}
+
 CudaBackend::CudaBackend(int device_id)
     : device_id_(device_id), stream_(nullptr),
       cublas_handle_(nullptr), cudnn_handle_(nullptr) {
@@ -821,6 +843,87 @@ std::shared_ptr<CudaBackend::ConvConfigCacheEntry> CudaBackend::get_conv_config(
             conv_config_cache_[key] = new_entry;
         }
         return conv_config_cache_[key];
+    }
+}
+
+std::shared_ptr<CudaBackend::TransposedConvConfigCacheEntry> CudaBackend::get_transposed_conv_config(
+    const Tensor& input, const Tensor& kernel, const Tensor& result,
+    int32_t stride, int32_t padding) {
+    // 1. 创建一个完整的、正确的键 (N, C, H, W, K, kH, s, p)
+    const auto& in_shape = input.shape();
+    const auto& k_shape = kernel.shape();
+    TransposedConvConfigKey key = std::make_tuple(
+        in_shape.n(), in_shape.c(), in_shape.h(), in_shape.w(),
+        k_shape.n(), k_shape.h(), stride, padding
+    );
+
+    // 2. 检查缓存
+    {
+        std::lock_guard<std::mutex> lock(transposed_conv_config_cache_mutex_);
+        auto it = transposed_conv_config_cache_.find(key);
+        if (it != transposed_conv_config_cache_.end()) {
+            return it->second; // 缓存命中
+        }
+    }
+
+    // 3. 缓存未命中：执行昂贵的操作
+    Logger::get_instance().info("CudaBackend::get_transposed_conv_config: Cache MISS. Finding best algorithm");
+
+    // 创建新条目（这会自动创建4个描述符）
+    auto new_entry = std::make_shared<TransposedConvConfigCacheEntry>();
+
+    const auto& out_shape = result.shape();
+
+    // 4. 设置描述符
+    CUDNN_CHECK(cudnnSetTensor4dDescriptor(static_cast<cudnnTensorDescriptor_t>(new_entry->input_desc), CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT,
+                                           in_shape.n(), in_shape.c(), in_shape.h(), in_shape.w()));
+    CUDNN_CHECK(cudnnSetFilter4dDescriptor(static_cast<cudnnFilterDescriptor_t>(new_entry->filter_desc), CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW,
+                                          k_shape.n(), k_shape.c(), k_shape.h(), k_shape.w()));
+    CUDNN_CHECK(cudnnSetTensor4dDescriptor(static_cast<cudnnTensorDescriptor_t>(new_entry->output_desc), CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT,
+                                           out_shape.n(), out_shape.c(), out_shape.h(), out_shape.w()));
+    CUDNN_CHECK(cudnnSetConvolution2dDescriptor(static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc), padding, padding,
+                                                stride, stride, 1, 1, // Dilation
+                                                CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+
+    // 启用Tensor Core支持（如果可用）
+    CUDNN_CHECK(cudnnSetConvolutionMathType(static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc), CUDNN_TENSOR_OP_MATH));
+
+    // 5. 查找最优转置卷积算法
+    int returned_algo_count = 0;
+
+    // 修复：始终请求固定的数量，避免栈缓冲区溢出
+    int requested_count = 3;
+    cudnnConvolutionBwdDataAlgoPerf_t perf_results[3]; // 修复：声明一个数组
+
+    CUDNN_CHECK(cudnnFindConvolutionBackwardDataAlgorithm(
+        cudnn_handle_,
+        static_cast<cudnnFilterDescriptor_t>(new_entry->filter_desc),
+        static_cast<cudnnTensorDescriptor_t>(new_entry->input_desc),
+        static_cast<cudnnConvolutionDescriptor_t>(new_entry->conv_desc),
+        static_cast<cudnnTensorDescriptor_t>(new_entry->output_desc),
+        requested_count, &returned_algo_count, perf_results)); // 修复：传入数组
+
+    if (returned_algo_count == 0) {
+        throw TRException("Failed to find any transposed convolution algorithm");
+    }
+
+    // 修复：使用数组的第一个元素
+    new_entry->algo = static_cast<int>(perf_results[0].algo);
+    new_entry->workspace_size = perf_results[0].memory;
+
+    Logger::get_instance().info("Best transposed convolution algorithm found: " + std::to_string(new_entry->algo) +
+                                ", time: " + std::to_string(perf_results[0].time) + " ms" +
+                                ", workspace: " + std::to_string(new_entry->workspace_size) + " bytes");
+
+    // 6. 存入缓存
+    {
+        std::lock_guard<std::mutex> lock(transposed_conv_config_cache_mutex_);
+        // 再次检查，防止双重计算
+        auto it = transposed_conv_config_cache_.find(key);
+        if (it == transposed_conv_config_cache_.end()) {
+            transposed_conv_config_cache_[key] = new_entry;
+        }
+        return transposed_conv_config_cache_[key];
     }
 }
 

@@ -15,7 +15,8 @@ kernel_size = 3
 
 # 构造输入与卷积层
 x = torch.randn(batch_size, in_channels, height, width, device=device, dtype=torch.float32)
-conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=1, bias=False).to(device)
+# conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=1, bias=False).to(device)
+conv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, padding=1, bias=False).to(device)
 
 # 预热
 for _ in range(10):
