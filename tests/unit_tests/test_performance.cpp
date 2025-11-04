@@ -117,34 +117,34 @@ int main() {
                   << profiler.get_performance() << " GFLOPS" << std::endl;
     }
 
-    // {
-    //     auto cpu_result = cpu_backend->transposed_conv(input, kernel_3, 1, 1);
-    //     for (int i = 0; i < warmup_iterations; ++i) {
-    //         cpu_backend->transposed_conv(input, kernel_3, 1, 1);
-    //     }
-    //
-    //     Profiler profiler;
-    //     profiler.set_iterations(iterations_cpu);
-    //     profiler.describe_operation("conv_k3_s1_p1", input.shape(), kernel_3.shape());
-    //
-    //     profiler.start();
-    //
-    //     if (using_into_form) {
-    //         for (int i = 0; i < iterations_cpu; ++i) {
-    //             cpu_backend->transposed_conv_into(input, kernel_3, cpu_result, 1, 1);  // FAST
-    //         }
-    //     }
-    //     else {
-    //         for (int i = 0; i < iterations_cpu; ++i) {
-    //             cpu_result = cpu_backend->transposed_conv(input, kernel_3, 1, 1);  // SLOW
-    //         }
-    //     }
-    //
-    //     profiler.stop();
-    //
-    //     std::cout << "CPU 3x3 TConv Performance: " << std::fixed << std::setprecision(2)
-    //               << profiler.get_performance() << " GFLOPS" << std::endl;
-    // }
+    {
+        auto cpu_result = cpu_backend->transposed_conv(input, kernel_3, 1, 1);
+        for (int i = 0; i < warmup_iterations; ++i) {
+            cpu_backend->transposed_conv(input, kernel_3, 1, 1);
+        }
+
+        Profiler profiler;
+        profiler.set_iterations(iterations_cpu);
+        profiler.describe_operation("conv_k3_s1_p1", input.shape(), kernel_3.shape());
+
+        profiler.start();
+
+        if (using_into_form) {
+            for (int i = 0; i < iterations_cpu; ++i) {
+                cpu_backend->transposed_conv_into(input, kernel_3, cpu_result, 1, 1);  // FAST
+            }
+        }
+        else {
+            for (int i = 0; i < iterations_cpu; ++i) {
+                cpu_result = cpu_backend->transposed_conv(input, kernel_3, 1, 1);  // SLOW
+            }
+        }
+
+        profiler.stop();
+
+        std::cout << "CPU 3x3 TConv Performance: " << std::fixed << std::setprecision(2)
+                  << profiler.get_performance() << " GFLOPS" << std::endl;
+    }
 
     {
         auto cuda_result = cuda_backend->mm(cuda_a, cuda_b);
