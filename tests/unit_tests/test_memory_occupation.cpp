@@ -64,7 +64,30 @@ int main() {
         Logger::get_instance().info("Time elapsed: " + std::to_string(i) + " s. " + "No tensor.");
     }
 
-    // 测试4：创建一个张量，但不把它赋给任何变量
+    // 测试4：创建一个张量，然后把它移到GPU，过一段时间后用Tensor()构造函数销毁它
+    // 预期结果：用t4 = cuda->from_cpu(t4)来移动张量到GPU后，CPU上的内存占用会释放
+    {
+        auto cuda = BackendManager::get_cuda_backend();
+        Tensor t4 = cpu->zeros(Shape(125 * tensor_size, 1000, 1000), DType::FP32);
+        Logger::get_instance().info("Created a 4GB tensor named \"t4\".");
+        for (i = 0; i < wait_time; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            Logger::get_instance().info("Time elapsed: " + std::to_string(i) + " s. " + "A 4GB tensor named \"t4\".");
+        }
+        t4 = cuda->from_cpu(t4);  // 将t4移动到GPU
+        Logger::get_instance().info("Move \"t4\" to GPU using\"t4 = cuda->from_cpu(t4);\".");
+        for (i = 0; i < wait_time; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            Logger::get_instance().info("Time elapsed: " + std::to_string(i) + " s. " + "Tensor \"t4\" is now on CUDA.");
+        }
+    }
+    Logger::get_instance().info("Left the range of \"t4\".");
+    for (i = 0; i < wait_time; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        Logger::get_instance().info("Time elapsed: " + std::to_string(i) + " s. " + "No tensor.");
+    }
+
+    // 测试5：创建一个张量，但不把它赋给任何变量
     // 预期结果：即使不赋值给变量，大张量仍可能会消耗内存
     cpu->zeros(Shape(250 * tensor_size, 1000, 1000), DType::FP32);
     Logger::get_instance().info("Created an 8GB tensor without name.");
