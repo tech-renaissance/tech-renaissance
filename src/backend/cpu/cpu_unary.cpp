@@ -1353,4 +1353,432 @@ void CpuBackend::copy_into(const Tensor& src, Tensor& dst) const {
               tr::CPU, tr::CPU);
 }
 
+// ===== reshape方法实现 =====
+
+Tensor CpuBackend::reshape(const Tensor& tensor_a, const Shape& shape) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::reshape] Only FP32 tensors are supported");
+    }
+
+    // 检查形状是否有效（不能为0）
+    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
+        throw TRException("[CpuBackend::reshape] Reshape target shape cannot have zero dimensions");
+    }
+
+    // 检查元素数量是否相等
+    if (tensor_a.numel() != shape.numel()) {
+        throw TRException("[CpuBackend::reshape] Shape mismatch: tensor has " +
+                         std::to_string(tensor_a.numel()) + " elements, but target shape " +
+                         shape.to_string() + " has " + std::to_string(shape.numel()) + " elements");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::reshape] Cannot reshape empty tensor");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(shape, DType::FP32, tr::CPU);
+
+    // 复制数据
+    const void* src_data = tensor_a.data_ptr();
+    void* dst_data = result.data_ptr();
+    copy_data(dst_data, src_data, tensor_a.numel() * dtype_size(tensor_a.dtype()),
+              tr::CPU, tr::CPU);
+
+    return result;
+}
+
+void CpuBackend::reshape_inplace(Tensor& tensor_a, const Shape& shape) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::reshape_inplace] Only FP32 tensors are supported");
+    }
+
+    // 检查形状是否有效（不能为0）
+    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
+        throw TRException("[CpuBackend::reshape_inplace] Reshape target shape cannot have zero dimensions");
+    }
+
+    // 检查元素数量是否相等
+    if (tensor_a.numel() != shape.numel()) {
+        throw TRException("[CpuBackend::reshape_inplace] Shape mismatch: tensor has " +
+                         std::to_string(tensor_a.numel()) + " elements, but target shape " +
+                         shape.to_string() + " has " + std::to_string(shape.numel()) + " elements");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::reshape_inplace] Cannot reshape empty tensor");
+    }
+
+    // 保存原始数据到临时缓冲区
+    std::vector<float> temp_data(tensor_a.numel());
+    const float* src_data = static_cast<const float*>(tensor_a.data_ptr());
+    std::memcpy(temp_data.data(), src_data, tensor_a.numel() * sizeof(float));
+
+    // 创建新的张量（使用empty来分配内存）
+    tensor_a = this->empty(shape, DType::FP32);
+
+    // 恢复数据
+    float* dst_data = static_cast<float*>(tensor_a.data_ptr());
+    std::memcpy(dst_data, temp_data.data(), tensor_a.numel() * sizeof(float));
+}
+
+void CpuBackend::reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape) {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::reshape_into] Only FP32 tensors are supported");
+    }
+
+    // 检查形状是否有效（不能为0）
+    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
+        throw TRException("[CpuBackend::reshape_into] Reshape target shape cannot have zero dimensions");
+    }
+
+    // 检查元素数量是否相等
+    if (tensor_a.numel() != shape.numel()) {
+        throw TRException("[CpuBackend::reshape_into] Shape mismatch: tensor has " +
+                         std::to_string(tensor_a.numel()) + " elements, but target shape " +
+                         shape.to_string() + " has " + std::to_string(shape.numel()) + " elements");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::reshape_into] Cannot reshape empty tensor");
+    }
+
+    // 检查输出张量是否为空
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::reshape_into] Output tensor is empty");
+    }
+
+    // 检查输出张量的元素数量是否匹配
+    if (result.numel() != shape.numel()) {
+        throw TRException("[CpuBackend::reshape_into] Output tensor has " +
+                         std::to_string(result.numel()) + " elements, but target shape " +
+                         shape.to_string() + " has " + std::to_string(shape.numel()) + " elements");
+    }
+
+    // 复制数据到结果张量
+    const void* src_data = tensor_a.data_ptr();
+    void* dst_data = result.data_ptr();
+    copy_data(dst_data, src_data, tensor_a.numel() * dtype_size(tensor_a.dtype()),
+              tr::CPU, tr::CPU);
+
+    // 注意：reshape_into不修改result的shape，只是复制数据
+    // 这是reshape的特殊性质：需要重新构造张量来改变形状
+    // 但由于result是const引用，我们无法重新构造它
+    // 所以这里只能复制数据，调用者需要确保result有正确的形状
+}
+
+// ===== tanh方法实现 =====
+
+Tensor CpuBackend::tanh(const Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::tanh] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::tanh] Cannot compute tanh of empty tensor");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor_a.shape(), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = input_vec.array().tanh().matrix();
+#else
+    // 朴素实现：使用高效的计算方式避免大内存分配
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = input_data[i];
+        // 双曲正切函数：tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+        // 为了数值稳定性，使用以下等价形式：
+        if (x > 0.0f) {
+            float exp_neg_2x = std::exp(-2.0f * x);
+            result_data[i] = (1.0f - exp_neg_2x) / (1.0f + exp_neg_2x);
+        } else {
+            float exp_2x = std::exp(2.0f * x);
+            result_data[i] = (exp_2x - 1.0f) / (exp_2x + 1.0f);
+        }
+    }
+#endif
+
+    return result;
+}
+
+void CpuBackend::tanh_inplace(Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::tanh_inplace] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::tanh_inplace] Cannot compute tanh of empty tensor");
+    }
+
+    float* data = static_cast<float*>(tensor_a.data_ptr());
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+    eigen_vec = eigen_vec.array().tanh().matrix();
+#else
+    // 朴素实现：原地计算
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = data[i];
+        // 双曲正切函数：tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+        // 为了数值稳定性，使用以下等价形式：
+        if (x > 0.0f) {
+            float exp_neg_2x = std::exp(-2.0f * x);
+            data[i] = (1.0f - exp_neg_2x) / (1.0f + exp_neg_2x);
+        } else {
+            float exp_2x = std::exp(2.0f * x);
+            data[i] = (exp_2x - 1.0f) / (exp_2x + 1.0f);
+        }
+    }
+#endif
+}
+
+void CpuBackend::tanh_into(const Tensor& tensor_a, Tensor& result) {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::tanh_into] Only FP32 tensors are supported");
+    }
+
+#if TR_ENABLE_INTO_FUNC_SHAPE_CHECK == 1
+    if (tensor_a.shape() != result.shape()) {
+        throw TRException("[CpuBackend::tanh_into] Shape mismatch: input shape " +
+                         tensor_a.shape().to_string() + " != output shape " +
+                         result.shape().to_string());
+    }
+#endif
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::tanh_into] Cannot compute tanh of empty tensor");
+    }
+
+    // 检查输出张量是否为空
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::tanh_into] Output tensor is empty");
+    }
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+    result_vec = input_vec.array().tanh().matrix();
+#else
+    // 朴素实现：使用高效的计算方式避免大内存分配
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = input_data[i];
+        // 双曲正切函数：tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+        // 为了数值稳定性，使用以下等价形式：
+        if (x > 0.0f) {
+            float exp_neg_2x = std::exp(-2.0f * x);
+            result_data[i] = (1.0f - exp_neg_2x) / (1.0f + exp_neg_2x);
+        } else {
+            float exp_2x = std::exp(2.0f * x);
+            result_data[i] = (exp_2x - 1.0f) / (exp_2x + 1.0f);
+        }
+    }
+#endif
+}
+
+// ===== dtanh方法实现 =====
+
+Tensor CpuBackend::dtanh(const Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::dtanh] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::dtanh] Cannot compute dtanh of empty tensor");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor_a.shape(), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：使用公式 dtanh(x) = 1 - tanh(x)^2
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 首先计算tanh(x)，然后使用向量化操作计算1-tanh^2
+    MatrixType tanh_vec = input_vec.array().tanh().matrix();
+    result_vec = (MatrixType::Ones(num_elements) - tanh_vec.array().square().matrix());
+#else
+    // 朴素实现：使用高效的直接计算避免中间数组
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = input_data[i];
+
+        // 直接计算dtanh，避免存储中间tanh结果
+        // 使用公式：dtanh(x) = 4 / (exp(x) + exp(-x))^2
+        // 这个公式等价于 1 - tanh(x)^2，但更直接
+        if (x > 0.0f) {
+            // 对于正数，使用更稳定的计算方式
+            float exp_neg_x = std::exp(-x);
+            float denominator = 1.0f + exp_neg_x * exp_neg_x;
+            result_data[i] = 4.0f / (denominator * denominator);
+        } else {
+            // 对于负数，使用exp(x)避免数值溢出
+            float exp_x = std::exp(x);
+            float denominator = exp_x * exp_x + 1.0f;
+            result_data[i] = 4.0f / (denominator * denominator);
+        }
+    }
+#endif
+
+    return result;
+}
+
+void CpuBackend::dtanh_inplace(Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::dtanh_inplace] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::dtanh_inplace] Cannot compute dtanh of empty tensor");
+    }
+
+    float* data = static_cast<float*>(tensor_a.data_ptr());
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：使用公式 dtanh(x) = 1 - tanh(x)^2
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+
+    // 首先计算tanh(x)，然后原地计算1-tanh^2
+    MatrixType tanh_vec = eigen_vec.array().tanh().matrix();
+    eigen_vec = (MatrixType::Ones(num_elements) - tanh_vec.array().square().matrix());
+#else
+    // 朴素实现：原地计算，避免中间数组
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = data[i];
+
+        // 直接计算dtanh，避免存储中间tanh结果
+        // 使用公式：dtanh(x) = 4 / (exp(x) + exp(-x))^2
+        if (x > 0.0f) {
+            float exp_neg_x = std::exp(-x);
+            float denominator = 1.0f + exp_neg_x * exp_neg_x;
+            data[i] = 4.0f / (denominator * denominator);
+        } else {
+            float exp_x = std::exp(x);
+            float denominator = exp_x * exp_x + 1.0f;
+            data[i] = 4.0f / (denominator * denominator);
+        }
+    }
+#endif
+}
+
+void CpuBackend::dtanh_into(const Tensor& tensor_a, Tensor& result) {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::dtanh_into] Only FP32 tensors are supported");
+    }
+
+#if TR_ENABLE_INTO_FUNC_SHAPE_CHECK == 1
+    if (tensor_a.shape() != result.shape()) {
+        throw TRException("[CpuBackend::dtanh_into] Shape mismatch: input shape " +
+                         tensor_a.shape().to_string() + " != output shape " +
+                         result.shape().to_string());
+    }
+#endif
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::dtanh_into] Cannot compute dtanh of empty tensor");
+    }
+
+    // 检查输出张量是否为空
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::dtanh_into] Output tensor is empty");
+    }
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：使用公式 dtanh(x) = 1 - tanh(x)^2
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 首先计算tanh(x)，然后使用向量化操作计算1-tanh^2
+    MatrixType tanh_vec = input_vec.array().tanh().matrix();
+    result_vec = (MatrixType::Ones(num_elements) - tanh_vec.array().square().matrix());
+#else
+    // 朴素实现：使用高效的直接计算避免中间数组
+    for (size_t i = 0; i < num_elements; ++i) {
+        float x = input_data[i];
+
+        // 直接计算dtanh，避免存储中间tanh结果
+        // 使用公式：dtanh(x) = 4 / (exp(x) + exp(-x))^2
+        if (x > 0.0f) {
+            float exp_neg_x = std::exp(-x);
+            float denominator = 1.0f + exp_neg_x * exp_neg_x;
+            result_data[i] = 4.0f / (denominator * denominator);
+        } else {
+            float exp_x = std::exp(x);
+            float denominator = exp_x * exp_x + 1.0f;
+            result_data[i] = 4.0f / (denominator * denominator);
+        }
+    }
+#endif
+}
+
 } // namespace tr

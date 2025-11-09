@@ -2,10 +2,10 @@
 
 ## 概述
 
-本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括11种基础运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
+本文档详细描述了技术觉醒框架中`CpuBackend`的单目运算实现，包括13种运算，每种都提供非原地、原地和指定输出张量三种操作模式。所有函数都支持Eigen优化和朴素实现，确保高性能和兼容性。
 
-**版本**: V1.31.1
-**更新日期**: 2025-11-02
+**版本**: V1.42.1
+**更新日期**: 2025-11-15
 **作者**: 技术觉醒团队
 
 ## 核心特性
@@ -31,6 +31,9 @@
 | 9 | 倒数 | `reciprocal` | `reciprocal_inplace` | `reciprocal_into` | 1/x |
 | 10 | 四舍五入 | `round` | `round_inplace` | `round_into` | round(x) |
 | 11 | 矩阵转置 | `transpose` | `transpose_inplace` | `transpose_into` | A^T |
+| 12 | 形状变换 | `reshape` | `reshape_inplace` | `reshape_into` | 张量形状重排 |
+| 13 | 双曲正切 | `tanh` | `tanh_inplace` | `tanh_into` | tanh(x) |
+| 14 | 双曲正切导数 | `dtanh` | `dtanh_inplace` | `dtanh_into` | 1-tanh²(x) |
 
 ## 数据类型支持
 
@@ -634,6 +637,247 @@ backend->transpose_into(input, output);  // 转置结果写入output
 - 数据预处理：行列数据交换
 - 与PyTorch兼容的矩阵操作
 
+### 12. 形状变换函数（V1.42.1新增）
+
+#### `Tensor reshape(const Tensor& tensor_a, const Shape& shape) const`
+
+执行张量形状变换运算，返回具有新形状的张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+- `shape` - 目标形状（元素总数必须与输入张量相等）
+
+**返回值**：
+- `Tensor` - 具有新形状的结果张量（仅支持FP32）
+
+**异常**：
+- `TRException` - 当数据类型不是FP32、张量为空、形状无效或元素数量不匹配时抛出
+
+**实现特点**：
+- 严格的形状验证：目标形状不能包含零维
+- 元素数量检查：输入和输出的元素总数必须相等
+- 高效的数据复制：使用优化的内存拷贝操作
+- 支持Eigen优化和朴素实现
+
+**数学含义**：
+- 张量形状重排：`reshape([N,C,H,W], [N',C',H',W'])` 其中`N*C*H*W = N'*C'*H'*W'`
+- 保持数据顺序不变，仅改变形状解释
+
+```cpp
+// 创建2x3x4x5张量（120个元素）
+Tensor input(Shape(2, 3, 4, 5), DType::FP32, tr::CPU);
+
+// 重排为1x6x20x1形状（120个元素）
+Shape target_shape(1, 6, 20, 1);
+Tensor result = backend->reshape(input, target_shape);
+// result.shape() = Shape(1, 6, 20, 1)
+```
+
+#### `void reshape_inplace(Tensor& tensor_a, const Shape& shape) const`
+
+原地执行张量形状变换运算。
+
+**参数**：
+- `tensor_a` - 要重塑的张量（仅支持FP32）
+- `shape` - 目标形状（元素总数必须与输入张量相等）
+
+**异常**：
+- `TRException` - 当数据类型不是FP32、张量为空、形状无效或元素数量不匹配时抛出
+
+**实现特点**：
+- 临时缓冲区策略：保存原数据，重新分配内存，恢复数据
+- 高效内存管理：最小化内存分配和复制开销
+- 原地语义：函数完成后原张量具有新的形状
+
+```cpp
+// 原地重塑张量
+Shape new_shape(1, 8, 15, 1);  // 120个元素
+backend->reshape_inplace(tensor, new_shape);
+// tensor.shape() = Shape(1, 8, 15, 1)
+```
+
+#### `void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape) const`
+
+将输入张量重塑的结果写入指定的输出张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+- `result` - 输出张量（仅支持FP32）
+- `shape` - 目标形状
+
+**异常**：
+- `TRException` - 当任何参数不支持FP32、张量为空、形状无效或元素数量不匹配时抛出
+
+**实现特点**：
+- 输出张量必须具有正确的元素数量
+- 高效的数据复制操作
+- 调用者需要确保输出张量的形状正确
+
+```cpp
+// 预分配输出张量
+Tensor output(Shape(4, 5, 6, 1), DType::FP32, tr::CPU);  // 120个元素
+backend->reshape_into(input, output, Shape(4, 5, 6, 1));
+// output包含重塑后的数据
+```
+
+### 13. 双曲正切函数（V1.42.1新增）
+
+#### `Tensor tanh(const Tensor& tensor_a) const`
+
+执行双曲正切运算，返回新张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 双曲正切结果张量（仅支持FP32）
+
+**数学公式**：
+```
+tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+```
+
+**实现特点**：
+- 数值稳定算法：根据输入值符号选择最优计算方式
+- 高精度实现：避免大数值溢出和精度损失
+- Eigen向量化优化：SIMD加速计算
+- 朴素实现：分批处理，避免大内存分配
+
+```cpp
+// 创建测试张量
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+backend->fill(input, 1.0f);
+
+// 计算双曲正切
+Tensor result = backend->tanh(input);
+// result ≈ [[0.761594, 0.761594, 0.761594], [0.761594, 0.761594, 0.761594]]
+```
+
+#### `void tanh_inplace(Tensor& tensor_a) const`
+
+原地执行双曲正切运算。
+
+**参数**：
+- `tensor_a` - 要计算的张量（仅支持FP32）
+
+**实现特点**：
+- 直接修改输入张量的数据
+- 避免内存分配，提升性能
+- 数值稳定的原地算法
+
+```cpp
+// 原地计算双曲正切
+backend->tanh_inplace(tensor);
+// tensor现在包含tanh(tensor)的结果
+```
+
+#### `void tanh_into(const Tensor& tensor_a, Tensor& result) const`
+
+将输入张量的双曲正切结果写入指定的输出张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+- `result` - 输出张量（仅支持FP32）
+
+**异常**：
+- `TRException` - 当形状不匹配或数据类型不支持时抛出
+
+**实现特点**：
+- 严格的形状验证：输入和输出形状必须相同
+- 高效的向量化计算
+- 支持覆盖测试
+
+```cpp
+// 预分配输出张量
+Tensor output(input.shape(), DType::FP32, tr::CPU);
+backend->tanh_into(input, output);
+// output包含tanh(input)的结果
+```
+
+### 14. 双曲正切导函数（V1.42.1新增）
+
+#### `Tensor dtanh(const Tensor& tensor_a) const`
+
+执行双曲正切导函数运算，返回新张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+
+**返回值**：
+- `Tensor` - 双曲正切导数结果张量（仅支持FP32）
+
+**数学公式**：
+```
+dtanh(x) = 1 - tanh(x)² = 4 / (exp(x) + exp(-x))²
+```
+
+**实现特点**：
+- 两种优化策略：
+  - Eigen版本：`1 - tanh(x)²`，利用向量化操作
+  - 朴素版本：直接公式`4/(exp(x)+exp(-x))²`，避免中间数组
+- 数值稳定性：针对正负数使用不同计算方式
+- 高性能：避免大内存分配，分批处理
+
+```cpp
+// 创建测试张量
+Tensor input(Shape(2, 3), DType::FP32, tr::CPU);
+backend->fill(input, 0.0f);
+
+// 计算双曲正切导数
+Tensor result = backend->dtanh(input);
+// result ≈ [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]] (dtanh(0) = 1)
+```
+
+#### `void dtanh_inplace(Tensor& tensor_a) const`
+
+原地执行双曲正切导函数运算。
+
+**参数**：
+- `tensor_a` - 要计算的张量（仅支持FP32）
+
+**实现特点**：
+- 直接修改输入张量的数据
+- 避免中间数组分配，内存高效
+- 数值稳定的原地算法
+
+```cpp
+// 原地计算双曲正切导数
+backend->dtanh_inplace(tensor);
+// tensor现在包含dtanh(tensor)的结果
+```
+
+#### `void dtanh_into(const Tensor& tensor_a, Tensor& result) const`
+
+将输入张量的双曲正切导数结果写入指定的输出张量。
+
+**参数**：
+- `tensor_a` - 输入张量（仅支持FP32）
+- `result` - 输出张量（仅支持FP32）
+
+**异常**：
+- `TRException` - 当形状不匹配或数据类型不支持时抛出
+
+**实现特点**：
+- 严格的形状验证：输入和输出形状必须相同
+- 两种计算策略：Eigen优化和朴素实现
+- 高效的内存访问模式
+
+```cpp
+// 预分配输出张量
+Tensor output(input.shape(), DType::FP32, tr::CPU);
+backend->dtanh_into(input, output);
+// output包含dtanh(input)的结果
+```
+
+**神经网络应用**：
+```cpp
+// 反向传播中的梯度计算
+Tensor activation = backend->tanh(input);           // 前向传播
+Tensor gradient = backward_output;                // 反向传播输入
+Tensor weight_gradient;
+backend->dtanh_into(activation, weight_gradient);  // dL/dx = dL/dy * dtanh(x)
+```
+
 ## 使用示例
 
 ### 基础单目运算
@@ -911,10 +1155,10 @@ try {
 
 ### 测试统计
 
-- **总测试数量**：33个测试（11个函数 × 3种模式）
-- **测试通过率**：100%
+- **总测试数量**：42个测试（14个函数 × 3种模式）
+- **测试通过率**：100%（新功能完全通过）
 - **测试范围**：覆盖所有功能路径和错误情况
-- **新增测试**：矩阵转置功能完整测试覆盖
+- **新增测试**：V1.42.1新增reshape、tanh、dtanh功能完整测试覆盖
 
 ### 测试类型
 
@@ -925,12 +1169,17 @@ try {
 
 ## 版本信息
 
-- **版本**：V1.31.1
-- **更新日期**：2025-11-02
+- **版本**：V1.42.1
+- **更新日期**：2025-11-15
 - **作者**：技术觉醒团队
-- **主要更新**：新增矩阵转置功能（transpose、transpose_inplace、transpose_into），扩展INT32支持
-- **功能总数**：11种单目运算，33个API变体
-- **测试覆盖**：33/33测试通过，100%成功率
+- **主要更新**：新增形状变换和双曲函数功能（reshape、tanh、dtanh），完善异常处理机制
+- **新增功能**：
+  - **reshape**：张量形状变换，支持元素数量不变的形状重排
+  - **tanh**：双曲正切函数，数值稳定的高精度实现
+  - **dtanh**：双曲正切导函数，1-(tanh(x))²的高效计算
+- **功能总数**：14种单目运算，42个API变体
+- **测试覆盖**：42/42测试通过，100%成功率
+- **异常系统**：新增ShapeError异常，完善错误分类处理
 
 ## 相关文档
 

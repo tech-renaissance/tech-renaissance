@@ -250,6 +250,22 @@ public:
     Tensor transposed_conv(const Tensor& input, const Tensor& kernel, int32_t stride = 1, int32_t padding = 0);
     void transposed_conv_into(const Tensor& input, const Tensor& kernel, Tensor& result, int32_t stride = 1, int32_t padding = 0);
 
+    // 形状变换和双曲函数操作（V1.42.1新增）
+    // reshape操作
+    Tensor reshape(const Tensor& tensor_a, const Shape& shape);
+    void reshape_inplace(Tensor& tensor_a, const Shape& shape);
+    void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape);
+
+    // tanh双曲正切函数
+    Tensor tanh(const Tensor& tensor_a);
+    void tanh_inplace(Tensor& tensor_a);
+    void tanh_into(const Tensor& tensor_a, Tensor& result);
+
+    // dtanh双曲正切导函数
+    Tensor dtanh(const Tensor& tensor_a);
+    void dtanh_inplace(Tensor& tensor_a);
+    void dtanh_into(const Tensor& tensor_a, Tensor& result);
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

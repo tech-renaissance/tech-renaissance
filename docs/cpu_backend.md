@@ -44,8 +44,8 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.33.0
-**更新日期**: 2025-11-03
+**版本**: V1.42.1
+**更新日期**: 2025-11-15
 **作者**: 技术觉醒团队
 
 ## 设计理念
@@ -897,17 +897,22 @@ void process_large_data() {
 
 ### 单目运算操作
 
-CPU后端提供了完整的单目运算功能，包括10种运算的30个API变体。详细的单目运算API、使用示例和性能优化请参考 [单目运算 API 文档](cpu_unary.md)。
+CPU后端提供了完整的单目运算功能，包括13种运算的39个API变体。详细的单目运算API、使用示例和性能优化请参考 [单目运算 API 文档](cpu_unary.md)。
 
 **主要功能**：
-- **10种运算**：zeros, ones, relu, sign, square, sqrt, abs, negative, reciprocal, round
+- **13种运算**：zeros, ones, relu, sign, square, sqrt, abs, negative, reciprocal, round, reshape, tanh, dtanh
 - **3种模式**：非原地运算（返回新张量）、原地运算（修改输入张量）、指定输出张量运算
 - **Eigen优化**：SIMD向量化加速，支持智能降级到朴素实现
 - **内存安全**：64字节对齐，完善的异常处理机制
 - **灵活配置**：NaN检查、形状验证等编译时配置选项
 
+**V1.42.1新增运算**：
+- **reshape**：张量形状变换，支持元素数量不变的形状重排
+- **tanh**：双曲正切函数，数值稳定的高精度实现
+- **dtanh**：双曲正切导函数，1-(tanh(x))²的高效计算
+
 **数据类型支持**：
-- FP32：全部10种运算完全支持
+- FP32：全部13种运算完全支持
 - INT8：仅支持zeros和ones运算
 
 **配置宏**：
