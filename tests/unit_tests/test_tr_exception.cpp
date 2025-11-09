@@ -1,9 +1,9 @@
 /**
  * @file test_tr_exception.cpp
- * @brief TRException unit test
- * @details Test TR_THROW macro and TRException::what() method, no third-party framework
- * @version 1.00.00
- * @date 2025-10-23
+ * @brief TRException unit test (enhanced with sub-exception classes)
+ * @details Test TR_THROW macro, TRException::what() method, and new exception sub-classes
+ * @version 1.10.00
+ * @date 2025-11-09
  * @author Tech Renaissance Team
  * @note Dependencies: tech_renaissance/utils/tr_exception.h, iostream, string
  * @note Series: tests
@@ -58,6 +58,8 @@ bool test_exception_basic_functionality();
 bool test_tr_throw_macro();
 bool test_tr_throw_if_macro();
 bool test_exception_inheritance();
+bool test_exception_subclasses();
+bool test_new_macros();
 
 int main() {
     std::cout << "=== TRException Unit Tests Start ===" << std::endl;
@@ -71,6 +73,8 @@ int main() {
     RUN_TEST(test_tr_throw_macro);
     RUN_TEST(test_tr_throw_if_macro);
     RUN_TEST(test_exception_inheritance);
+    RUN_TEST(test_exception_subclasses);
+    RUN_TEST(test_new_macros);
 
     // Output test results
     std::cout << "\n=== Test Results Summary ===" << std::endl;
@@ -127,6 +131,10 @@ bool test_exception_basic_functionality() {
                    "Exception message should contain 'File:'");
         TEST_ASSERT(what_str.find("Line:") != std::string::npos,
                    "Exception message should contain 'Line:'");
+
+        // Test type() method
+        TEST_ASSERT(std::string(ex.type()) == "TRException",
+                   "Base exception type should be 'TRException'");
 
         return true;
     } catch (...) {
@@ -236,6 +244,168 @@ bool test_exception_inheritance() {
         return true;
     } catch (...) {
         std::cerr << "test_exception_inheritance threw unexpected exception" << std::endl;
+        return false;
+    }
+}
+
+bool test_exception_subclasses() {
+    try {
+        // Test FileNotFoundError
+        try {
+            TR_THROW_FILE_NOT_FOUND("File not found: test.txt");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::FileNotFoundError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("FileNotFoundError:") == 0,
+                       "FileNotFoundError message should start with 'FileNotFoundError:'");
+            TEST_ASSERT(what_str.find("File not found: test.txt") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "FileNotFoundError",
+                       "type() should return 'FileNotFoundError'");
+        }
+
+        // Test NotImplementedError
+        try {
+            TR_THROW_NOT_IMPLEMENTED("Feature not implemented yet");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::NotImplementedError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("NotImplementedError:") == 0,
+                       "NotImplementedError message should start with 'NotImplementedError:'");
+            TEST_ASSERT(what_str.find("Feature not implemented yet") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "NotImplementedError",
+                       "type() should return 'NotImplementedError'");
+        }
+
+        // Test ValueError
+        try {
+            TR_THROW_VALUE_ERROR("Invalid parameter value");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::ValueError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("ValueError:") == 0,
+                       "ValueError message should start with 'ValueError:'");
+            TEST_ASSERT(what_str.find("Invalid parameter value") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "ValueError",
+                       "type() should return 'ValueError'");
+        }
+
+        // Test IndexError
+        try {
+            TR_THROW_INDEX_ERROR("Array index out of bounds");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::IndexError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("IndexError:") == 0,
+                       "IndexError message should start with 'IndexError:'");
+            TEST_ASSERT(what_str.find("Array index out of bounds") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "IndexError",
+                       "type() should return 'IndexError'");
+        }
+
+        // Test TypeError
+        try {
+            TR_THROW_TYPE_ERROR("Wrong data type provided");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::TypeError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("TypeError:") == 0,
+                       "TypeError message should start with 'TypeError:'");
+            TEST_ASSERT(what_str.find("Wrong data type provided") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "TypeError",
+                       "type() should return 'TypeError'");
+        }
+
+        // Test ZeroDivisionError
+        try {
+            TR_THROW_ZERO_DIVISION("Division by zero");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::ZeroDivisionError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("ZeroDivisionError:") == 0,
+                       "ZeroDivisionError message should start with 'ZeroDivisionError:'");
+            TEST_ASSERT(what_str.find("Division by zero") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(std::string(ex.type()) == "ZeroDivisionError",
+                       "type() should return 'ZeroDivisionError'");
+        }
+
+        // Test inheritance chain - all subclasses should be catchable as TRException
+        TEST_ASSERT_THROWS(TR_THROW_NOT_IMPLEMENTED("Test"), tr::TRException,
+                          "Subclass exceptions should be catchable as base TRException");
+
+        // Test inheritance chain - all subclasses should be catchable as std::exception
+        TEST_ASSERT_THROWS(TR_THROW_VALUE_ERROR("Test"), std::exception,
+                          "Subclass exceptions should be catchable as std::exception");
+
+        return true;
+    } catch (...) {
+        std::cerr << "test_exception_subclasses threw unexpected exception" << std::endl;
+        return false;
+    }
+}
+
+bool test_new_macros() {
+    try {
+        // Test backward compatibility - old TR_THROW macro should still work
+        try {
+            TR_THROW("Old style macro test");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::TRException& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("TRException:") == 0,
+                       "Old TR_THROW should still create TRException");
+            TEST_ASSERT(what_str.find("Old style macro test") != std::string::npos,
+                       "Should contain original message");
+        }
+
+        // Test new TYPE macro works
+        try {
+            TR_THROW_TYPE(ValueError, "Custom type test");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::ValueError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("ValueError:") == 0,
+                       "TR_THROW_TYPE should create specified exception type");
+            TEST_ASSERT(what_str.find("Custom type test") != std::string::npos,
+                       "Should contain original message");
+        }
+
+        // Test all specific macros work and include file/line info
+        try {
+            TR_THROW_NOT_IMPLEMENTED("Macro with location test");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::NotImplementedError& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("Macro with location test") != std::string::npos,
+                       "Should contain original message");
+            TEST_ASSERT(!ex.file().empty(), "Should contain file info");
+            TEST_ASSERT(ex.line() > 0, "Should contain line info");
+            TEST_ASSERT(what_str.find("File:") != std::string::npos,
+                       "Should contain 'File:' in formatted output");
+            TEST_ASSERT(what_str.find("Line:") != std::string::npos,
+                       "Should contain 'Line:' in formatted output");
+        }
+
+        // Test TR_THROW_IF still works with simple message
+        try {
+            TR_THROW_IF(true, "Conditional test with simple message");
+            TEST_ASSERT(false, "Should not reach here");
+        } catch (const tr::TRException& ex) {
+            std::string what_str = ex.what();
+            TEST_ASSERT(what_str.find("TRException:") == 0,
+                       "Should be TRException");
+            TEST_ASSERT(what_str.find("Conditional test with simple message") != std::string::npos,
+                       "Should contain the message");
+        }
+
+        return true;
+    } catch (...) {
+        std::cerr << "test_new_macros threw unexpected exception" << std::endl;
         return false;
     }
 }

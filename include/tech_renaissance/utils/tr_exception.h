@@ -1,12 +1,12 @@
 /**
  * @file tr_exception.h
- * @brief 框架异常类声明
- * @details 技术觉醒框架统一异常类，封装错误信息和堆栈跟踪，继承自std::exception
- * @version 1.00.00
- * @date 2025-10-23
+ * @brief 框架异常类声明（含子类）
+ * @details 技术觉醒框架统一异常体系，支持错误类型分类，完全向后兼容
+ * @version 1.10.00
+ * @date 2025-11-09
  * @author 技术觉醒团队
  * @note 依赖项: std::exception
- * @note 所属系列: export
+ * @note 所属系列: utils
  */
 
 #pragma once
@@ -18,7 +18,7 @@
 namespace tr {
 
 /**
- * @brief 技术觉醒框架统一异常类
+ * @brief 框架统一异常基类
  * @details 继承自std::exception，封装错误信息、文件名和行号
  */
 class TRException : public std::exception {
@@ -56,7 +56,10 @@ public:
      */
     int line() const noexcept { return line_; }
 
-private:
+    /** @brief 返回异常类型（默认：TRException） */
+    virtual const char* type() const noexcept { return "TRException"; }
+
+protected:
     std::string message_;      // 错误消息
     std::string file_;         // 源文件名
     int line_;                 // 行号
@@ -68,23 +71,79 @@ private:
     void build_what() const;
 };
 
-} // namespace tr
+/**
+ * @brief 文件未找到异常
+ */
+class FileNotFoundError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "FileNotFoundError"; }
+};
 
 /**
- * @brief 抛出技术觉醒异常的便捷宏
- * @param message 错误消息
+ * @brief 未实现功能异常
  */
+class NotImplementedError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "NotImplementedError"; }
+};
+
+/**
+ * @brief 除零异常
+ */
+class ZeroDivisionError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "ZeroDivisionError"; }
+};
+
+/**
+ * @brief 类型错误异常
+ */
+class TypeError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "TypeError"; }
+};
+
+/**
+ * @brief 数值/参数取值错误异常
+ */
+class ValueError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "ValueError"; }
+};
+
+/**
+ * @brief 索引越界异常
+ */
+class IndexError : public TRException {
+public:
+    using TRException::TRException;
+    const char* type() const noexcept override { return "IndexError"; }
+};
+
+} // namespace tr
+
+// ========================= 宏定义 =========================
+
+/** 旧版兼容宏：抛出通用异常 */
 #define TR_THROW(message) \
     throw tr::TRException(message, __FILE__, __LINE__)
 
-/**
- * @brief 条件抛出异常的便捷宏
- * @param condition 条件
- * @param message 错误消息
- */
+/** 条件抛出通用异常 */
 #define TR_THROW_IF(condition, message) \
-    do { \
-        if (condition) { \
-            TR_THROW(message); \
-        } \
-    } while(0)
+    do { if (condition) { TR_THROW(message); } } while (0)
+
+/** 新版宏：按类型抛出特定异常 */
+#define TR_THROW_TYPE(ExceptionType, message) \
+    throw tr::ExceptionType(message, __FILE__, __LINE__)
+
+#define TR_THROW_NOT_IMPLEMENTED(msg) TR_THROW_TYPE(NotImplementedError, msg)
+#define TR_THROW_FILE_NOT_FOUND(msg)  TR_THROW_TYPE(FileNotFoundError, msg)
+#define TR_THROW_VALUE_ERROR(msg)     TR_THROW_TYPE(ValueError, msg)
+#define TR_THROW_INDEX_ERROR(msg)     TR_THROW_TYPE(IndexError, msg)
+#define TR_THROW_TYPE_ERROR(msg)      TR_THROW_TYPE(TypeError, msg)
+#define TR_THROW_ZERO_DIVISION(msg)   TR_THROW_TYPE(ZeroDivisionError, msg)
