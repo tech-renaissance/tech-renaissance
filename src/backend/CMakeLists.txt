@@ -12,7 +12,6 @@ set(BACKEND_SOURCES
     cpu/cpu_mm_fp32.cpp
     cpu/cpu_unary.cpp
     cpu/cpu_scalar.cpp
-    cpu/cpu_bce.cpp
     cpu/cpu_broadcast.cpp
     cpu/cpu_dimension.cpp
     cpu/cpu_create.cpp
