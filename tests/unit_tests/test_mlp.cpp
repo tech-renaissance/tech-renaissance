@@ -35,11 +35,45 @@ int main() {
         Tensor samples = ps.calculate("samples", 10000);
         samples.summary("samples");
 
+        Tensor weights0 = ps.calculate("weights0", 10000);
+        cpu_backend->transpose_inplace(weights0);
+        weights0.summary("weights0");
+
+        Tensor weights1 = ps.calculate("weights1", 10000);
+        cpu_backend->transpose_inplace(weights1);
+        weights1.summary("weights1");
+
+        Tensor weights2 = ps.calculate("weights2", 10000);
+        cpu_backend->transpose_inplace(weights2);
+        weights2.summary("weights2");
+
         auto my_samples = cpu_backend->reshape(data, Shape(2,784));
         my_samples.summary("my_samples");
 
         bool ok = cpu_backend->is_close(my_samples, samples);
-        std::cout << "ok: " << ok << std::endl;
+        if (ok) {
+            std::cout << "samples are equal" << std::endl;
+        }
+        else {
+            std::cout << "samples are NOT equal" << std::endl;
+        }
+
+        auto my_results = cpu_backend->reshape(data, Shape(2,784));
+        my_results = cpu_backend->mm(my_results, weights0);
+        my_results = cpu_backend->tanh(my_results);
+        my_results = cpu_backend->mm(my_results, weights1);
+        my_results = cpu_backend->tanh(my_results);
+        my_results = cpu_backend->mm(my_results, weights2);
+        my_results.summary("my_results");
+        my_results.print("my_results");
+
+        ok = cpu_backend->is_close(my_results, output);
+        if (ok) {
+            std::cout << "outputs are equal" << std::endl;
+        }
+        else {
+            std::cout << "outputs are NOT equal" << std::endl;
+        }
         // Tensor data = ps.fetch_tensor("data", 10000);
         // Tensor label = ps.fetch_tensor("label");
         // Tensor output = ps.fetch_tensor("output");

@@ -23,6 +23,7 @@ data_batch_id = 0
 label_batch_id = 0
 output_batch_id = 0
 loss_batch_id = 0
+weights = list()
 
 
 # 调试模式开关，设置为False可关闭所有调试输出
@@ -99,6 +100,12 @@ class SimpleHelloServer(TechRenaissanceServer):
             loss_batch_id += 1
         elif command.lower() == 'samples':
             self.send_tensors(samples)
+        elif command.lower() == 'weights0':
+            self.send_tensors(weights[0])
+        elif command.lower() == 'weights1':
+            self.send_tensors(weights[1])
+        elif command.lower() == 'weights2':
+            self.send_tensors(weights[2])
         elif command.lower() == 'matmul':    # 执行矩阵乘法！
             if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing matmul command")
             tensors = self.get_tensors(parameters, 2)
@@ -123,7 +130,7 @@ class SimpleHelloServer(TechRenaissanceServer):
 
 
 def main():
-    global data_list, label_list, output_list, loss_list
+    global data_list, label_list, output_list, loss_list, weights
     """主函数 - 简化为仅需几行代码"""
     if len(sys.argv) != 2:
         print("Usage: python_server.py <session_id>")
@@ -149,6 +156,10 @@ def main():
     criterion = nn.CrossEntropyLoss()
     model.load_state_dict(torch.load('R:\\tech-renaissance\\python\\module\\models\\best_model.pth', map_location='cpu'))
     model.eval()
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            weights.append(param.data)
+
     with torch.no_grad():
         for data, target in test_loader:
             data_list.append(data)
