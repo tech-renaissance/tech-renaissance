@@ -74,6 +74,22 @@ int main() {
         else {
             std::cout << "outputs are NOT equal" << std::endl;
         }
+
+        auto agm = cpu_backend->argmax(my_results, 1);
+        agm.print("agm");
+        label = cpu_backend->cast(label, DType::INT32);
+        label.print("label");
+
+        auto cmp = cpu_backend->eq(agm, label);
+        cmp.print("cmp");
+
+        ok = cpu_backend->equal(agm, label);
+        if (ok) {
+            std::cout << "labels are equal" << std::endl;
+        }
+        else {
+            std::cout << "labels are NOT equal" << std::endl;
+        }
         // Tensor data = ps.fetch_tensor("data", 10000);
         // Tensor label = ps.fetch_tensor("label");
         // Tensor output = ps.fetch_tensor("output");

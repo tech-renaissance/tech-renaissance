@@ -263,6 +263,12 @@ public:
     void dtanh_inplace(Tensor& tensor_a);
     void dtanh_into(const Tensor& tensor_a, Tensor& result);
 
+    // INT32张量比较操作（V1.42.4新增）
+    // 比较两个INT32张量的每个元素是否相等
+    void eq_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+    Tensor eq(const Tensor& tensor_a, const Tensor& tensor_b) const;
+    bool equal(const Tensor& tensor_a, const Tensor& tensor_b) const;
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

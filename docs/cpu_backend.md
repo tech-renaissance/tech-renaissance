@@ -44,8 +44,8 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.42.1
-**更新日期**: 2025-11-15
+**版本**: V1.42.4
+**更新日期**: 2025-11-16
 **作者**: 技术觉醒团队
 
 ## 设计理念
@@ -1132,6 +1132,180 @@ EXPORT_TENSOR(tensor, "output.tsr");
 tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
 ```
 
+## INT32张量比较操作（V1.42.4新增）
+
+CPU后端新增了完整的INT32张量比较操作功能，支持元素级相等性检查和整体张量相等性验证。这些方法提供了高性能的比较能力，同时包含完整的安全检查机制。
+
+### 核心方法
+
+#### `void eq_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const`
+
+比较两个INT32张量的每个元素是否相等，结果写入result张量。
+
+**参数：**
+- `tensor_a` - 第一个INT32张量，必须与tensor_b形状相同
+- `tensor_b` - 第二个INT32张量，必须与tensor_a形状相同
+- `result` - 结果张量，必须为INT32类型且与输入张量形状相同
+
+**功能：**
+- 元素相等时result对应位置写入1，不等时写入0
+- 支持Eigen向量化优化和朴素实现
+- 完整的参数验证和异常处理
+
+**异常：**
+- `TypeError` - 当任一张量不是INT32类型时抛出
+- `ShapeError` - 当形状不匹配或空张量状态不一致时抛出
+
+**示例：**
+```cpp
+auto backend = BackendManager::get_cpu_backend();
+
+// 创建INT32张量
+Tensor a = backend->zeros({2, 3}, DType::INT32);
+Tensor b = backend->zeros({2, 3}, DType::INT32);
+Tensor result = backend->zeros({2, 3}, DType::INT32);
+
+// 设置数据
+int32_t* data_a = static_cast<int32_t*>(a.data_ptr());
+int32_t* data_b = static_cast<int32_t*>(b.data_ptr());
+data_a[0] = 1; data_a[1] = 2; data_a[2] = 3;
+data_b[0] = 1; data_b[1] = 5; data_b[2] = 3;
+
+// 执行比较
+backend->eq_into(a, b, result);
+// 结果：result = [1, 0, 1, ...]
+```
+
+#### `Tensor eq(const Tensor& tensor_a, const Tensor& tensor_b) const`
+
+比较两个INT32张量的每个元素是否相等，返回新的结果张量。
+
+**参数：**
+- `tensor_a` - 第一个INT32张量
+- `tensor_b` - 第二个INT32张量
+
+**返回值：**
+- `Tensor` - 新的INT32张量，包含比较结果（相等为1，不等为0）
+
+**功能：**
+- 自动创建与输入同形状的INT32结果张量
+- 内部调用`eq_into`执行比较操作
+- 对于空张量输入返回null张量
+
+**异常：**
+- `TypeError` - 当输入张量不是INT32类型时抛出
+- `ShapeError` - 当形状不匹配时抛出
+
+**示例：**
+```cpp
+auto backend = BackendManager::get_cpu_backend();
+
+Tensor a = backend->zeros({2, 2}, DType::INT32);
+Tensor b = backend->zeros({2, 2}, DType::INT32);
+
+// 设置数据
+int32_t* data_a = static_cast<int32_t*>(a.data_ptr());
+int32_t* data_b = static_cast<int32_t*>(b.data_ptr());
+data_a[0] = 1; data_a[1] = 2; data_a[2] = 3; data_a[3] = 4;
+data_b[0] = 1; data_b[1] = 2; data_b[2] = 5; data_b[3] = 6;
+
+// 执行比较
+Tensor result = backend->eq(a, b);
+// 结果：result = [1, 1, 0, 0]
+```
+
+#### `bool equal(const Tensor& tensor_a, const Tensor& tensor_b) const`
+
+比较两个INT32张量是否完全相等，返回布尔值。
+
+**参数：**
+- `tensor_a` - 第一个INT32张量
+- `tensor_b` - 第二个INT32张量
+
+**返回值：**
+- `bool` - 完全相等返回true，否则返回false
+
+**功能：**
+- 形状不同立即返回false
+- 使用memcmp进行快速比较，提升性能
+- 失败时回退到逐元素验证
+- 支持空张量比较
+
+**异常：**
+- `TypeError` - 当输入张量不是INT32类型时抛出
+
+**示例：**
+```cpp
+auto backend = BackendManager::get_cpu_backend();
+
+Tensor a = backend->zeros({3, 3}, DType::INT32);
+Tensor b = backend->zeros({3, 3}, DType::INT32);
+
+// 相同张量比较
+bool same = backend->equal(a, a);  // true
+
+// 不同张量比较
+bool different = backend->equal(a, b);  // false（除非a和b内容完全相同）
+
+// 形状不匹配
+Tensor c = backend->zeros({2, 3}, DType::INT32);
+bool shape_mismatch = backend->equal(a, c);  // false
+```
+
+### 空张量处理
+
+所有比较方法都正确处理空张量情况：
+
+```cpp
+auto backend = BackendManager::get_cpu_backend();
+
+Tensor empty_a = backend->null_tensor();
+Tensor empty_b = backend->null_tensor();
+
+// eq_into - 空张量到空张量
+Tensor result = backend->null_tensor();
+backend->eq_into(empty_a, empty_b, result);  // 正常执行
+
+// eq - 空张量比较
+Tensor eq_result = backend->eq(empty_a, empty_b);  // 返回null张量
+
+// equal - 空张量相等性
+bool is_equal = backend->equal(empty_a, empty_b);  // 返回true
+```
+
+### 性能优化
+
+- **Eigen向量化**：使用`Eigen::ArrayXi`进行高效的SIMD向量化比较
+- **快速memcmp**：`equal`方法使用memcmp进行快速整体比较
+- **零拷贝操作**：通过`Eigen::Map`直接操作内存，避免拷贝开销
+- **智能降级**：不支持Eigen时自动降级到朴素实现
+
+### 异常处理
+
+完整的错误检查和异常处理：
+
+```cpp
+try {
+    backend->eq_into(fp32_tensor, int32_tensor, result);  // 类型错误
+} catch (const TypeError& e) {
+    // "[CpuBackend::eq_into] All tensors must be INT32 type"
+}
+
+try {
+    backend->eq(tensor_a, tensor_b);  // 形状错误
+} catch (const ShapeError& e) {
+    // "[CpuBackend::eq] All tensors must have the same shape"
+}
+```
+
+### 应用场景
+
+1. **分类结果验证**：比较预测标签与真实标签
+2. **数据一致性检查**：验证两个数据集是否相同
+3. **单元测试**：验证计算结果的正确性
+4. **条件判断**：基于张量相等性进行分支逻辑
+5. **缓存验证**：检查缓存数据是否过期
+
 ## 元素级数据访问方法
 
 CPU后端提供了完整的元素级数据访问功能，支持线性索引直接访问张量中的单个元素。这些方法提供了高性能的直接内存访问能力，同时包含完整的安全检查机制。
@@ -1283,10 +1457,10 @@ try {
 
 ## 版本信息
 
-- **版本**：V1.42.1
-- **更新日期**：2025-11-15
+- **版本**：V1.42.4
+- **更新日期**：2025-11-16
 - **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持、张量复制功能
+- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持、张量复制功能、INT32张量比较操作
 - **架构特性**：
   - **后端管理存储原则**：CPU使用行主序，与C/C++语言惯例一致
   - **跨后端透明转换**：`from_cpu()`和`to_cpu()`自动处理格式转换
@@ -1301,6 +1475,7 @@ try {
   - **广播运算**：不同形状张量的自动扩展（详见[广播运算文档](cpu_broadcast.md)）
   - **维度操作**：squeeze、unsqueeze、padding等（详见[维度操作文档](cpu_dimension.md)）
   - **张量复制**：同设备内深拷贝操作（V1.27.1新增）
+  - **张量比较**：INT32张量元素级和整体相等性比较（V1.42.4新增）
   - **张量IO**：独有TSR格式导入导出功能
   - **跨后端转换**：与其他后端的无缝数据转换
 - **性能优化**：

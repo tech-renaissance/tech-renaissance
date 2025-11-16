@@ -919,4 +919,128 @@ void CpuBackend::set_item_int32(Tensor& tensor_a, int64_t element_index, int32_t
     data[element_index] = value;
 }
 
+// ===== INT32张量比较操作 =====
+
+void CpuBackend::eq_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const {
+    // 1. 检查设备一致性
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+    validate_same_device(result.device());
+
+    // 2. 检查数据类型必须是INT32
+    if (tensor_a.dtype() != DType::INT32 || tensor_b.dtype() != DType::INT32 || result.dtype() != DType::INT32) {
+        throw TypeError("[CpuBackend::eq_into] All tensors must be INT32 type");
+    }
+
+    // 3. 检查形状一致性
+    if (tensor_a.shape() != tensor_b.shape() || tensor_a.shape() != result.shape()) {
+        throw ShapeError("[CpuBackend::eq_into] All tensors must have the same shape");
+    }
+
+    // 4. 处理空张量情况
+    if (tensor_a.is_empty() && tensor_b.is_empty()) {
+        if (!result.is_empty()) {
+            throw ShapeError("[CpuBackend::eq_into] Result tensor must also be empty for empty input tensors");
+        }
+        return; // 空张量，无需操作
+    }
+    if (tensor_a.is_empty() || tensor_b.is_empty() || result.is_empty()) {
+        throw ShapeError("[CpuBackend::eq_into] Inconsistent empty tensor status");
+    }
+
+    // 5. 执行元素级比较
+    const int32_t* data_a = static_cast<const int32_t*>(tensor_a.data_ptr());
+    const int32_t* data_b = static_cast<const int32_t*>(tensor_b.data_ptr());
+    int32_t* data_result = static_cast<int32_t*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现
+    using MatrixType = Eigen::Matrix<int32_t, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> eigen_a(data_a, num_elements);
+    Eigen::Map<const MatrixType> eigen_b(data_b, num_elements);
+    Eigen::Map<MatrixType> eigen_result(data_result, num_elements);
+
+    eigen_result = (eigen_a.array() == eigen_b.array()).template cast<int32_t>();
+#else
+    // 朴素实现
+    for (size_t i = 0; i < num_elements; ++i) {
+        data_result[i] = (data_a[i] == data_b[i]) ? 1 : 0;
+    }
+#endif
+}
+
+Tensor CpuBackend::eq(const Tensor& tensor_a, const Tensor& tensor_b) const {
+    // 1. 检查设备一致性
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+
+    // 2. 检查数据类型必须是INT32
+    if (tensor_a.dtype() != DType::INT32 || tensor_b.dtype() != DType::INT32) {
+        throw TypeError("[CpuBackend::eq] All tensors must be INT32 type");
+    }
+
+    // 3. 检查形状一致性
+    if (tensor_a.shape() != tensor_b.shape()) {
+        throw ShapeError("[CpuBackend::eq] All tensors must have the same shape");
+    }
+
+    // 4. 处理空张量情况
+    if (tensor_a.is_empty() && tensor_b.is_empty()) {
+        return null_tensor();
+    }
+    if (tensor_a.is_empty() || tensor_b.is_empty()) {
+        throw ShapeError("[CpuBackend::eq] Inconsistent empty tensor status");
+    }
+
+    // 5. 创建结果张量并执行比较
+    Tensor result = Tensor::empty(tensor_a.shape(), DType::INT32, tensor_a.device());
+    eq_into(tensor_a, tensor_b, result);
+    return result;
+}
+
+bool CpuBackend::equal(const Tensor& tensor_a, const Tensor& tensor_b) const {
+    // 1. 检查设备一致性
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+
+    // 2. 检查数据类型必须是INT32
+    if (tensor_a.dtype() != DType::INT32 || tensor_b.dtype() != DType::INT32) {
+        throw TypeError("[CpuBackend::equal] All tensors must be INT32 type");
+    }
+
+    // 3. 检查形状一致性
+    if (tensor_a.shape() != tensor_b.shape()) {
+        return false;
+    }
+
+    // 4. 处理空张量情况
+    if (tensor_a.is_empty() && tensor_b.is_empty()) {
+        return true;
+    }
+    if (tensor_a.is_empty() || tensor_b.is_empty()) {
+        return false;
+    }
+
+    // 5. 执行快速比较
+    const int32_t* data_a = static_cast<const int32_t*>(tensor_a.data_ptr());
+    const int32_t* data_b = static_cast<const int32_t*>(tensor_b.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+    // 先使用memcmp进行快速比较（如果内存完全相同）
+    if (std::memcmp(data_a, data_b, num_elements * sizeof(int32_t)) == 0) {
+        return true;
+    }
+
+    // 如果memcmp失败，逐个元素比较
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (data_a[i] != data_b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace tr
