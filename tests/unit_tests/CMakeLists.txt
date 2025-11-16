@@ -115,6 +115,7 @@ configure_simple_test(test_cpu_dimension test_cpu_dimension.cpp)
 configure_simple_test(test_cpu_pad test_cpu_pad.cpp)
 configure_simple_test(test_cpu_create test_cpu_create.cpp)
 configure_simple_test(test_cpu_cast test_cpu_cast.cpp)
+configure_simple_test(test_cpu_loss test_cpu_loss.cpp)
 
 # =============================================================================
 # CPU矩阵运算测试
@@ -450,6 +451,7 @@ register_test(test_cpu_dimension "CPU Dimension Test")
 register_test(test_cpu_pad "CPU Pad Test")
 register_test(test_cpu_create "CPU Create Test")
 register_test(test_cpu_cast "CPU Cast Test")
+register_test(test_cpu_loss "CPU Loss Test")
 
 # 注册矩阵运算测试
 # register_test(test_cpu_mm "CPU Matrix Multiplication Test")  # 已删除

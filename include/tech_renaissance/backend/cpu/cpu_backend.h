@@ -269,6 +269,15 @@ public:
     Tensor eq(const Tensor& tensor_a, const Tensor& tensor_b) const;
     bool equal(const Tensor& tensor_a, const Tensor& tensor_b) const;
 
+    // One-hot编码操作（V1.42.6新增）
+    // 将1D INT32标签张量转换为2D FP32 one-hot编码
+    Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f);
+    void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing = 0.0f);
+
+    // 交叉熵损失函数（V1.42.6新增）
+    // 计算预测张量和标签张量之间的交叉熵损失
+    float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean");
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

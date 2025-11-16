@@ -12,7 +12,7 @@ from torchvision import datasets, transforms
 from six.moves import urllib
 
 
-BATCH_SIZE = 10000
+BATCH_SIZE = 4
 NUM_EPOCHS = 20
 NUM_WORKERS = 0
 data_list = list()
@@ -168,7 +168,6 @@ def main():
             output_list.append(output)
             loss_list.append(criterion(output, target))
 
-    print('Hello World3!')
     # 创建服务器实例（可启用调试模式）
     server = SimpleHelloServer(debug=False)
 
