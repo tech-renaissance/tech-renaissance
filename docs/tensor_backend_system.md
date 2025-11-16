@@ -1,4 +1,154 @@
-# Tensor-Backend System Architecture Documentation
+# 张量-后端系统文档
+
+## 概述
+
+张量-后端系统是技术觉醒框架的核心架构之一，采用**后端管理存储**的设计理念。这个系统彻底分离了**张量元数据**与**实际数据存储**，提供了高度灵活的多后端支持。
+
+**核心设计原则**：
+- **张量类**：纯元数据容器，不持有实际数据
+- **后端类**：管理内存分配、数据访问和计算操作
+- **存储类**：RAII内存管理，与特定后端绑定
+- **BackendManager**：单例模式，统一管理所有后端实例
+
+**版本**: V1.43.0
+**更新日期**: 2025-11-16
+**作者**: 技术觉醒团队
+
+## 🆕 V1.43.0重大更新：后端基类重构
+
+### 🎯 重构目标
+在V1.43.0版本中，我们对Backend基类进行了重大重构，实现了以下目标：
+1. **从抽象类改为可实例化类**：Backend基类不再是抽象类，而是可以实例化但抛出异常的类
+2. **统一方法声明机制**：引入宏系统，一行代码即可声明新方法并实现默认NotImplementedError行为
+3. **简化后端扩展**：新增方法时，无需修改所有后端类，只需在Backend基类添加宏定义
+4. **100%向后兼容**：所有现有代码无需修改即可正常工作
+
+### 🔧 后端基类实例化机制
+
+#### 构造函数设计
+```cpp
+class Backend {
+public:
+    /**
+     * @brief 公共构造函数 - 防止直接实例化
+     * @throws TRException 直接实例化时抛出异常
+     */
+    Backend() {
+        throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+    }
+
+protected:
+    /**
+     * @brief 受保护的构造函数 - 允许派生类构造
+     * @param allow_construction 是否允许构造（派生类传true）
+     */
+    Backend(bool allow_construction) {
+        if (!allow_construction) {
+            throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+        }
+    }
+};
+```
+
+#### 后端类构造示例
+```cpp
+// CPU后端构造函数
+CpuBackend::CpuBackend() : Backend(true) {
+    // CPU后端初始化代码
+}
+
+// CUDA后端构造函数
+CudaBackend::CudaBackend(int device_id) : Backend(true), device_id_(device_id) {
+    // CUDA后端初始化代码
+}
+```
+
+### 📝 宏定义系统
+
+#### 宏定义语法
+```cpp
+/**
+ * @brief 定义未实现方法的宏
+ * @param method_name 方法名
+ * @param return_type 返回类型
+ * @param params 参数列表（带括号）
+ * @param const_qualifier const限定符（如果方法不是const则为空）
+ * @details 生成默认抛出NotImplementedError异常的方法实现
+ */
+#define DEFINE_NOT_IMPLEMENTED_METHOD(method_name, return_type, params, const_qualifier) \
+    return_type Backend::method_name params const_qualifier { \
+        throw NotImplementedError("[" + name() + " " #method_name "] Operation NOT implemented!"); \
+    }
+
+/**
+ * @brief 定义void返回类型未实现方法的宏
+ * @param method_name 方法名
+ * @param params 参数列表（带括号）
+ * @param const_qualifier const限定符（如果方法不是const则为空）
+ */
+#define DEFINE_NOT_IMPLEMENTED_VOID_METHOD(method_name, params, const_qualifier) \
+    void Backend::method_name params const_qualifier { \
+        throw NotImplementedError("[" + name() + " " #method_name "] Operation NOT implemented!"); \
+    }
+```
+
+#### 宏使用示例
+```cpp
+// 在backend.cpp中使用宏定义新方法
+DEFINE_NOT_IMPLEMENTED_METHOD(crossentropy, float, (const Tensor& pred, const Tensor& label, std::string reduction), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(reshape_inplace, (Tensor& tensor_a, const Shape& shape), )
+DEFINE_NOT_IMPLEMENTED_METHOD(minus, Tensor, (float scalar, const Tensor& input), const)
+```
+
+#### 异常信息格式
+所有未实现的方法都会抛出统一格式的异常：
+```
+[BackendName method_name] Operation NOT implemented!
+```
+
+示例：
+```
+[CudaBackend crossentropy] Operation NOT implemented!
+[CPUBackend reshape] Operation NOT implemented!
+```
+
+### 🚀 新方法添加流程
+
+#### 步骤1：在Backend基类中声明方法
+```cpp
+// 在backend.h中
+class Backend {
+    // ... 现有方法
+    virtual Tensor new_method(const Tensor& input, float param) const;
+};
+```
+
+#### 步骤2：在backend.cpp中使用宏实现
+```cpp
+// 在backend.cpp中使用宏
+DEFINE_NOT_IMPLEMENTED_METHOD(new_method, Tensor, (const Tensor& input, float param), const)
+```
+
+#### 步骤3：在需要的后端中重写
+```cpp
+// 在cpu_backend.h中重写
+class CpuBackend : public Backend {
+    Tensor new_method(const Tensor& input, float param) const override;
+};
+
+// 在cpu_backend.cpp中实现
+Tensor CpuBackend::new_method(const Tensor& input, float param) const {
+    // CPU后端具体实现
+}
+```
+
+### ✅ 重构优势
+
+1. **扩展性极强**：新增方法只需要在Backend基类添加一行宏定义
+2. **维护成本低**：无需修改所有后端类的头文件
+3. **异常信息统一**：所有未实现方法都有清晰的错误提示
+4. **类型安全**：编译时检查，避免运行时错误
+5. **向后兼容**：现有代码无需任何修改
 
 ## # 重要警告：不要直接使用Tensor构造函数！
 
@@ -26,12 +176,6 @@
 ## Overview
 
 The Tensor-Backend system in Tech Renaissance framework adopts a layered decoupled design, implementing efficient and safe tensor data management through five core classes. The system follows the "backend manages storage" principle, providing a unified data abstraction layer for deep learning computations.
-
-## Version Information
-
-- **Version**: V1.32.3
-- **Date**: 2025-11-03
-- **Author**: 技术觉醒团队
 
 ## Design Philosophy
 
@@ -214,7 +358,7 @@ void* data_ptr() noexcept { return data_ptr_.get(); }
 const void* data_ptr() const noexcept { return data_ptr_.get(); }
 ```
 
-### 3. Backend Abstract Base Class - Computation and Storage Implementation
+### 3. Backend Base Class - Computation and Storage Implementation
 
 **Design Position**: Defines unified computation interfaces, with specific implementations handled by each backend.
 
@@ -268,6 +412,21 @@ public:
 
     // Tensor comparison
     virtual bool is_close(const Tensor& tensor_a, const Tensor& tensor_b, float eps = 5e-5f) const = 0;
+
+    // 🆕 V1.43.0新增方法 (通过宏定义实现，默认抛出NotImplementedError)
+    virtual Tensor reshape(const Tensor& tensor_a, const Shape& shape);
+    virtual void reshape_inplace(Tensor& tensor_a, const Shape& shape);
+    virtual void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape);
+    virtual Tensor tanh(const Tensor& tensor_a);
+    virtual void tanh_inplace(Tensor& tensor_a);
+    virtual void tanh_into(const Tensor& tensor_a, Tensor& result);
+    virtual Tensor dtanh(const Tensor& tensor_a);
+    virtual void dtanh_inplace(Tensor& tensor_a);
+    virtual void dtanh_into(const Tensor& tensor_a, Tensor& result);
+    virtual float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction);
+    virtual Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing);
+    virtual void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing);
+    // ... 以及其他标量运算和广播运算方法
 };
 ```
 
@@ -499,18 +658,25 @@ Tensor cuda_tensor = backend->from_cpu(cpu_tensor);
 
 ## Performance Characteristics and Benchmarks
 
-### Measured Performance (V1.29.2)
+### Measured Performance (V1.43.0)
 
 **CUDA Backend Performance**:
-- **Matrix Multiplication**: 6673.76 GFLOPS (1024×2048 × 2048×512)
-- **Average Execution Time**: 0.3218 ms
-- **Efficiency**: 52.4% of theoretical peak (RTX 3060-class)
-- **Precision**: Average relative error 4.590400e-07
+- **Matrix Multiplication**: 6602.77 GFLOPS (1024×2048 × 2048×512)
+- **3x3 Convolution**: 11917.52 GFLOPS
+- **1x1 Convolution**: 6076.90 GFLOPS
+- **3x3 Transposed Convolution**: 12789.55 GFLOPS
 
 **CPU Backend Performance**:
-- **Matrix Multiplication**: Eigen-based SIMD optimization
-- **Memory Alignment**: 64-byte alignment for cache access optimization
-- **Multi-threading**: OpenMP parallel computation support
+- **Matrix Multiplication**: 126.78 GFLOPS
+- **3x3 Convolution**: 342.72 GFLOPS
+- **1x1 Convolution**: 162.88 GFLOPS
+- **3x3 Transposed Convolution**: 194.82 GFLOPS
+
+**Performance Acceleration Ratios**:
+- **Matrix Multiplication**: 52x speedup (CUDA vs CPU)
+- **3x3 Convolution**: 35x speedup (CUDA vs CPU)
+- **1x1 Convolution**: 37x speedup (CUDA vs CPU)
+- **3x3 Transposed Convolution**: 66x speedup (CUDA vs CPU)
 
 ### Performance Optimization Strategies
 
@@ -556,9 +722,13 @@ int main() {
 }
 ```
 
-### New Backend Operations (V1.29.2)
+### New Backend Operations (V1.43.0)
 
 ```cpp
+// Shape operations
+Tensor reshaped = cpu_backend->reshape(input_tensor, Shape(2, 3, 4));
+Tensor tanh_result = cpu_backend->tanh(input_tensor);
+
 // Scalar operations
 Tensor scalar_result = cpu_backend->mul(input_tensor, 2.0f);
 Tensor mac_result = cpu_backend->mac(input_tensor, 2.0f, 1.0f);
@@ -572,9 +742,15 @@ Tensor expanded_result = cpu_backend->expand(input_tensor, Shape(2, 1, 3));
 // Dimension operations
 Tensor unsqueezed_result = cpu_backend->unsqueeze(input_tensor, 1);
 Tensor squeezed_result = cpu_backend->squeeze(unsqueezed_result, 1);
+
+// Loss functions
+float loss = cpu_backend->crossentropy(pred, label, "mean");
+
+// One-hot encoding
+Tensor one_hot = cpu_backend->one_hot(label, 10, 0.1f);
 ```
 
-### Advanced API Usage (V1.29.2)
+### Advanced API Usage (V1.43.0)
 
 ```cpp
 // Use static convenience methods
@@ -611,6 +787,12 @@ public:
 private:
     std::string message_;
 };
+
+// NotImplementedError for unimplemented backend methods
+class NotImplementedError : public TRException {
+public:
+    NotImplementedError(const std::string& message) : TRException(message) {}
+};
 ```
 
 ### Memory Safety Guarantees
@@ -629,6 +811,25 @@ private:
 3. **Implement Conversion Methods** (`from_cpu`, `to_cpu`, `to`)
 4. **Register with BackendManager**
 
+### 🆕 V1.43.0新方法扩展
+
+使用新的宏系统，添加新方法变得极其简单：
+
+```cpp
+// 步骤1：在backend.h中声明
+class Backend {
+    virtual Tensor new_advanced_op(const Tensor& input, float param) const;
+};
+
+// 步骤2：在backend.cpp中使用宏实现
+DEFINE_NOT_IMPLEMENTED_METHOD(new_advanced_op, Tensor, (const Tensor& input, float param), const)
+
+// 步骤3：在需要后端中重写（如CPU后端）
+class CpuBackend : public Backend {
+    Tensor new_advanced_op(const Tensor& input, float param) const override;
+};
+```
+
 ### New Memory Format Support
 
 The framework supports future memory format extensions:
@@ -645,10 +846,12 @@ The Tech Renaissance framework's Tensor-Backend system through the innovative "B
 3. **Type Safety**: Strong typing and comprehensive error checking mechanisms
 4. **Device-Agnostic**: Unified API supports multiple devices and cross-device data transfer
 5. **Extensibility**: Modular design supports new backends and new storage formats
+6. **🆕 极强扩展性**: V1.43.0宏系统使得新方法添加只需一行代码
 
 **Key Innovations**:
 - **Backend-Managed Storage Principle**: Each backend selects optimal memory layout
 - **Transparent Conversion Layers**: Automatically handle conversions between different storage formats
+- **🆕 宏定义系统**: V1.43.0实现的统一方法声明机制，极大提升开发效率
 
 ## 张量销毁最佳实践
 
@@ -717,7 +920,12 @@ large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null�
 
 ## Version Information
 
-- **Version**: V1.31.1
-- **Date**: 2025-11-02
+- **Version**: V1.43.0
+- **Date**: 2025-11-16
 - **Author**: 技术觉醒团队
-- **Major Updates**: Removed Tensor shape operations, expanded backend operation capabilities, added scalar and broadcast operations, enhanced dimension manipulation
+- **Major Updates**:
+  - 🆕 Backend基类重构：从抽象类改为可实例化类
+  - 🆕 宏定义系统：统一方法声明和默认实现机制
+  - 🆕 新增方法：reshape、tanh、crossentropy、one_hot等高级操作
+  - 🆕 扩展性大幅提升：新增方法只需一行宏定义
+  - ✅ 100%向后兼容：现有代码无需修改

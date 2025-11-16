@@ -25,7 +25,7 @@
 
 namespace tr {
 
-CpuBackend::CpuBackend() {
+CpuBackend::CpuBackend() : Backend(true) {
     // 确保workspace目录存在
     namespace fs = std::filesystem;
     std::string workspace_path = WORKSPACE_PATH;

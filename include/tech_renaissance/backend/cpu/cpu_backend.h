@@ -45,8 +45,8 @@ public:
     // 基本运算
     void add(Tensor& result, const Tensor& a, const Tensor& b) override;
     void mul(Tensor& result, const Tensor& a, const Tensor& b) override;
-    Tensor mm(const Tensor& tensor_a, const Tensor& tensor_b) override;
-    void mm_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) override;
+    Tensor mm(const Tensor& a, const Tensor& b) override;
+    void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override;
 
     // 设备转换方法
     Tensor to(const Tensor& tensor, const Device& device) const override;
@@ -249,19 +249,19 @@ public:
 
     // 形状变换和双曲函数操作（V1.42.1新增）
     // reshape操作
-    Tensor reshape(const Tensor& tensor_a, const Shape& shape);
-    void reshape_inplace(Tensor& tensor_a, const Shape& shape);
-    void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape);
+    Tensor reshape(const Tensor& tensor_a, const Shape& shape) override;
+    void reshape_inplace(Tensor& tensor_a, const Shape& shape) override;
+    void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape) override;
 
     // tanh双曲正切函数
-    Tensor tanh(const Tensor& tensor_a);
-    void tanh_inplace(Tensor& tensor_a);
-    void tanh_into(const Tensor& tensor_a, Tensor& result);
+    Tensor tanh(const Tensor& tensor_a) override;
+    void tanh_inplace(Tensor& tensor_a) override;
+    void tanh_into(const Tensor& tensor_a, Tensor& result) override;
 
     // dtanh双曲正切导函数
-    Tensor dtanh(const Tensor& tensor_a);
-    void dtanh_inplace(Tensor& tensor_a);
-    void dtanh_into(const Tensor& tensor_a, Tensor& result);
+    Tensor dtanh(const Tensor& tensor_a) override;
+    void dtanh_inplace(Tensor& tensor_a) override;
+    void dtanh_into(const Tensor& tensor_a, Tensor& result) override;
 
     // INT32张量比较操作（V1.42.4新增）
     // 比较两个INT32张量的每个元素是否相等
@@ -271,16 +271,39 @@ public:
 
     // One-hot编码操作（V1.42.6新增）
     // 将1D INT32标签张量转换为2D FP32 one-hot编码
-    Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f);
-    void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing = 0.0f);
+    Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f) override;
+    void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing = 0.0f) override;
 
     // 交叉熵损失函数（V1.42.6新增）
     // 计算预测张量和标签张量之间的交叉熵损失
-    float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean");
+    float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean") override;
 
     // MSE损失函数（V1.42.7新增）
     // 计算预测张量和目标张量之间的均方误差损失
     float mse(const Tensor& pred, const Tensor& target, std::string reduction = "mean");
+
+    // ===== Backend基类新增方法的override声明 =====
+
+    // 注意：以下方法在CPU后端中已经存在，只需要添加override关键字
+    // 形状变换操作
+    // Tensor reshape(const Tensor& tensor_a, const Shape& shape) override;  // 已存在，需加override
+    // void reshape_inplace(Tensor& tensor_a, const Shape& shape) override;   // 已存在，需加override
+    // void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape) override;  // 已存在，需加override
+
+    // 双曲函数操作
+    // Tensor tanh(const Tensor& tensor_a) override;  // 已存在，需加override
+    // void tanh_inplace(Tensor& tensor_a) override;  // 已存在，需加override
+    // void tanh_into(const Tensor& tensor_a, Tensor& result) override;  // 已存在，需加override
+    // Tensor dtanh(const Tensor& tensor_a) override;  // 已存在，需加override
+    // void dtanh_inplace(Tensor& tensor_a) override;  // 已存在，需加override
+    // void dtanh_into(const Tensor& tensor_a, Tensor& result) override;  // 已存在，需加override
+
+    // 交叉熵损失函数
+    // float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean") override;  // 已存在，需加override
+
+    // One-hot编码操作
+    // Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f) override;  // 已存在，需加override
+    // void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing = 0.0f) override;  // 已存在，需加override
 
 private:
     void validate_same_device(const Device& device) const;

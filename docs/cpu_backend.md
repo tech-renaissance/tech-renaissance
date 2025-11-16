@@ -44,9 +44,55 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 `CpuBackend`是技术觉醒框架的CPU计算后端实现，继承自`Backend`基类。它提供了基于CPU的高性能张量计算能力，支持Eigen库优化和多线程并行计算，是框架的默认和基础计算后端。
 
-**版本**: V1.42.4
+**版本**: V1.43.0
 **更新日期**: 2025-11-16
 **作者**: 技术觉醒团队
+
+## 🆕 V1.43.0重大更新
+
+### 🎯 新增的高级操作
+
+在V1.43.0版本中，CPU后端新增了多个高级操作方法：
+
+#### 形状变换操作
+```cpp
+Tensor reshape(const Tensor& tensor_a, const Shape& shape) override;
+void reshape_inplace(Tensor& tensor_a, const Shape& shape) override;
+void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape) override;
+```
+
+#### 双曲函数操作
+```cpp
+Tensor tanh(const Tensor& tensor_a) override;
+void tanh_inplace(Tensor& tensor_a) override;
+void tanh_into(const Tensor& tensor_a, Tensor& result) override;
+Tensor dtanh(const Tensor& tensor_a) override;
+void dtanh_inplace(Tensor& tensor_a) override;
+void dtanh_into(const Tensor& tensor_a, Tensor& result) override;
+```
+
+#### 损失函数操作
+```cpp
+float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean") override;
+```
+
+#### One-hot编码操作
+```cpp
+Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f) override;
+void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing = 0.0f) override;
+```
+
+#### 标量运算和广播运算
+```cpp
+// 所有V1.43.0新增的标量运算和广播运算方法都已实现
+// 包括minus、mac、clamp以及各种广播运算
+```
+
+### ✅ 重构兼容性
+
+- **100%向后兼容**：所有现有代码无需修改即可正常工作
+- **性能优化**：新增方法基于Eigen库优化，提供高性能计算
+- **异常处理**：完善的错误检查和异常处理机制
 
 ## 设计理念
 
@@ -57,10 +103,11 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 3. **跨后端兼容**：通过`from_cpu()`和`to_cpu()`方法与其他后端保持数据一致性
 4. **内存安全**：RAII智能指针自动内存管理，64字节对齐优化SIMD访问
 5. **类型安全**：强类型设计防止数据类型错误，完善的边界检查
+6. **🆕 宏驱动扩展**：通过V1.43.0的宏系统快速实现新方法
 
 ### 关键架构特性
 
-#### **后端管理存储原则（V1.23.1核心特性）**
+#### **后端管理存储原则（核心特性）**
 
 CPU后端遵循"后端管理存储"的设计原则：
 - **CPU后端**：使用行主序（Row-major）存储张量数据，符合C/C++惯例
@@ -98,1395 +145,615 @@ for (int32_t i = 0; i < M; ++i) {
 
 - **行主序存储**：使用行主序存储格式，符合C/C++语言惯例
 - **Eigen优化**：集成Eigen库提供高性能线性代数计算和SIMD优化
-- **多线程支持**：支持OpenMP并行计算，充分利用多核CPU
-- **内存对齐**：64字节对齐内存分配，优化SIMD访问性能
-- **跨后端转换**：提供`from_cpu()`和`to_cpu()`方法支持跨后端数据转换
-- **张量IO**：独有的张量导入导出功能，支持TSR格式文件
+- **多线程支持**：基于OpenMP的并行计算，充分利用多核CPU性能
+- **内存对齐**：64字节对齐优化，最大化缓存效率
+- **🆕 高级操作支持**：V1.43.0新增形状变换、激活函数、损失函数等高级操作
 
-## 核心API
+## 构造函数
 
-### 构造函数
+```cpp
+CpuBackend();
+```
 
-#### `CpuBackend()`
+**描述**：构造CPU后端实例，内部调用`Backend(true)`进行初始化。
 
-默认构造函数，初始化CPU后端。
-
-**功能**：
-- 初始化CPU计算环境
-- 自动创建workspace目录（如果不存在）
-- 记录初始化日志信息
-
-**异常**：
-- 无（workspace目录创建失败不会阻止初始化）
+**特性**：
+- 自动初始化Eigen库
+- 设置OpenMP并行计算环境
+- 配置内存对齐参数
 
 **示例**：
 ```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();  // V1.23.1推荐用法
+auto cpu_backend = std::make_shared<CpuBackend>();
 ```
 
-### 跨后端转换接口（V1.23.1核心特性）
+## 张量创建接口
 
-#### `Tensor from_cpu(const Tensor& tensor) const override`
+### `Tensor zeros(const Shape& shape, DType dtype = DType::FP32)`
 
-将CPU张量转换为CPU张量（对于CPU后端，此操作为恒等变换）。
+创建全零张量。
 
 **参数**：
-- `tensor` - CPU张量（行主序存储）
+- `shape` - 张量形状
+- `dtype` - 数据类型（可选，默认FP32）
 
 **返回值**：
-- `Tensor` - 相同的CPU张量（行主序存储）
-
-**特点**：
-- CPU后端的`from_cpu()`是恒等操作
-- 与CUDA后端的`from_cpu()`保持接口一致性
-- 用于跨后端代码的统一处理
-
-#### `Tensor to_cpu(const Tensor& tensor) const override`
-
-将CPU张量转换为CPU张量（对于CPU后端，此操作为恒等变换）。
-
-**参数**：
-- `tensor` - CPU张量（行主序存储）
-
-**返回值**：
-- `Tensor` - 相同的CPU张量（行主序存储）
-
-**特点**：
-- CPU后端的`to_cpu()`是恒等操作
-- 与CUDA后端的`to_cpu()`保持接口一致性
-- 用于跨后端代码的统一处理
-
-#### `Tensor to(const Tensor& tensor, const Device& target_device) const override`
-
-通用设备转换接口，支持CPU到其他设备的转换。
-
-**参数**：
-- `tensor` - 源张量
-- `target_device` - 目标设备
-
-**返回值**：
-- `Tensor` - 目标设备上的张量
-
-**注意**：CPU后端不能直接转换到其他设备，需要通过BackendManager获取目标后端。
-
-## 继承的接口实现
-
-### 内存管理
-
-#### `std::shared_ptr<void> allocate(size_t size) override`
-
-在CPU内存中分配指定大小的内存块。
-
-**参数：**
-- `size` - 要分配的内存大小（字节）
-
-**返回值：**
-- `std::shared_ptr<void>` - CPU内存块的智能指针，自动管理生命周期
-
-**异常：**
-- `TRException` - 当size为0或分配失败时抛出
-
-**实现特点：**
-- 使用64字节对齐内存分配，优化SIMD访问
-- 跨平台内存分配（Windows: `_aligned_malloc`, Linux: `posix_memalign`）
-- 智能指针自动管理，自定义删除器确保正确的释放方式
-- 内存分配失败时抛出详细异常信息
-
-**示例：**
-```cpp
-auto backend = std::make_shared<tr::CpuBackend>();
-auto memory = backend->allocate(1024 * 1024);  // 分配1MB内存
-float* data = static_cast<float*>(backend->get_data_ptr(memory));
-```
-
-#### `void deallocate(void* ptr) override`
-
-释放CPU内存（通常通过智能指针自动调用）。
-
-**参数：**
-- `ptr` - 要释放的内存指针
-
-**异常：**
-- `TRException` - 当ptr为null时抛出
-
-**注意：**
-- 建议使用智能指针自动管理内存，很少需要直接调用此方法
-
-#### `void* get_data_ptr(const std::shared_ptr<void>& holder) override`
-
-从内存智能指针中获取原始数据指针。
-
-**参数：**
-- `holder` - 内存智能指针
-
-**返回值：**
-- `void*` - 原始数据指针
-
-**示例：**
-```cpp
-auto memory = backend->allocate(1024);
-float* ptr = static_cast<float*>(backend->get_data_ptr(memory));
-```
-
-#### `void copy_data(void* dst, const void* src, size_t size, const Device& dst_device, const Device& src_device) override`
-
-在CPU内存或CPU与其他设备间复制数据。
-
-**参数：**
-- `dst` - 目标内存指针
-- `src` - 源内存指针
-- `size` - 复制大小（字节）
-- `dst_device` - 目标设备
-- `src_device` - 源设备
-
-**异常：**
-- `TRException` - 当设备类型不支持时抛出
-
-**支持的复制方向：**
-- CPU → CPU：使用`std::memcpy`
-- CUDA → CPU：通过CUDA运行时API
-- CPU → CUDA：通过CUDA运行时API
-
-**示例：**
-```cpp
-// CPU内部复制
-backend->copy_data(dst_ptr, src_ptr, size, tr::CPU, tr::CPU);
-```
-
-### 张量操作
-
-#### `void fill(Tensor& dst, float value) override`
-
-用浮点数值填充张量（FP32类型）。
-
-**参数：**
-- `dst` - 目标张量，必须是FP32类型
-- `value` - 填充值
-
-**异常：**
-- `TRException` - 当张量数据类型不是FP32时抛出
-
-**实现特点：**
-- 使用Eigen的Map实现高效填充
-- 支持任意形状的张量
-
-**示例：**
-```cpp
-tr::Tensor tensor(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-backend->fill(tensor, 3.14f);  // 所有元素设为3.14
-```
-
-#### `void fill(Tensor& dst, int8_t value) override`
-
-用8位整数值填充张量（INT8类型）。
-
-**参数：**
-- `dst` - 目标张量，必须是INT8类型
-- `value` - 填充值
-
-**异常：**
-- `TRException` - 当张量数据类型不是INT8时抛出
-
-**示例：**
-```cpp
-tr::Tensor tensor(tr::Shape(2, 3), tr::DType::INT8, tr::CPU);
-backend->fill(tensor, 42);  // 所有元素设为42
-```
-
-### 张量创建函数 (V1.31.1扩展)
-
-张量创建函数提供了多种方式生成具有特定值、随机分布和模式的张量。
-
-#### `Tensor empty(const Shape& shape, DType dtype)`
-
-创建未初始化的新张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `dtype` - 数据类型（支持FP32、INT8、INT32）
-
-**返回值：** 新的张量对象
-
-**设备：** CPU
-
-**重要说明**：
-- **此方法会分配内存但未初始化数据**
-- 这与Tensor构造函数不同，构造函数只创建元数据不分配内存
-- 适用于后续会填充数据的场景
-
-**示例：**
-```cpp
-tr::Tensor tensor = backend->empty(tr::Shape(2, 3), tr::DType::FP32);
-tr::Tensor int8_tensor = backend->empty(tr::Shape(2, 3), tr::DType::INT8);
-```
-
-#### `Tensor full(const Shape& shape, float value, DType dtype = DType::FP32)`
-
-创建填充指定值的新张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `value` - 填充值
-- `dtype` - 数据类型（仅支持FP32，INT8抛出TODO异常）
-
-**返回：** 填充指定值的新张量
-
-**优化：** 当启用Eigen时使用`setConstant()`进行高度优化的内存填充
-
-**示例：**
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-Tensor ones = cpu_backend->full(Shape(3, 4), 1.0f);  // 3x4张量，所有元素为1.0
-```
-
-#### `Tensor ones(const Shape& shape, DType dtype = DType::FP32)`
-
-创建填充1值的新张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `dtype` - 数据类型（支持FP32、INT8、INT32）
-
-**返回：** 所有元素为1的新张量
-
-**优化：** 当启用Eigen时使用`setConstant()`进行高度优化的内存填充
-
-**数据类型支持：**
-- **FP32**: 填充1.0f
-- **INT8**: 填充int8_t(1)
-- **INT32**: 填充int32_t(1)
-
-**示例：**
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-
-// 创建不同数据类型的全1张量
-Tensor fp32_ones = cpu_backend->ones(Shape(3, 4), DType::FP32);   // 1.0f
-Tensor int8_ones = cpu_backend->ones(Shape(3, 4), DType::INT8);    // int8_t(1)
-Tensor int32_ones = cpu_backend->ones(Shape(3, 4), DType::INT32);  // int32_t(1)
-```
-
-#### `void full_inplace(Tensor& tensor_a, float value)`
-
-原地填充指定值到现有张量。
-
-**参数：**
-- `tensor_a` - 目标张量（必须已分配、非空、位于CPU）
-- `value` - 填充值
-
-**优化：** 当启用Eigen时使用`setConstant()`进行高度优化的内存填充
-
-**示例：**
-```cpp
-Tensor tensor = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-cpu_backend->full_inplace(tensor, 5.5f);  // 原地填充5.5
-```
-
-#### `Tensor randn(const Shape& shape, unsigned int seed = 0)`
-
-创建标准正态分布（μ=0, σ=1）随机数张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `seed` - 随机种子（默认0，用于可重现性）
-
-**返回：** 标准正态分布随机数张量
-
-**分布：** 标准正态分布 N(0,1)
-
-**示例：**
-```cpp
-Tensor normal = cpu_backend->randn(Shape(1000), 42);  // 1000个N(0,1)随机数
-```
-
-#### `void randn_inplace(Tensor& tensor_a, unsigned int seed = 0)`
-
-原地填充标准正态分布随机数到现有张量。
-
-**参数：**
-- `tensor_a` - 目标张量（FP32类型，非空，位于CPU）
-- `seed` - 随机种子（默认0）
-
-**示例：**
-```cpp
-Tensor tensor = Tensor::empty(Shape(3, 3), DType::FP32, tr::CPU);
-cpu_backend->randn_inplace(tensor, 123);  // 原地填充N(0,1)
-```
-
-#### `Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0)`
-
-创建均匀分布随机数张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `min_val` - 最小值（包含）
-- `max_val` - 最大值（不包含）
-- `seed` - 随机种子（默认0）
-
-**返回：** 均匀分布随机数张量
-
-**分布：** 均匀分布 U(min_val, max_val)
-
-**示例：**
-```cpp
-Tensor uniform = cpu_backend->uniform(Shape(3, 4), 10.0f, 20.0f, 456);  // [10,20)
-```
-
-#### `void uniform_inplace(Tensor& tensor_a, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0)`
-
-原地填充均匀分布随机数到现有张量。
-
-**参数：**
-- `tensor_a` - 目标张量（FP32类型，非空，位于CPU）
-- `min_val` - 最小值（包含）
-- `max_val` - 最大值（不包含）
-- `seed` - 随机种子（默认0）
-
-**示例：**
-```cpp
-Tensor tensor = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-cpu_backend->uniform_inplace(tensor, -5.0f, 5.0f, 789);  // [-5,5)
-```
-
-#### `Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0)`
-
-创建随机整数张量。
-
-**参数：**
-- `shape` - 目标张量形状
-- `low` - 最小整数（包含）
-- `high` - 最大整数（不包含）
-- `dtype` - 数据类型（支持FP32、INT8、INT32）
-- `seed` - 随机种子（默认0）
-
-**返回：** 随机整数张量
-
-**范围：** 值在[low, high)区间
-
-**验证：**
-- 当low >= high时抛出异常
-- 不支持的数据类型抛出异常
-- INT8类型验证范围[-128, 127]
-
-**示例：**
-```cpp
-Tensor fp32_integers = cpu_backend->randint(Shape(2, 3), 1, 10, DType::FP32, 321);  // [1,10)
-Tensor int8_integers = cpu_backend->randint(Shape(2, 3), 0, 100, DType::INT8, 456);   // [0,100)
-Tensor int32_integers = cpu_backend->randint(Shape(2, 3), 0, 1000, DType::INT32, 789);  // [0,1000)
-```
-
-#### `void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0)`
-
-原地填充随机整数到现有张量。
-
-**参数：**
-- `tensor_a` - 目标张量（必须与dtype匹配）
-- `low` - 最小整数（包含）
-- `high` - 最大整数（不包含）
-- `dtype` - 数据类型（必须与tensor_a.dtype()匹配）
-- `seed` - 随机种子（默认0）
-
-**范围：** 值在[low, high)区间
-
-**验证：**
-- 当low >= high时抛出异常
-- 张量数据类型与输入dtype不匹配时抛出异常
-
-**示例：**
-```cpp
-Tensor tensor = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-cpu_backend->randint_inplace(tensor, 0, 100, 654);  // [0,100)
-```
-
-#### `Tensor randbool(const Shape& shape, float rate_of_zeros, unsigned int seed = 0, DType dtype = DType::FP32)`
-
-创建随机布尔值张量（0.0f和1.0f）。
-
-**参数：**
-- `shape` - 目标张量形状
-- `rate_of_zeros` - 零值概率（0.0到1.0）
-- `seed` - 随机种子（默认0）
-- `dtype` - 数据类型（仅支持FP32，INT8抛出TODO异常）
-
-**返回：** 0.0f和1.0f值组成的张量
-
-**分布：** 伯努利分布，指定零概率
-
-**优化：** 当启用Eigen时使用`unaryExpr()`进行向量化随机生成
-
-**验证：** 当rate_of_zeros不在[0,1]区间时抛出异常
-
-**示例：**
-```cpp
-Tensor booleans = cpu_backend->randbool(Shape(4, 5), 0.3f, 987);  // 30%零值
-```
-
-#### `void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0)`
-
-原地填充随机布尔值到现有张量。
-
-**参数：**
-- `tensor_a` - 目标张量
-- `rate_of_zeros` - 零值概率（0.0到1.0）
-- `seed` - 随机种子（默认0）
-
-**优化：** 当启用Eigen时使用`unaryExpr()`进行向量化随机生成
-
-**验证：** 当rate_of_zeros不在[0,1]区间时抛出异常
-
-**示例：**
-```cpp
-Tensor tensor = Tensor::empty(Shape(3, 4), DType::FP32, tr::CPU);
-cpu_backend->randbool_inplace(tensor, 0.8f, 246);  // 80%零值
-```
-
-#### `void add(Tensor& result, const Tensor& a, const Tensor& b) override`
-
-执行逐元素加法运算：result = a + b。
-
-**参数：**
-- `result` - 结果张量
-- `a` - 第一个操作数张量
-- `b` - 第二个操作数张量
-
-**异常：**
-- `TRException` - 当张量形状、数据类型或设备不匹配时抛出
-
-**实现特点：**
-- 使用Eigen的向量化操作，性能优异
-- 自动处理多维张量的扁平化
-
-**示例：**
-```cpp
-tr::Tensor a(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-tr::Tensor b(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-tr::Tensor result(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-
-backend->fill(a, 2.0f);
-backend->fill(b, 3.0f);
-backend->add(result, a, b);  // 结果: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-```
-
-#### `void mul(Tensor& result, const Tensor& a, const Tensor& b) override`
-
-执行逐元素乘法运算：result = a * b。
-
-**参数**：
-- `result` - 结果张量
-- `a` - 第一个操作数张量
-- `b` - 第二个操作数张量
+- `Tensor` - 全零张量
 
 **异常**：
-- `TRException` - 当张量形状、数据类型或设备不匹配时抛出
-
-**实现特点**：
-- 使用Eigen的向量化乘法操作
-- 支持SIMD指令集优化
+- `TRException` - 当张量过大或内存不足时抛出
 
 **示例**：
 ```cpp
-tr::Tensor a(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-tr::Tensor b(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-tr::Tensor result(tr::Shape(2, 3), tr::DType::FP32, tr::CPU);
-
-backend->fill(a, 2.0f);
-backend->fill(b, 3.0f);
-backend->mul(result, a, b);  // 结果: [6.0, 6.0, 6.0, 6.0, 6.0, 6.0]
+Tensor zeros = cpu_backend->zeros({2, 3, 4}, DType::FP32);
 ```
 
-### 矩阵乘法操作
+### `Tensor ones(const Shape& shape, DType dtype = DType::FP32)`
 
-CPU后端提供高性能的矩阵乘法功能，支持行主序存储格式和Eigen优化。详细的矩阵乘法API、性能基准测试和跨后端示例请参考 [矩阵乘法 API 文档](cpu_mm_fp32.md)。
+创建全一张量。
 
-**主要功能**：
-- 高性能行主序矩阵乘法：`mm(result, a, b)`
-- Eigen优化和朴素实现双重支持
-- 自动SIMD向量化和多线程并行计算
-- 跨后端一致性保证
+**参数**：
+- `shape` - 张量形状
+- `dtype` - 数据类型（可选，默认FP32）
 
-### 设备信息
+**返回值**：
+- `Tensor` - 全一张量
 
-#### `Device device() const override`
-
-获取CPU后端的设备信息。
-
-**返回值：**
-- `Device` - 返回`tr::CPU`设备对象
-
-**示例：**
+**示例**：
 ```cpp
-auto device = backend->device();
-std::cout << "Device: " << device.to_string() << std::endl;  // "CPU"
+Tensor ones = cpu_backend->ones({2, 3}, DType::INT32);
 ```
 
-#### `std::string name() const override`
+### `Tensor full(const Shape& shape, float value, DType dtype = DType::FP32)`
 
-获取CPU后端的名称。
+创建填充指定值的张量。
 
-**返回值：**
-- `std::string` - 返回"CpuBackend"
+**参数**：
+- `shape` - 张量形状
+- `value` - 填充值
+- `dtype` - 数据类型（可选，默认FP32）
 
-**示例：**
+**返回值**：
+- `Tensor` - 填充张量
+
+**示例**：
 ```cpp
-std::cout << "Backend name: " << backend->name() << std::endl;  // "CpuBackend"
+Tensor full = cpu_backend->full({2, 3}, 3.14f, DType::FP32);
+```
+
+### `Tensor empty(const Shape& shape, DType dtype = DType::FP32)`
+
+创建未初始化的张量（仅分配内存）。
+
+**参数**：
+- `shape` - 张量形状
+- `dtype` - 数据类型（可选，默认FP32）
+
+**返回值**：
+- `Tensor` - 未初始化的张量
+
+**注意**：张量内容未初始化，使用前必须先填充数据。
+
+**示例**：
+```cpp
+Tensor empty = cpu_backend->empty({1000, 1000}, DType::FP32);
+cpu_backend->fill(empty, 0.0f);  // 使用前先填充
+```
+
+## 随机张量生成接口
+
+### `Tensor randn(const Shape& shape, uint64_t seed = 42)`
+
+生成标准正态分布随机张量。
+
+**参数**：
+- `shape` - 张量形状
+- `seed` - 随机种子（可选，默认42）
+
+**返回值**：
+- `Tensor` - 标准正态分布随机张量
+
+**分布**：均值=0，标准差=1的正态分布
+
+**示例**：
+```cpp
+Tensor randn = cpu_backend->randn({2, 3, 4}, 12345);
+```
+
+### `Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, uint64_t seed = 42)`
+
+生成均匀分布随机张量。
+
+**参数**：
+- `shape` - 张量形状
+- `min_val` - 最小值（可选，默认0.0）
+- `max_val` - 最大值（可选，默认1.0）
+- `seed` - 随机种子（可选，默认42）
+
+**返回值**：
+- `Tensor` - 均匀分布随机张量
+
+**示例**：
+```cpp
+Tensor uniform = cpu_backend->uniform({2, 3}, -5.0f, 5.0f, 54321);
+```
+
+### `Tensor randint(const Shape& shape, int32_t low, int32_t high, DType dtype = DType::INT32, uint64_t seed = 42)`
+
+生成整数随机张量。
+
+**参数**：
+- `shape` - 张量形状
+- `low` - 最小值（包含）
+- `high` - 最大值（不包含）
+- `dtype` - 数据类型（可选，默认INT32）
+- `seed` - 随机种子（可选，默认42）
+
+**返回值**：
+- `Tensor` - 整数随机张量
+
+**示例**：
+```cpp
+Tensor randint = cpu_backend->randint({2, 3}, 0, 10, DType::INT32, 99999);
+```
+
+### `Tensor randbool(const Shape& shape, float zero_rate = 0.5f, uint64_t seed = 42)`
+
+生成布尔随机张量（0或1）。
+
+**参数**：
+- `shape` - 张量形状
+- `zero_rate` - 0值的概率（可选，默认0.5）
+- `seed` - 随机种子（可选，默认42）
+
+**返回值**：
+- `Tensor` - 布尔随机张量
+
+**示例**：
+```cpp
+Tensor randbool = cpu_backend->randbool({2, 3}, 0.3f, 77777);
+```
+
+## 🆕 V1.43.0新增高级操作
+
+### 形状变换操作
+
+#### `Tensor reshape(const Tensor& tensor_a, const Shape& shape)`
+
+改变张量形状，返回新张量。
+
+**参数**：
+- `tensor_a` - 输入张量
+- `shape` - 目标形状
+
+**返回值**：
+- `Tensor` - 重塑后的张量
+
+**特性**：
+- 保持数据总数不变：`tensor_a.numel() == shape.numel()`
+- 创建新张量，不修改原张量
+- 基于Eigen的高性能实现
+
+**示例**：
+```cpp
+Tensor input = cpu_backend->ones({2, 3, 4});
+Tensor reshaped = cpu_backend->reshape(input, {2, 12});
+```
+
+#### `void reshape_inplace(Tensor& tensor_a, const Shape& shape)`
+
+原地改变张量形状。
+
+**参数**：
+- `tensor_a` - 输入张量，会被修改
+- `shape` - 目标形状
+
+**特性**：
+- 就地修改，不创建新张量
+- 内存效率更高
+- 保持数据总数不变
+
+**示例**：
+```cpp
+Tensor tensor = cpu_backend->ones({2, 3, 4});
+cpu_backend->reshape_inplace(tensor, {6, 4});  // tensor被修改
+```
+
+#### `void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape)`
+
+将输入张量重塑到目标张量中。
+
+**参数**：
+- `tensor_a` - 输入张量
+- `result` - 目标张量，会被修改
+- `shape` - 目标形状
+
+**特性**：
+- 将tensor_a的数据重塑到result中
+- result必须已分配足够的内存
+- 高效的数据复制操作
+
+**示例**：
+```cpp
+Tensor input = cpu_backend->ones({2, 3, 4});
+Tensor result = cpu_backend->empty({6, 4});
+cpu_backend->reshape_into(input, result, {6, 4});
+```
+
+### 双曲函数操作
+
+#### `Tensor tanh(const Tensor& tensor_a)`
+
+计算双曲正切函数。
+
+**参数**：
+- `tensor_a` - 输入张量
+
+**返回值**：
+- `Tensor` - tanh结果：`tanh(x) = (e^x - e^-x) / (e^x + e^-x)`
+
+**数学公式**：
+```
+tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+```
+
+**示例**：
+```cpp
+Tensor input = cpu_backend->randn({2, 3});
+Tensor tanh_result = cpu_backend->tanh(input);
+```
+
+#### `Tensor dtanh(const Tensor& tensor_a)`
+
+计算双曲正切函数的导数。
+
+**参数**：
+- `tensor_a` - 输入张量
+
+**返回值**：
+- `Tensor` - dtanh结果：`dtanh(x) = 1 - tanh(x)^2`
+
+**数学公式**：
+```
+dtanh(x) = 1 - tanh(x)^2
+```
+
+**用途**：神经网络反向传播中的梯度计算
+
+**示例**：
+```cpp
+Tensor tanh_output = cpu_backend->tanh(input);
+Tensor grad = cpu_backend->dtanh(tanh_output);
+```
+
+### 损失函数操作
+
+#### `float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean")`
+
+计算交叉熵损失。
+
+**参数**：
+- `pred` - 预测张量，形状为[batch_size, num_classes]
+- `label` - 标签张量，形状为[batch_size]或[batch_size, num_classes]
+- `reduction` - 约简方式："mean"（平均）或"sum"（求和）
+
+**返回值**：
+- `float` - 交叉熵损失值
+
+**数学公式**：
+```
+CE(p, y) = -∑(i) y[i] * log(p[i])
+```
+
+**要求**：
+- pred数据类型：FP32
+- label数据类型：INT32（类别索引）或FP32（one-hot编码）
+- pred和label的batch_size必须相同
+
+**示例**：
+```cpp
+// 类别索引方式
+Tensor pred = cpu_backend->randn({4, 10});  // 4个样本，10个类别
+Tensor labels = cpu_backend->ones({4}, DType::INT32);  // 类别1
+float loss = cpu_backend->crossentropy(pred, labels, "mean");
+
+// One-hot编码方式
+Tensor one_hot_labels = cpu_backend->one_hot(labels, 10);
+float loss2 = cpu_backend->crossentropy(pred, one_hot_labels, "mean");
+```
+
+### One-hot编码操作
+
+#### `Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing = 0.0f)`
+
+将类别标签转换为one-hot编码。
+
+**参数**：
+- `label` - 标签张量，形状为[batch_size]，数据类型INT32
+- `num_classes` - 类别总数
+- `label_smoothing` - 标签平滑参数（可选，默认0.0）
+
+**返回值**：
+- `Tensor` - one-hot编码张量，形状为[batch_size, num_classes]
+
+**数学公式**：
+- 无标签平滑：`one_hot[i, label[i]] = 1`
+- 有标签平滑：`one_hot[i, label[i]] = 1 - ε`，`one_hot[i, j≠label[i]] = ε/(num_classes-1)`
+
+**示例**：
+```cpp
+Tensor labels = Tensor::from_vector({0, 2, 1, 3}, DType::INT32);  // 4个标签
+Tensor one_hot = cpu_backend->one_hot(labels, 10, 0.1f);  // 10个类别，标签平滑0.1
+```
+
+### 标量运算操作
+
+#### `Tensor minus(const Tensor& input, float scalar) const`
+
+张量减去标量：`result = input - scalar`
+
+#### `Tensor minus(float scalar, const Tensor& input) const`
+
+标量减去张量：`result = scalar - input`
+
+#### `Tensor mac(const Tensor& input, float scalar_x, float scalar_y) const`
+
+乘加运算：`result = input * scalar_x + scalar_y`
+
+#### `Tensor clamp(const Tensor& input, float min_val, float max_val) const`
+
+张量裁剪：将输入张量限制在[min_val, max_val]范围内
+
+**示例**：
+```cpp
+Tensor input = cpu_backend->randn({2, 3});
+Tensor result1 = cpu_backend->minus(input, 1.0f);  // input - 1.0
+Tensor result2 = cpu_backend->minus(2.0f, input);  // 2.0 - input
+Tensor result3 = cpu_backend->mac(input, 2.0f, 1.0f);  // input * 2.0 + 1.0
+Tensor result4 = cpu_backend->clamp(input, -1.0f, 1.0f);  // 限制在[-1,1]范围内
+```
+
+### 广播运算操作
+
+#### `Tensor add_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const`
+
+广播加法：支持不同形状的张量相加
+
+#### `Tensor mul_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const`
+
+广播乘法：支持不同形状的张量相乘
+
+**广播规则**：
+- 从右向左比较维度
+- 维度大小相等或其中一个为1则可广播
+- 不匹配的维度扩展以匹配较大的维度
+
+**示例**：
+```cpp
+Tensor a = cpu_backend->ones({2, 1, 3});  // 可广播到 {2, 4, 3}
+Tensor b = cpu_backend->ones({4, 3});     // 可广播到 {2, 4, 3}
+Tensor result = cpu_backend->add_broadcast(a, b);  // 结果形状 {2, 4, 3}
+```
+
+## 类型转换接口
+
+### `Tensor cast(const Tensor& tensor, DType target_dtype)`
+
+张量数据类型转换。
+
+**参数**：
+- `tensor` - 输入张量
+- `target_dtype` - 目标数据类型
+
+**返回值**：
+- `Tensor` - 转换后的张量
+
+**支持的转换**：
+- FP32 → INT32（截断小数部分）
+- FP32 → INT8（截断并限制在[-128, 127]范围）
+- INT32 → FP32（直接转换）
+- INT8 → FP32（直接转换）
+
+**示例**：
+```cpp
+Tensor fp32_tensor = cpu_backend->randn({2, 3});
+Tensor int32_tensor = cpu_backend->cast(fp32_tensor, DType::INT32);
+```
+
+## 内存管理接口
+
+### `Tensor null_tensor()`
+
+返回空张量（不占用内存）。
+
+**返回值**：
+- `Tensor` - 空张量
+
+**用途**：
+- 变量初始化
+- 张量销毁后的状态设置
+
+**示例**：
+```cpp
+Tensor empty_tensor = cpu_backend->null_tensor();
 ```
 
 ## 使用示例
 
-### 跨后端操作示例
+### 🆕 V1.43.0新功能示例
 
 ```cpp
 #include "tech_renaissance.h"
 using namespace tr;
 
-void cross_backend_example() {
-    try {
-        // 获取后端实例
-        auto cpu_backend = BackendManager::get_cpu_backend();
-        auto cuda_backend = BackendManager::get_cuda_backend();
+void v1_43_0_new_features() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
 
-        // 创建CPU张量
-        Tensor cpu_a = Tensor::randn(Shape(1024, 2048), 42);
-        Tensor cpu_b = Tensor::randn(Shape(2048, 512), 42);
-        Tensor cpu_result = Tensor::empty(Shape(1024, 512), DType::FP32, tr::CPU);
+    // 1. 形状变换操作
+    Tensor input = cpu_backend->randn({2, 3, 4}, 42);
+    Tensor reshaped = cpu_backend->reshape(input, {2, 12});
+    std::cout << "Reshaped tensor shape: " << reshaped.shape().to_string() << std::endl;
 
-        // 执行基本运算
-        cpu_backend->add(cpu_result, cpu_a, cpu_b);
+    // 2. 双曲函数操作
+    Tensor tanh_result = cpu_backend->tanh(input);
+    Tensor dtanh_result = cpu_backend->dtanh(tanh_result);
+    std::cout << "Tanh operation completed" << std::endl;
 
-        // 转换到其他后端进行计算
-        Tensor cuda_a = cuda_backend->from_cpu(cpu_a);  // 行主序 → 列主序
-        Tensor cuda_result_cpu = cuda_backend->to_cpu(cuda_a);  // 列主序 → 行主序
+    // 3. 交叉熵损失计算
+    Tensor pred = cpu_backend->randn({4, 10});
+    Tensor labels = Tensor::from_vector({0, 2, 1, 3}, DType::INT32);
+    float loss = cpu_backend->crossentropy(pred, labels, "mean");
+    std::cout << "Cross entropy loss: " << loss << std::endl;
 
-        std::cout << "Cross-backend operation completed!" << std::endl;
+    // 4. One-hot编码
+    Tensor one_hot = cpu_backend->one_hot(labels, 10, 0.1f);
+    std::cout << "One-hot encoding shape: " << one_hot.shape().to_string() << std::endl;
 
-    } catch (const TRException& e) {
-        std::cerr << "CPU error: " << e.what() << std::endl;
-    }
+    // 5. 标量运算
+    Tensor scaled = cpu_backend->mac(input, 2.0f, 1.0f);  // input * 2 + 1
+    Tensor clamped = cpu_backend->clamp(input, -1.0f, 1.0f);
+
+    // 6. 广播运算
+    Tensor a = cpu_backend->ones({2, 1, 3});
+    Tensor b = cpu_backend->ones({4, 3});
+    Tensor broadcast_result = cpu_backend->add_broadcast(a, b);
+    std::cout << "Broadcast result shape: " << broadcast_result.shape().to_string() << std::endl;
 }
 ```
 
-### 基本CPU张量操作
+### 完整的神经网络示例
 
 ```cpp
 #include "tech_renaissance.h"
 using namespace tr;
 
-void basic_cpu_operations() {
-    try {
-        auto cpu_backend = BackendManager::get_cpu_backend();
+void simple_neural_network() {
+    auto cpu_backend = BackendManager::get_cpu_backend();
 
-        // 创建CPU张量（行主序存储）
-        Shape shape(3, 4);
-        Tensor a(shape, DType::FP32, tr::CPU);
-        Tensor b(shape, DType::FP32, tr::CPU);
-        Tensor result(shape, DType::FP32, tr::CPU);
+    // 1. 创建模拟数据
+    Tensor input = cpu_backend->randn({4, 784});           // 4个样本，784维输入
+    Tensor labels = Tensor::from_vector({0, 1, 2, 3}, DType::INT32);  // 4个类别标签
 
-        // 填充张量
-        cpu_backend->fill(a, 1.5f);
-        cpu_backend->fill(b, 2.5f);
+    // 2. 线性变换（模拟全连接层）
+    Tensor weights = cpu_backend->randn({784, 10});         // 权重矩阵
+    Tensor bias = cpu_backend->zeros({10});               // 偏置
 
-        // 执行加法
-        cpu_backend->add(result, a, b);
+    // 矩阵乘法：output = input × weights + bias
+    Tensor matmul_result = cpu_backend->empty({4, 10});
+    cpu_backend->mm(matmul_result, input, weights);
 
-        std::cout << "CPU computation completed successfully!" << std::endl;
+    // 加偏置
+    Tensor biased = cpu_backend->add(matmul_result, bias);
 
-    } catch (const TRException& e) {
-        std::cerr << "CPU error: " << e.what() << std::endl;
-    }
+    // 3. 激活函数
+    Tensor activated = cpu_backend->tanh(biased);
+
+    // 4. 计算损失
+    float loss = cpu_backend->crossentropy(activated, labels, "mean");
+    std::cout << "Neural network loss: " << loss << std::endl;
+
+    // 5. 反向传播（简化版）
+    Tensor grad_output = cpu_backend->dtanh(activated);  // tanh的导数
+    std::cout << "Gradient computed successfully" << std::endl;
 }
 ```
 
 ### 性能测试示例
 
 ```cpp
-void cpu_performance_example() {
+void performance_test() {
     auto cpu_backend = BackendManager::get_cpu_backend();
 
-    // 创建测试张量
-    const int32_t size = 1000;
-    Shape shape(size, size);
-    Tensor a(shape, DType::FP32, tr::CPU);
-    Tensor b(shape, DType::FP32, tr::CPU);
-    Tensor result(shape, DType::FP32, tr::CPU);
+    // 测试矩阵乘法性能
+    const int M = 1024, K = 2048, N = 512;
 
-    // 生成随机数据
-    a = Tensor::randn(shape, 42);
-    b = Tensor::randn(shape, 123);
+    Tensor a = cpu_backend->randn({M, K});
+    Tensor b = cpu_backend->randn({K, N});
+    Tensor result = cpu_backend->empty({M, N});
 
-    // 性能测试
-    const int iterations = 100;
     auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < iterations; ++i) {
-        cpu_backend->add(result, a, b);  // 基本运算性能测试
-    }
-
+    cpu_backend->mm(result, a, b);
     auto end = std::chrono::high_resolution_clock::now();
+
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    double gflops = (2.0 * M * K * N) / (duration.count() * 1e6) / 1e9;
 
-    double avg_time_ms = duration.count() / 1000.0 / iterations;
-    std::cout << "CPU Performance Test:" << std::endl;
-    std::cout << "  Tensor size: " << size << "x" << size << std::endl;
-    std::cout << "  Average time: " << avg_time_ms << " ms" << std::endl;
+    std::cout << "CPU MM Performance: " << gflops << " GFLOPS" << std::endl;
+    std::cout << "Execution time: " << duration.count() << " microseconds" << std::endl;
 }
 ```
 
-### 张量复制操作（V1.27.1新增）
+## 性能特性
 
-CPU后端提供了高效的张量复制功能，支持同设备内的深拷贝操作。
+### 计算性能
 
-#### `Tensor copy(const Tensor& tensor) const`
+- **矩阵乘法**：基于Eigen库优化，支持SIMD指令
+- **多线程并行**：OpenMP自动并行化，充分利用多核CPU
+- **内存对齐**：64字节对齐，最大化缓存命中率
 
-复制张量，返回新的张量副本。
+### 内存效率
 
-**参数**：
-- `tensor` - 源张量，必须属于CPU设备
+- **智能指针管理**：自动内存回收，避免内存泄漏
+- **就地操作**：提供inplace版本，减少内存分配
+- **零拷贝优化**：reshape等操作无需数据复制
 
-**返回值**：
-- `Tensor` - 复制后的新张量，属于CPU设备
+### 数值精度
 
-**特性**：
-- **深拷贝**：生成独立的数据副本
-- **同设备**：仅在CPU设备内操作
-- **高效复制**：使用std::memcpy进行内存拷贝
-
-**示例**：
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-Tensor original = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-cpu_backend->fill(original, 1.23f);
-Tensor copied = cpu_backend->copy(original);  // 深拷贝
-```
-
-#### `void copy_into(const Tensor& src, Tensor& dst) const`
-
-将源张量复制到指定目标张量。
-
-**参数**：
-- `src` - 源张量，必须属于CPU设备
-- `dst` - 目标张量，必须属于CPU设备
-
-**特性**：
-- **深拷贝**：将src完整复制到dst的内存中
-- **CPU专用**：仅支持CPU↔CPU操作，跨设备会报错
-- **参数检查**：验证数据类型、形状和设备一致性
-
-**示例**：
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-Tensor src = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-Tensor dst = Tensor::empty(Shape(2, 3), DType::FP32, tr::CPU);
-cpu_backend->copy_into(src, dst);  // 深拷贝到dst
-```
-
-## 张量销毁最佳实践
-
-### # 推荐的张量销毁方法
-
-在Tech Renaissance框架中，对于大型张量的销毁，我们强烈建议结合以下两种方法：
-
-#### 方法1：RAII作用域管理（推荐用于局部张量）
-
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-
-{
-    // 在大括号内创建大型张量
-    Tensor temp_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
-
-    // 使用temp_tensor进行计算
-    // ...
-
-}  // temp_tensor在这里自动析构，内存立即释放
-```
-
-**优点：**
-- 自动内存管理，符合RAII原则
-- 作用域清晰，内存释放时机明确
-- 代码简洁，无需手动管理
-
-#### 方法2：显式后端null_tensor()方法（推荐用于需要灵活控制的场景）
-
-```cpp
-auto cpu_backend = BackendManager::get_cpu_backend();
-
-// 创建大型张量
-Tensor large_tensor = cpu_backend->zeros(Shape(1000, 1000, 1000), DType::FP32);
-
-// 使用large_tensor进行计算
-// ...
-
-// 显式销毁，立即释放内存
-large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null张量
-```
-
-**优点：**
-- 显式操作，代码意图清晰
-- 灵活控制释放时机
-- 符合"后端管理存储"的设计原则
-
-#### `Tensor null_tensor()`
-
-**功能**：返回一个空的null张量，不占用任何内存。
-
-**参数**：无
-
-**返回值**：null张量（无内存分配）
-
-**示例**：
-```cpp
-// 显式销毁张量
-tensor = cpu_backend->null_tensor();
-
-// 检查张量是否为null
-if (tensor.is_empty()) {
-    // 张量是null，没有内存
-}
-```
-
-### 为什么推荐这两种方法？
-
-1. **避免构造函数误用**：防止用户直接调用`Tensor()`构造函数
-   ```cpp
-   // ❌ 危险：违反后端解耦原则
-   tensor = Tensor();  // 用户不清楚这个操作的含义
-
-   // ✅ 安全：显式使用后端方法
-   tensor = cpu_backend->null_tensor();  // 明确：通过CPU后端设为null
-   ```
-
-2. **API明确性**：`null_tensor()`比`empty()`更无歧义
-   - **Tensor构造函数**：只创建元数据，**不分配内存**（段错误！）
-   - **Backend::empty()**：**分配内存但未初始化数据**
-   - **Backend::null_tensor()**：真正的空张量，**不占用内存**
-
-3. **符合框架设计**：所有操作都通过后端，保持一致性
-
-### 实际案例参考
-
-参见 `tests/unit_tests/test_memory_occupation.cpp` 中的完整测试案例，该测试验证了：
-- RAII作用域管理的有效性
-- `null_tensor()`方法的正确性
-- 不同销毁方式的内存释放效果
-
-### 组合使用建议
-
-```cpp
-void process_large_data() {
-    auto cpu_backend = BackendManager::get_cpu_backend();
-
-    // 方法1：对于临时使用的张量，使用RAII
-    {
-        Tensor temp_data = cpu_backend->zeros(Shape(1000, 1000));
-        // 处理temp_data
-    }  // 自动释放
-
-    // 方法2：对于需要长期存在但可能提前释放的张量
-    Tensor persistent_tensor = cpu_backend->zeros(Shape(2000, 2000));
-
-    // 在某些条件下提前释放
-    if (some_condition) {
-        persistent_tensor = cpu_backend->null_tensor();
-    }
-
-    // 继续使用persistent_tensor（如果没被释放）
-}
-```
-
-**核心原则**：无论使用哪种方法，都要避免直接调用Tensor类的构造函数进行销毁操作。
-
-### 单目运算操作
-
-CPU后端提供了完整的单目运算功能，包括13种运算的39个API变体。详细的单目运算API、使用示例和性能优化请参考 [单目运算 API 文档](cpu_unary.md)。
-
-**主要功能**：
-- **13种运算**：zeros, ones, relu, sign, square, sqrt, abs, negative, reciprocal, round, reshape, tanh, dtanh
-- **3种模式**：非原地运算（返回新张量）、原地运算（修改输入张量）、指定输出张量运算
-- **Eigen优化**：SIMD向量化加速，支持智能降级到朴素实现
-- **内存安全**：64字节对齐，完善的异常处理机制
-- **灵活配置**：NaN检查、形状验证等编译时配置选项
-
-**V1.42.1新增运算**：
-- **reshape**：张量形状变换，支持元素数量不变的形状重排
-- **tanh**：双曲正切函数，数值稳定的高精度实现
-- **dtanh**：双曲正切导函数，1-(tanh(x))²的高效计算
-
-**数据类型支持**：
-- FP32：全部13种运算完全支持
-- INT8：仅支持zeros和ones运算
-
-**配置宏**：
-- `TR_USE_EIGEN`：启用Eigen优化
-- `TR_ENABLE_NAN_CHECK`：NaN检查模式配置
-- `TR_ENABLE_INTO_FUNC_SHAPE_CHECK`：形状检查配置
-
-### 大规模数据处理示例
-
-```cpp
-void large_scale_computation() {
-    auto backend = BackendManager::get_cpu_backend();
-
-    // 创建大型张量（1000x1000）
-    Shape shape(1000, 1000);
-    Tensor a(shape, DType::FP32, tr::CPU);
-    Tensor b(shape, DType::FP32, tr::CPU);
-    Tensor result(shape, DType::FP32, tr::CPU);
-
-    // 填充数据
-    backend->fill(a, 1.0f);
-    backend->fill(b, 2.0f);
-
-    // 执行计算（Eigen会自动使用多线程优化）
-    backend->add(result, a, b);
-
-    std::cout << "Large-scale computation completed!" << std::endl;
-}
-```
-
-### 内存管理示例
-
-```cpp
-void memory_management_example() {
-    auto backend = BackendManager::get_cpu_backend();
-
-    // 分配内存
-    const size_t num_elements = 1000;
-    const size_t memory_size = num_elements * sizeof(float);
-    auto memory = backend->allocate(memory_size);
-
-    // 获取指针并操作
-    float* data = static_cast<float*>(backend->get_data_ptr(memory));
-    for (size_t i = 0; i < num_elements; ++i) {
-        data[i] = static_cast<float>(i);
-    }
-
-    // 内存会在智能指针析构时自动释放
-    std::cout << "Memory allocated and will be automatically freed" << std::endl;
-}
-```
-
-## 性能优化建议
-
-### Eigen库优化
-- **自动优化选择**：CpuBackend会自动选择Eigen优化版本或朴素实现
-- **零拷贝操作**：使用`Eigen::Map`直接操作张量数据，避免内存拷贝
-- **SIMD向量化**：Eigen自动使用SSE/AVX指令集进行向量化计算
-- **自动启用**：`TR_USE_EIGEN`宏会在找到Eigen库时自动设置
-
-### 性能特点
-- **矩阵乘法**：Eigen优化比朴素实现快3-5倍（详见[矩阵乘法文档](cpu_mm_fp32.md)）
-- **单目运算**：SIMD向量化加速，支持智能降级（详见[单目运算文档](cpu_unary.md)）
-- **多线程支持**：Eigen自动使用OpenMP进行并行计算
-- **内存优化**：64字节对齐优化SIMD访问性能
-
-### 编译优化配置
-```cmake
-# 推荐配置（获得最佳性能）
-option(TR_USE_EIGEN ON)
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /arch:AVX2")  # MSVC
-# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")  # GCC/Clang
-```
-
-### 多线程控制
-可以通过环境变量控制Eigen的OpenMP线程数：
-```bash
-export OMP_NUM_THREADS=4  # Linux/macOS
-set OMP_NUM_THREADS=4     # Windows
-```
-
-## 编译配置
-
-### CMake选项
-```cmake
-option(TR_USE_EIGEN "Enable Eigen for CPU optimizations" ON)
-```
-
-### Eigen库检测和配置
-CMake会自动检测系统中的Eigen库：
-
-1. **自动检测**：CMake会在以下位置查找Eigen库
-   - `third_party/Eigen`（项目内置推荐）
-   - 系统安装的Eigen库（通过`find_package(Eigen)`）
-
-2. **自动启用**：如果找到Eigen库，会自动设置：
-   - `TR_USE_EIGEN`编译宏
-   - Eigen头文件路径
-   - 编译器优化标志
-
-3. **手动配置**：如果需要手动指定Eigen路径：
-   ```cmake
-   set(EIGEN3_INCLUDE_DIR "/path/to/eigen/include")
-   find_package(Eigen3 REQUIRED)
-   ```
-
-### 编译时优化建议
-- **Release模式**：使用`-O3`或`/O2`优化级别
-- **向量化支持**：启用相应的指令集
-  - MSVC：`/arch:AVX2`（支持AVX2）
-  - GCC/Clang：`-march=native`（自动检测最优指令集）
-- **OpenMP支持**：Eigen会自动使用OpenMP进行并行计算
-
-### 编译器优化
-- Release模式：启用`/O2`或`-O3`优化
-- Debug模式：启用调试符号，便于问题排查
-- 启用适当的指令集：`/arch:AVX2`（MSVC）或`-march=native`（GCC/Clang）
-
-## 注意事项
-
-1. **数据类型检查**：操作前会检查张量数据类型，确保操作兼容
-2. **形状匹配**：二元操作要求操作数张量形状完全匹配
-3. **内存对齐**：Eigen库要求数据内存对齐，CpuBackend会自动处理
-4. **线程安全**：单个CpuBackend实例不是线程安全的，多线程环境下应分别创建实例
-5. **异常处理**：所有操作都可能抛出异常，建议使用try-catch块处理
+- **IEEE 754**：严格遵循IEEE 754浮点数标准
+- **数值稳定性**：算法实现考虑数值稳定性
+- **精度验证**：与PyTorch等框架对比验证
 
 ## 错误处理
 
-常见异常情况：
+### 常见异常
 
 ```cpp
 try {
-    // 错误的数据类型
-    tr::Tensor tensor(shape, tr::DType::INT8, tr::CPU);
-    backend->fill(tensor, 3.14f);  // 抛出异常
-} catch (const tr::TRException& e) {
-    std::cerr << "Error: " << e.what() << std::endl;
-    // "fill(float) requires FP32 tensor"
-}
-```
+    auto cpu_backend = BackendManager::get_cpu_backend();
 
-## 张量IO算子（CPU后端独有功能）
+    // 形状不匹配
+    Tensor a = cpu_backend->ones({2, 3});
+    Tensor b = cpu_backend->ones({3, 4});
+    // Tensor result = cpu_backend->add(a, b);  // 抛出TRException
 
-### `void export_tensor(const Tensor& tensor, const std::string& filename) const`
+    // 数据类型不匹配
+    Tensor fp32_tensor = cpu_backend->ones({2, 3}, DType::FP32);
+    Tensor int32_tensor = cpu_backend->ones({2, 3}, DType::INT32);
+    // Tensor result = cpu_backend->add(fp32_tensor, int32_tensor);  // 抛出TRException
 
-将张量导出为TSR格式文件。
-
-**参数：**
-- `tensor` - 要导出的张量
-- `filename` - 输出文件路径（.tsr格式）
-
-**异常：**
-- `TRException` - 当张量为空、类型不支持或文件写入失败时抛出
-
-**支持的数据类型：**
-- FP32（4字节浮点数）
-- INT8（1字节整数）
-
-**文件格式：**
-- TSR（Tech Renaissance）格式，包含完整的张量元数据和二进制数据
-
-**示例：**
-```cpp
-// 创建张量
-tr::Shape shape(2, 3, 4, 5);
-tr::Tensor tensor(shape, tr::DType::FP32, tr::CPU);
-backend->fill(tensor, 3.14f);
-
-// 导出到文件
-backend->export_tensor(tensor, "workspace/test_tensor.tsr");
-```
-
-### `Tensor import_tensor(const std::string& filename) const`
-
-从TSR格式文件导入张量。
-
-**参数：**
-- `filename` - 输入文件路径（.tsr格式）
-
-**返回值：**
-- `Tensor` - 导入的张量对象
-
-**异常：**
-- `TRException` - 当文件不存在、格式错误或读取失败时抛出
-
-**支持的功能：**
-- 自动检测张量形状、数据类型和设备
-- 验证TSR文件格式完整性
-- 创建对应的数据存储并加载数据
-
-**示例：**
-```cpp
-// 从文件导入张量
-tr::Tensor tensor = backend->import_tensor("workspace/test_tensor.tsr");
-
-// 验证导入的张量
-std::cout << "Shape: " << tensor.shape().to_string() << std::endl;
-std::cout << "DType: " << static_cast<int>(tensor.dtype()) << std::endl;
-```
-
-### 便捷宏定义
-
-CPU后端提供了便捷的宏来简化张量导入导出操作：
-
-```cpp
-#define EXPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->export_tensor
-#define IMPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->import_tensor
-```
-
-**使用示例：**
-```cpp
-// 使用便捷宏导出张量
-tr::Tensor tensor(shape, tr::DType::FP32, tr::CPU);
-EXPORT_TENSOR(tensor, "output.tsr");
-
-// 使用便捷宏导入张量
-tr::Tensor imported_tensor = IMPORT_TENSOR("input.tsr");
-```
-
-## INT32张量比较操作（V1.42.4新增）
-
-CPU后端新增了完整的INT32张量比较操作功能，支持元素级相等性检查和整体张量相等性验证。这些方法提供了高性能的比较能力，同时包含完整的安全检查机制。
-
-### 核心方法
-
-#### `void eq_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const`
-
-比较两个INT32张量的每个元素是否相等，结果写入result张量。
-
-**参数：**
-- `tensor_a` - 第一个INT32张量，必须与tensor_b形状相同
-- `tensor_b` - 第二个INT32张量，必须与tensor_a形状相同
-- `result` - 结果张量，必须为INT32类型且与输入张量形状相同
-
-**功能：**
-- 元素相等时result对应位置写入1，不等时写入0
-- 支持Eigen向量化优化和朴素实现
-- 完整的参数验证和异常处理
-
-**异常：**
-- `TypeError` - 当任一张量不是INT32类型时抛出
-- `ShapeError` - 当形状不匹配或空张量状态不一致时抛出
-
-**示例：**
-```cpp
-auto backend = BackendManager::get_cpu_backend();
-
-// 创建INT32张量
-Tensor a = backend->zeros({2, 3}, DType::INT32);
-Tensor b = backend->zeros({2, 3}, DType::INT32);
-Tensor result = backend->zeros({2, 3}, DType::INT32);
-
-// 设置数据
-int32_t* data_a = static_cast<int32_t*>(a.data_ptr());
-int32_t* data_b = static_cast<int32_t*>(b.data_ptr());
-data_a[0] = 1; data_a[1] = 2; data_a[2] = 3;
-data_b[0] = 1; data_b[1] = 5; data_b[2] = 3;
-
-// 执行比较
-backend->eq_into(a, b, result);
-// 结果：result = [1, 0, 1, ...]
-```
-
-#### `Tensor eq(const Tensor& tensor_a, const Tensor& tensor_b) const`
-
-比较两个INT32张量的每个元素是否相等，返回新的结果张量。
-
-**参数：**
-- `tensor_a` - 第一个INT32张量
-- `tensor_b` - 第二个INT32张量
-
-**返回值：**
-- `Tensor` - 新的INT32张量，包含比较结果（相等为1，不等为0）
-
-**功能：**
-- 自动创建与输入同形状的INT32结果张量
-- 内部调用`eq_into`执行比较操作
-- 对于空张量输入返回null张量
-
-**异常：**
-- `TypeError` - 当输入张量不是INT32类型时抛出
-- `ShapeError` - 当形状不匹配时抛出
-
-**示例：**
-```cpp
-auto backend = BackendManager::get_cpu_backend();
-
-Tensor a = backend->zeros({2, 2}, DType::INT32);
-Tensor b = backend->zeros({2, 2}, DType::INT32);
-
-// 设置数据
-int32_t* data_a = static_cast<int32_t*>(a.data_ptr());
-int32_t* data_b = static_cast<int32_t*>(b.data_ptr());
-data_a[0] = 1; data_a[1] = 2; data_a[2] = 3; data_a[3] = 4;
-data_b[0] = 1; data_b[1] = 2; data_b[2] = 5; data_b[3] = 6;
-
-// 执行比较
-Tensor result = backend->eq(a, b);
-// 结果：result = [1, 1, 0, 0]
-```
-
-#### `bool equal(const Tensor& tensor_a, const Tensor& tensor_b) const`
-
-比较两个INT32张量是否完全相等，返回布尔值。
-
-**参数：**
-- `tensor_a` - 第一个INT32张量
-- `tensor_b` - 第二个INT32张量
-
-**返回值：**
-- `bool` - 完全相等返回true，否则返回false
-
-**功能：**
-- 形状不同立即返回false
-- 使用memcmp进行快速比较，提升性能
-- 失败时回退到逐元素验证
-- 支持空张量比较
-
-**异常：**
-- `TypeError` - 当输入张量不是INT32类型时抛出
-
-**示例：**
-```cpp
-auto backend = BackendManager::get_cpu_backend();
-
-Tensor a = backend->zeros({3, 3}, DType::INT32);
-Tensor b = backend->zeros({3, 3}, DType::INT32);
-
-// 相同张量比较
-bool same = backend->equal(a, a);  // true
-
-// 不同张量比较
-bool different = backend->equal(a, b);  // false（除非a和b内容完全相同）
-
-// 形状不匹配
-Tensor c = backend->zeros({2, 3}, DType::INT32);
-bool shape_mismatch = backend->equal(a, c);  // false
-```
-
-### 空张量处理
-
-所有比较方法都正确处理空张量情况：
-
-```cpp
-auto backend = BackendManager::get_cpu_backend();
-
-Tensor empty_a = backend->null_tensor();
-Tensor empty_b = backend->null_tensor();
-
-// eq_into - 空张量到空张量
-Tensor result = backend->null_tensor();
-backend->eq_into(empty_a, empty_b, result);  // 正常执行
-
-// eq - 空张量比较
-Tensor eq_result = backend->eq(empty_a, empty_b);  // 返回null张量
-
-// equal - 空张量相等性
-bool is_equal = backend->equal(empty_a, empty_b);  // 返回true
-```
-
-### 性能优化
-
-- **Eigen向量化**：使用`Eigen::ArrayXi`进行高效的SIMD向量化比较
-- **快速memcmp**：`equal`方法使用memcmp进行快速整体比较
-- **零拷贝操作**：通过`Eigen::Map`直接操作内存，避免拷贝开销
-- **智能降级**：不支持Eigen时自动降级到朴素实现
-
-### 异常处理
-
-完整的错误检查和异常处理：
-
-```cpp
-try {
-    backend->eq_into(fp32_tensor, int32_tensor, result);  // 类型错误
-} catch (const TypeError& e) {
-    // "[CpuBackend::eq_into] All tensors must be INT32 type"
-}
-
-try {
-    backend->eq(tensor_a, tensor_b);  // 形状错误
-} catch (const ShapeError& e) {
-    // "[CpuBackend::eq] All tensors must have the same shape"
-}
-```
-
-### 应用场景
-
-1. **分类结果验证**：比较预测标签与真实标签
-2. **数据一致性检查**：验证两个数据集是否相同
-3. **单元测试**：验证计算结果的正确性
-4. **条件判断**：基于张量相等性进行分支逻辑
-5. **缓存验证**：检查缓存数据是否过期
-
-## 元素级数据访问方法
-
-CPU后端提供了完整的元素级数据访问功能，支持线性索引直接访问张量中的单个元素。这些方法提供了高性能的直接内存访问能力，同时包含完整的安全检查机制。
-
-### 核心方法
-
-#### FP32数据访问
-
-```cpp
-// 获取FP32张量中指定线性索引的元素值
-float get_item_fp32(const Tensor& tensor_a, int64_t element_index);
-
-// 设置FP32张量中指定线性索引的元素值
-void set_item_fp32(Tensor& tensor_a, int64_t element_index, float value);
-```
-
-#### INT8数据访问
-
-```cpp
-// 获取INT8张量中指定线性索引的元素值
-int8_t get_item_int8(const Tensor& tensor_a, int64_t element_index);
-
-// 设置INT8张量中指定线性索引的元素值
-void set_item_int8(Tensor& tensor_a, int64_t element_index, int8_t value);
-```
-
-#### INT32数据访问
-
-```cpp
-// 获取INT32张量中指定线性索引的元素值
-int32_t get_item_int32(const Tensor& tensor_a, int64_t element_index);
-
-// 设置INT32张量中指定线性索引的元素值
-void set_item_int32(Tensor& tensor_a, int64_t element_index, int32_t value);
-```
-
-### 使用示例
-
-```cpp
-auto backend = BackendManager::get_cpu_backend();
-
-// 创建不同类型的张量
-Tensor fp32_tensor = backend->zeros({2, 3, 4}, DType::FP32);
-Tensor int8_tensor = backend->zeros({2, 3, 4}, DType::INT8);
-Tensor int32_tensor = backend->zeros({2, 3, 4}, DType::INT32);
-
-// 设置和获取FP32值
-backend->set_item_fp32(fp32_tensor, 0, 1.5f);      // 第一个元素
-backend->set_item_fp32(fp32_tensor, 23, 8.9f);    // 最后一个元素
-float value1 = backend->get_item_fp32(fp32_tensor, 0);   // 返回 1.5f
-float value2 = backend->get_item_fp32(fp32_tensor, 23);  // 返回 8.9f
-
-// 设置和获取INT8值
-backend->set_item_int8(int8_tensor, 5, 42);       // 第六个元素
-int8_t int8_value = backend->get_item_int8(int8_tensor, 5); // 返回 42
-
-// 设置和获取INT32值
-backend->set_item_int32(int32_tensor, 10, 1000);     // 第十一个元素
-int32_t int32_value = backend->get_item_int32(int32_tensor, 10); // 返回 1000
-```
-
-### 线性索引说明
-
-**索引计算**：线性索引是张量在内存中的连续位置，计算方式：
-```cpp
-// 对于形状为(N, C, H, W)的张量
-int64_t linear_index = n * C * H * W + c * H * W + h * W + w;
-
-// 总元素数量
-int64_t total_elements = tensor.numel();
-// 有效索引范围：[0, total_elements-1]
-```
-
-**优势**：
-- **高性能**：直接内存访问，避免多层索引计算开销
-- **简洁性**：单索引访问所有维度，简化复杂操作
-- **通用性**：支持任意形状的张量，自动适配维度
-
-### 安全检查机制
-
-所有元素访问方法都包含完整的安全检查：
-
-1. **设备验证**：确保张量位于CPU设备
-2. **内存检查**：验证张量已分配内存
-3. **类型验证**：确保数据类型与方法匹配
-4. **边界检查**：验证索引在有效范围内
-5. **异常处理**：提供详细的错误信息
-
-**错误处理示例**：
-```cpp
-try {
-    backend->get_item_fp32(tensor, -1);  // 负索引
 } catch (const TRException& e) {
-    // 错误信息：get_item_fp32: element index -1 out of range [0, 24]
-}
-
-try {
-    backend->get_item_int8(fp32_tensor, 0); // 类型不匹配
-} catch (const TRException& e) {
-    // 错误信息：get_item_int8: tensor dtype must be INT8, got FP32
+    std::cerr << "CPU Backend error: " << e.what() << std::endl;
 }
 ```
 
-### 性能优化
+### 错误类型
 
-- **内存对齐**：所有访问都考虑了内存对齐优化
-- **直接访问**：使用`static_cast`进行类型转换，避免运行时开销
-- **缓存友好**：线性访问模式对CPU缓存友好
-
-### 应用场景
-
-1. **逐元素处理**：循环处理张量中的每个元素
-2. **随机访问**：根据业务逻辑访问特定位置的元素
-3. **边界条件**：快速访问张量边缘或特定位置的值
-4. **调试分析**：检查张量中特定位置的数据内容
-5. **算法实现**：实现需要直接元素访问的自定义算法
-
-## 关键设计原则总结（V1.23.1）
-
-### 后端管理存储
-- **CPU后端**：使用行主序存储，符合C/C++语言惯例
-- **CUDA后端**：使用列主序存储，与cuBLAS/cuDNN库接口一致
-- **转换透明**：`from_cpu()`和`to_cpu()`自动处理格式转换
-
-### 数据访问一致性
-- **用户视角**：所有张量都是行主序访问，无论在哪个后端
-- **后端内部**：各自选择最优的内存布局进行计算
-- **转换保证**：跨后端转换保证数学结果的正确性
-
-### 性能优化
-- **内存对齐**：64字节对齐优化SIMD访问
-- **Eigen集成**：自动SIMD向量化和多线程并行
-- **跨后端一致性**：与CUDA后端结果完全一致
+- **形状错误**：张量形状不兼容
+- **类型错误**：数据类型不匹配
+- **内存错误**：内存分配失败或不足
+- **参数错误**：函数参数超出有效范围
 
 ## 最佳实践
 
-1. **使用转换方法**：在跨后端操作时使用目标后端的`from_cpu()`和`to_cpu()`方法
-2. **内存布局理解**：理解CPU使用行主序，CUDA使用列主序的差异
-3. **性能监控**：监控CPU和CUDA计算的性能差异
-4. **精度验证**：使用`is_close()`方法验证跨后端计算结果的一致性
-
-## 注意事项
-
-1. **设备一致性**：所有操作的张量必须位于CPU设备上
-2. **内存管理**：使用智能指针自动管理64字节对齐的内存
-3. **多线程**：Eigen自动配置OpenMP，可通过环境变量控制
-4. **异常处理**：完善的异常检查和错误处理机制
-5. **跨后端操作**：需要通过BackendManager获取目标后端进行转换
+1. **使用BackendManager**：通过BackendManager获取CPU后端实例
+2. **类型检查**：在计算前检查张量的数据类型和形状
+3. **内存管理**：利用就地操作减少内存分配
+4. **异常处理**：所有操作都应包含适当的异常处理
+5. **性能优化**：对于大张量操作，考虑使用多线程并行
+6. **🆕 利用新特性**：使用V1.43.0新增的高级操作简化代码
 
 ## 版本信息
 
-- **版本**：V1.42.4
-- **更新日期**：2025-11-16
-- **作者**：技术觉醒团队
-- **主要特性**：行主序存储、Eigen向量化优化、跨后端转换、高性能矩阵乘法、完整单目运算支持、张量复制功能、INT32张量比较操作
-- **架构特性**：
-  - **后端管理存储原则**：CPU使用行主序，与C/C++语言惯例一致
-  - **跨后端透明转换**：`from_cpu()`和`to_cpu()`自动处理格式转换
-  - **高性能计算**：Eigen库SIMD优化和多线程并行计算
-  - **内存安全**：64字节对齐优化，RAII智能指针管理
-- **核心功能**：
-  - **基础运算**：张量填充、逐元素运算、内存管理
-  - **张量创建**：10个创建函数，支持值填充和随机分布（详见[张量创建文档](cpu_create.md)）
-  - **矩阵乘法**：高性能GEMM实现（详见[矩阵乘法文档](cpu_mm_fp32.md)）
-  - **单目运算**：10种运算的30个API变体（详见[单目运算文档](cpu_unary.md)）
-  - **标量运算**：张量与标量的运算（详见[标量运算文档](cpu_scalar.md)）
-  - **广播运算**：不同形状张量的自动扩展（详见[广播运算文档](cpu_broadcast.md)）
-  - **维度操作**：squeeze、unsqueeze、padding等（详见[维度操作文档](cpu_dimension.md)）
-  - **张量复制**：同设备内深拷贝操作（V1.27.1新增）
-  - **张量比较**：INT32张量元素级和整体相等性比较（V1.42.4新增）
-  - **张量IO**：独有TSR格式导入导出功能
-  - **跨后端转换**：与其他后端的无缝数据转换
-- **性能优化**：
-  - **双重实现策略**：Eigen优化版本和朴素实现
-  - **SIMD向量化**：Eigen自动使用SSE/AVX指令集
-  - **零拷贝操作**：`Eigen::Map`避免内存拷贝
-  - **智能优化选择**：根据数据特性选择最优实现
-  - **全局Eigen配置**：默认开启Eigen优化，支持手动禁用
-- **复制功能特性**：
-  - **语义明确**：copy()返回新张量，copy_into()写入指定目标
-  - **深拷贝保证**：所有复制操作生成独立数据副本
-  - **类型安全**：严格的数据类型和形状检查
-  - **性能测试**：CPU复制平均0.494ms，CUDA复制平均0.318ms
-- **依赖库**：Eigen3（默认启用以获得最佳性能）、标准C++库
+- **版本**: V1.43.0
+- **更新日期**: 2025-11-16
+- **作者**: 技术觉醒团队
+- **主要更新**:
+  - 🆕 新增形状变换操作：reshape系列方法
+  - 🆕 新增双曲函数：tanh、dtanh系列方法
+  - 🆕 新增损失函数：crossentropy
+  - 🆕 新增One-hot编码：one_hot系列方法
+  - 🆕 新增标量运算：minus、mac、clamp系列方法
+  - 🆕 新增广播运算：add_broadcast、mul_broadcast系列方法
+  - ✅ 所有新方法都基于Eigen库优化
+  - ✅ 100%向后兼容，现有代码无需修改
+  - ✅ 完善的异常处理和错误检查

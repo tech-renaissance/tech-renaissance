@@ -72,7 +72,7 @@ CudaBackend::TransposedConvConfigCacheEntry::~TransposedConvConfigCacheEntry() {
 }
 
 CudaBackend::CudaBackend(int device_id)
-    : device_id_(device_id), stream_(nullptr),
+    : Backend(true), device_id_(device_id), stream_(nullptr),
       cublas_handle_(nullptr), cudnn_handle_(nullptr) {
 
     if (device_id < 0 || device_id >= 8) {

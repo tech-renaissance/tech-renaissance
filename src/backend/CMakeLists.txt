@@ -7,6 +7,7 @@
 
 # 基础后端源文件（始终编译）
 set(BACKEND_SOURCES
+    backend.cpp
     backend_manager.cpp
     cpu/cpu_backend.cpp
     cpu/cpu_mm_fp32.cpp

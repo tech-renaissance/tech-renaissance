@@ -13,6 +13,8 @@
 
 #include "tech_renaissance/data/device.h"
 #include "tech_renaissance/data/dtype.h"
+#include "tech_renaissance/data/shape.h"
+#include "tech_renaissance/utils/tr_exception.h"
 #include <memory>
 #include <cstddef>
 
@@ -20,18 +22,24 @@ namespace tr {
 
 // 前向声明
 class Tensor;
-class Shape;
 
-// ########## 关键修改 ##########
-// 不包含 "tech_renaissance/data/tensor.h"
-// 仅使用前向声明，彻底解耦
-class Tensor;
+// 注意：宏定义移到包含Tensor之后
+// 这里先声明方法，具体实现在cpp文件中
 
 /**
- * @brief 后端抽象基类
+ * @brief 后端基类（可实例化但抛出异常）
+ * @details 所有方法默认抛出NotImplementedError异常，防止直接使用
  */
 class Backend {
 public:
+    /**
+     * @brief 构造函数 - 防止直接实例化
+     * @throws TRException 直接实例化时抛出异常
+     */
+    Backend() {
+        throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+    }
+
     virtual ~Backend() = default;
 
     // ===== 内存管理接口 =====
@@ -274,8 +282,66 @@ public:
      */
     virtual int64_t get_memory_size(const Tensor& tensor) = 0;
 
+    // ===== 新增必须实现的方法 =====
+
+    // 形状变换操作
+    virtual Tensor reshape(const Tensor& tensor_a, const Shape& shape);
+    virtual void reshape_inplace(Tensor& tensor_a, const Shape& shape);
+    virtual void reshape_into(const Tensor& tensor_a, Tensor& result, const Shape& shape);
+
+    // 双曲函数操作
+    virtual Tensor tanh(const Tensor& tensor_a);
+    virtual void tanh_inplace(Tensor& tensor_a);
+    virtual void tanh_into(const Tensor& tensor_a, Tensor& result);
+    virtual Tensor dtanh(const Tensor& tensor_a);
+    virtual void dtanh_inplace(Tensor& tensor_a);
+    virtual void dtanh_into(const Tensor& tensor_a, Tensor& result);
+
+    // 交叉熵损失函数
+    virtual float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction);
+
+    // One-hot编码操作
+    virtual Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing);
+    virtual void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing);
+
+    // 标量运算（tensor - scalar）
+    virtual Tensor minus(const Tensor& input, float scalar) const;
+    virtual void minus_inplace(Tensor& input, float scalar) const;
+    virtual void minus_into(const Tensor& input, float scalar, Tensor& output) const;
+
+    // 标量运算（scalar - tensor）
+    virtual Tensor minus(float scalar, const Tensor& input) const;
+    virtual void minus_inplace(float scalar, Tensor& input) const;
+    virtual void minus_into(float scalar, const Tensor& input, Tensor& output) const;
+
+    // 标量乘加运算
+    virtual Tensor mac(const Tensor& input, float scalar_x, float scalar_y) const;
+    virtual void mac_inplace(Tensor& input, float scalar_x, float scalar_y) const;
+    virtual void mac_into(const Tensor& input, float scalar_x, float scalar_y, Tensor& output) const;
+
+    // 标量裁剪运算
+    virtual Tensor clamp(const Tensor& input, float min_val, float max_val) const;
+    virtual void clamp_inplace(Tensor& input, float min_val, float max_val) const;
+    virtual void clamp_into(const Tensor& input, float min_val, float max_val, Tensor& output) const;
+
+    // 广播运算
+    virtual Tensor add_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
+    virtual void add_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+    virtual Tensor minus_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
+    virtual void minus_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+    virtual Tensor mul_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
+    virtual void mul_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+
 protected:
-    Backend() = default;
+    /**
+     * @brief 受保护的构造函数 - 允许派生类构造
+     */
+    Backend(bool allow_construction) {
+        // 当且仅当派生类调用时才允许构造
+        if (!allow_construction) {
+            throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+        }
+    }
 };
 
 } // namespace tr
