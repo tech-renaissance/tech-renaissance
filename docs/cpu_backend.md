@@ -54,6 +54,16 @@ Tensor tensor = backend->zeros(shape, dtype);  // 编译错误！
 
 在V1.43.0版本中，CPU后端新增了多个高级操作方法：
 
+#### 视图操作
+```cpp
+Tensor view(const Tensor& input, const Shape& new_shape) override;
+```
+**特性**:
+- 零拷贝张量变换，共享底层存储
+- 支持连续张量的形状重解释
+- 自动内存管理，基于shared_ptr
+- 可写视图，修改会反映在原始张量上
+
 #### 形状变换操作
 ```cpp
 Tensor reshape(const Tensor& tensor_a, const Shape& shape) override;

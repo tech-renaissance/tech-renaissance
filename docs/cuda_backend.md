@@ -159,9 +159,19 @@ auto cuda_backend = std::make_shared<CudaBackend>(1);  // 使用设备1
 [CudaBackend method_name] Operation NOT implemented!
 ```
 
-### 当前未实现的方法
+### 🆕 V1.44.1新增的方法
 
-以下V1.43.0新增的方法在CUDA后端中暂时未实现，会抛出NotImplementedError：
+以下方法在V1.44.1版本中已实现：
+
+#### 视图操作
+```cpp
+Tensor view(const Tensor& input, const Shape& new_shape) override;
+```
+**特性**:
+- GPU设备上的零拷贝张量变换
+- 与CPU后端保持一致的接口和行为
+- 高效的CUDA内存管理
+- 支持大尺寸张量的快速形状重解释
 
 #### 形状变换操作
 ```cpp

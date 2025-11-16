@@ -36,7 +36,7 @@ Tensor randint = cpu_backend->randint(shape, low, high, dtype, seed);
 
 `Backend`是技术觉醒框架的后端基类，定义了所有计算后端（CPU、CUDA等）必须实现的统一接口。在V1.43.0版本中进行了重大重构，从抽象类改为可实例化但抛出异常的类，并引入了宏定义系统来简化新方法的添加。
 
-**版本**: V1.43.0
+**版本**: V1.44.1
 **更新日期**: 2025-11-16
 **作者**: 技术觉醒团队
 
@@ -251,6 +251,14 @@ Backend类定义了标准的跨后端转换接口：
 ### 🆕 V1.43.0新增接口
 
 以下方法通过宏定义系统实现，默认抛出`NotImplementedError`异常：
+
+#### 视图操作
+
+```cpp
+virtual Tensor view(const Tensor& input, const Shape& new_shape);
+```
+
+**说明**: 创建张量视图，提供零拷贝的形状变换。视图与原始张量共享存储空间，支持高效的数据重解释。
 
 #### 形状变换操作
 

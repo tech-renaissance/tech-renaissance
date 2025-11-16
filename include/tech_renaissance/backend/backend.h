@@ -284,6 +284,16 @@ public:
 
     // ===== 新增必须实现的方法 =====
 
+    // 视图操作
+    /**
+     * @brief 创建一个张量视图（零拷贝）
+     * @param input 源张量
+     * @param new_shape 新的形状
+     * @return 一个新的Tensor对象，它与输入张量共享底层存储
+     * @throws TRException 如果无法创建视图（如numel不匹配）
+     */
+    virtual Tensor view(const Tensor& input, const Shape& new_shape);
+
     // 形状变换操作
     virtual Tensor reshape(const Tensor& tensor_a, const Shape& shape);
     virtual void reshape_inplace(Tensor& tensor_a, const Shape& shape);

@@ -46,8 +46,8 @@ The Tensor class is the core data structure in Tech Renaissance framework, repre
 
 ## Version Information
 
-- **Version**: V1.32.3
-- **Date**: 2025-11-03
+- **Version**: V1.44.1
+- **Date**: 2025-11-16
 - **Author**: 技术觉醒团队
 
 ## Design Philosophy
@@ -93,6 +93,20 @@ public:
     bool is_empty() const noexcept;
     bool is_scalar() const noexcept;
     bool is_contiguous() const noexcept;
+
+    // ===== View and Strides Methods =====
+
+    /**
+     * @brief 获取张量的步长
+     * @return Strides对象
+     */
+    const Strides& strides() const noexcept;
+
+    /**
+     * @brief 检查张量是否为视图
+     * @return 如果是视图则返回true
+     */
+    bool is_view() const noexcept;
 
     // Data access
     void* data_ptr() noexcept;
@@ -143,6 +157,8 @@ The Tensor class maintains comprehensive metadata about the tensor:
 - **Device**: CPU or CUDA device specification
 - **Storage**: Shared memory handle with reference counting
 - **Offset**: Memory offset within storage (currently always 0)
+- **Strides**: Step size for each dimension to compute memory offsets
+- **View Flag**: Indicates whether the tensor is a view of another tensor
 
 ### 2. Static Factory Methods
 
@@ -172,7 +188,61 @@ Tensor randint_int8 = Tensor::randint(0, 100, Shape(2, 3), DType::INT8); // INT8
 Tensor randint_int32 = Tensor::randint(0, 1000, Shape(2, 3), DType::INT32); // INT32 integers
 ```
 
-### 3. Data Access and Manipulation
+### 3. View and Strides Operations
+
+The Tensor class now supports view operations for zero-copy tensor transformations:
+
+#### Creating Views
+Views are created through backend methods, providing zero-copy tensor reshaping:
+
+```cpp
+auto cpu_backend = BackendManager::get_cpu_backend();
+
+// Create original tensor
+Tensor original = cpu_backend->zeros(Shape(2, 3, 4), DType::FP32);
+
+// Create a view with different shape (same element count)
+Tensor view_2d = cpu_backend->view(original, Shape(6, 4));
+Tensor view_4d = cpu_backend->view(view_2d, Shape(2, 2, 3, 2));
+```
+
+#### View Properties
+```cpp
+// Check if tensor is a view
+bool is_view_tensor = tensor.is_view();
+
+// Get tensor strides
+const Strides& strides = tensor.strides();
+
+// Check if memory layout is contiguous
+bool is_contiguous = tensor.is_contiguous();
+
+// Verify memory sharing
+bool shares_memory = (original.storage() == view_tensor.storage());
+```
+
+#### Strides Information
+The strides object describes how to compute memory offsets for multi-dimensional access:
+
+```cpp
+// Access individual stride values
+int64_t stride_n = strides.n();  // Batch dimension stride
+int64_t stride_c = strides.c();  // Channel dimension stride
+int64_t stride_h = strides.h();  // Height dimension stride
+int64_t stride_w = strides.w();  // Width dimension stride
+
+// Calculate linear offset
+int64_t offset = strides.get_offset(n, c, h, w);
+```
+
+**Key Characteristics of Views:**
+- **Zero-Copy**: Views share the same underlying storage
+- **Memory Efficient**: No data duplication, only metadata changes
+- **Automatic Lifetime**: Managed by shared_ptr reference counting
+- **Writable**: Modifying a view affects the original tensor
+- **Contiguous Only**: Current version supports only contiguous tensors
+
+### 4. Data Access and Manipulation
 
 #### Direct Data Access
 ```cpp
@@ -253,7 +323,7 @@ int32_t height = tensor.height();        // 4 (H dimension)
 int32_t width = tensor.width();          // 5 (W dimension)
 ```
 
-## Memory Management
+### 5. Memory Management
 
 ### Storage Model
 
@@ -489,6 +559,32 @@ large_tensor = cpu_backend->null_tensor();  // 明确告知：这是一个null�
 - 灵活控制释放时机
 - 符合"后端管理存储"的设计原则
 
+#### View张量的特殊考虑
+
+当处理view张量时，内存管理具有一些特殊考虑：
+
+```cpp
+// 原始张量和view的内存管理
+Tensor original = cpu_backend->zeros(Shape(1000, 1000));
+Tensor view_tensor = cpu_backend->view(original, Shape(500, 2000));
+
+// 内存会一直保持，直到所有引用都被释放
+{
+    Tensor additional_view = cpu_backend->view(original, Shape(2000, 500));
+    // 此时storage引用计数为3，内存不会被释放
+} // additional_view离开作用域，引用计数降为2
+
+// 手动释放原始张量会影响所有view
+original = cpu_backend->null_tensor();  // 所有view都失效
+// 此时view_tensor成为悬空引用，不应再使用
+```
+
+**View张量管理要点：**
+- **共享生命周期**: view与原始张量共享底层存储的生命周期
+- **引用计数跟踪**: 所有引用的张量都必须被释放，内存才会真正释放
+- **显式清理**: 如果需要提前释放内存，显式设置原始张量为null_tensor
+- **避免悬空引用**: 原始张量释放后，所有view都会失效
+
 ### 为什么推荐这两种方法？
 
 1. **避免构造函数误用**：防止用户直接调用`Tensor()`构造函数
@@ -573,10 +669,12 @@ Planned improvements for the Tensor class:
 - [Shape Class](shape.md) - Tensor shape management
 - [Device Class](device.md) - Device management
 - [Storage Class](storage.md) - Memory management
+- [Strides Class](strides.md) - Tensor strides and memory layout
 - [Backend System](backend.md) - Computational operations
 - [CPU Backend](cpu_backend.md) - CPU-specific operations
 - [CUDA Backend](cuda_backend.md) - GPU-specific operations
 - [CPU Dimension Operations](cpu_dimension.md) - Unsqueeze and squeeze operations
+- [View Operations](about_view.md) - View creation and usage guide
 
 ## Files
 

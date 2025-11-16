@@ -28,11 +28,12 @@ namespace tr {
 
 Tensor::Tensor()
     : shape_(), dtype_(DType::FP32), device_(tr::CPU),
-      storage_(nullptr), offset_(0) {
+      storage_(nullptr), offset_(0), strides_(), is_view_(false) {
 }
 
 Tensor::Tensor(const Shape& shape, DType dtype, const Device& device)
-    : shape_(shape), dtype_(dtype), device_(device), storage_(nullptr), offset_(0) {
+    : shape_(shape), dtype_(dtype), device_(device), storage_(nullptr),
+      offset_(0), strides_(shape), is_view_(false) {
 
     // 验证形状和数据类型
     validate_shape_dtype();
@@ -102,8 +103,15 @@ bool Tensor::is_scalar() const noexcept {
 }
 
 bool Tensor::is_contiguous() const noexcept {
-    // 第一期实现中，所有Tensor都是连续存储的
-    return true;
+    return strides_.is_contiguous(shape_);
+}
+
+const Strides& Tensor::strides() const noexcept {
+    return strides_;
+}
+
+bool Tensor::is_view() const noexcept {
+    return is_view_;
 }
 
 Tensor Tensor::view() const {
@@ -538,6 +546,19 @@ void Tensor::format_tensor_content(std::ostringstream& oss, int precision) const
         // 更高维度暂时不支持
         oss << "[...unsupported dimensions...]";
     }
+}
+
+// 视图构造函数的实现（仅Backend使用）
+Tensor::Tensor(std::shared_ptr<Storage> storage, const Shape& shape, const Strides& strides,
+               DType dtype, const Device& device, size_t offset)
+    : shape_(shape),
+      dtype_(dtype),
+      device_(device),
+      storage_(storage),  // 关键：共享传入的storage
+      offset_(offset),
+      strides_(strides),
+      is_view_(true) {  // 标记为视图
+    validate_shape_dtype();
 }
 
 std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {

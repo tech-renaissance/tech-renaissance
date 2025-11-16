@@ -976,6 +976,34 @@ std::shared_ptr<void> CudaBackend::get_workspace(size_t size) {
     }
 }
 
+// ===== View 操作实现 =====
+
+Tensor CudaBackend::view(const Tensor& input, const Shape& new_shape) {
+    // 1. 有效性检查
+    validate_same_device(input.device());
+
+    if (input.numel() != new_shape.numel()) {
+        throw TRException("[CudaBackend::view] Shape mismatch: cannot view a tensor with " +
+                         std::to_string(input.numel()) + " elements as shape " +
+                         new_shape.to_string() + " with " + std::to_string(new_shape.numel()) + " elements.");
+    }
+
+    // 2. 连续性检查 (一期简化)
+    // 在一期，我们假设所有非视图张量都是连续的。
+    if (!input.is_contiguous()) {
+        throw TRException("[CudaBackend::view] view is only supported for contiguous tensors in the current version.");
+    }
+
+    // 3. 计算新步长
+    // 对于连续张量，步长计算很简单，从右到左累乘维度大小。
+    Strides new_strides(new_shape);
+
+    // 4. 创建视图张量
+    // 调用我们为视图创建的私有Tensor构造函数
+    // 关键：共享input的storage_，并传入新的shape和strides
+    return Tensor(input.storage(), new_shape, new_strides, input.dtype(), input.device(), 0);
+}
+
 } // namespace tr
 
 #endif // TR_USE_CUDA

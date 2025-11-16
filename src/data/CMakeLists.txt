@@ -11,6 +11,7 @@ set(DATA_SOURCES
     dtype.cpp
     offset.cpp
     shape.cpp
+    strides.cpp
     storage.cpp
     tensor.cpp
 )

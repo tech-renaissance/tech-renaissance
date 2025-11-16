@@ -12,6 +12,7 @@
 #pragma once
 
 #include "tech_renaissance/backend/backend.h"
+#include "tech_renaissance/data/strides.h"
 #include <map>
 #include <tuple>
 #include <mutex>
@@ -88,6 +89,9 @@ public:
     Tensor zeros(const Shape& shape, DType dtype) override;
     Tensor ones(const Shape& shape, DType dtype) override;
     Tensor randn(const Shape& shape, unsigned int seed = 0) override;
+
+    // 视图操作
+    Tensor view(const Tensor& input, const Shape& new_shape) override;
 
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;

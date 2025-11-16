@@ -39,6 +39,9 @@ namespace tr {
         throw NotImplementedError("[" + name() + " " #method_name "] Operation NOT implemented!"); \
     }
 
+// 视图操作
+DEFINE_NOT_IMPLEMENTED_METHOD(view, Tensor, (const Tensor& input, const Shape& new_shape), )
+
 // 形状变换操作
 DEFINE_NOT_IMPLEMENTED_METHOD(reshape, Tensor, (const Tensor& tensor_a, const Shape& shape), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(reshape_inplace, (Tensor& tensor_a, const Shape& shape), )

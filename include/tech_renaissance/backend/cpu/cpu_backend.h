@@ -14,6 +14,7 @@
 #include "tech_renaissance/backend/backend.h"
 #include "tech_renaissance/data/shape.h"
 #include "tech_renaissance/data/offset.h"
+#include "tech_renaissance/data/strides.h"
 #define EXPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->export_tensor
 #define IMPORT_TENSOR dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get())->import_tensor
 
@@ -248,6 +249,9 @@ public:
     void transposed_conv_into(const Tensor& input, const Tensor& kernel, Tensor& result, int32_t stride = 1, int32_t padding = 0);
 
     // 形状变换和双曲函数操作（V1.42.1新增）
+    // 视图操作
+    Tensor view(const Tensor& input, const Shape& new_shape) override;
+
     // reshape操作
     Tensor reshape(const Tensor& tensor_a, const Shape& shape) override;
     void reshape_inplace(Tensor& tensor_a, const Shape& shape) override;

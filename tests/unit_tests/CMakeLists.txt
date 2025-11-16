@@ -735,6 +735,10 @@ register_test(test_naive_gemm "Naive GEMM Test")
 register_test(test_memory_occupation "Memory Occupation Test")
 register_test(test_get_memory_size "Get Memory Size Test")
 
+# 注册视图功能测试
+configure_simple_test(test_view test_view.cpp)
+register_test(test_view "View Functionality Test")
+
 # 注册元素访问测试
 register_test(test_item_access "Item Access Test")
 

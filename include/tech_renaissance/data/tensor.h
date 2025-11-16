@@ -18,6 +18,7 @@
 #include "tech_renaissance/data/shape.h"
 #include "tech_renaissance/data/dtype.h"
 #include "tech_renaissance/data/device.h"
+#include "tech_renaissance/data/strides.h"
 
 namespace tr {
 
@@ -169,9 +170,21 @@ public:
 
     /**
      * @brief 检查是否连续存储
-     * @return 当前实现总是返回true
+     * @return 如果内存布局是连续的则返回true
      */
     bool is_contiguous() const noexcept;
+
+    /**
+     * @brief 获取张量的步长
+     * @return Strides对象
+     */
+    const Strides& strides() const noexcept;
+
+    /**
+     * @brief 检查张量是否为视图
+     * @return 如果是视图则返回true
+     */
+    bool is_view() const noexcept;
 
     /**
      * @brief 获取所需内存大小
@@ -374,12 +387,27 @@ protected:
      */
     Tensor(const Shape& shape, DType dtype, const Device& device = tr::CPU);
 
+    /**
+     * @brief 创建视图的构造函数（仅Backend使用）
+     * @details 由Backend调用，用于零拷贝创建视图
+     * @param storage Storage句柄（共享）
+     * @param shape 张量形状
+     * @param strides 步长信息
+     * @param dtype 数据类型
+     * @param device 设备信息
+     * @param offset 在Storage中的偏移量
+     */
+    Tensor(std::shared_ptr<Storage> storage, const Shape& shape, const Strides& strides,
+           DType dtype, const Device& device, size_t offset);
+
 private:
     Shape shape_;                          ///< 张量形状
     DType dtype_;                          ///< 数据类型
     Device device_;                        ///< 设备信息
     std::shared_ptr<Storage> storage_;     ///< Storage句柄
     size_t offset_;                        ///< 在Storage中的偏移量（目前为0）
+    Strides strides_;                      ///< 步长信息
+    bool is_view_;                         ///< 视图标识
 
     // 友元声明：Backend类可以访问protected成员
     friend class Backend;
