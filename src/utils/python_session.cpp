@@ -354,6 +354,10 @@ Tensor PythonSession::fetch_tensor(const std::string& msg, uint32_t timeout_ms) 
     return dynamic_cast<CpuBackend*>(backend.get())->import_tensor(result_path);
 }
 
+Tensor PythonSession::calculate(const std::string& msg, uint32_t timeout_ms) const {
+    return fetch_tensor(R"({"cmd": ")" + msg + R"(", "params": ""})", timeout_ms);
+}
+
 Tensor PythonSession::calculate(const std::string& msg, const Tensor& tensor_a, uint32_t timeout_ms) const {
     send_tensor(tensor_a, "a");
     return fetch_tensor(R"({"cmd": ")" + msg + R"(", "params": "a"})", timeout_ms);

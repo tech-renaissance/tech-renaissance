@@ -1363,11 +1363,6 @@ Tensor CpuBackend::reshape(const Tensor& tensor_a, const Shape& shape) {
         throw TRException("[CpuBackend::reshape] Only FP32 tensors are supported");
     }
 
-    // 检查形状是否有效（不能为0）
-    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
-        throw TRException("[CpuBackend::reshape] Reshape target shape cannot have zero dimensions");
-    }
-
     // 检查元素数量是否相等
     if (tensor_a.numel() != shape.numel()) {
         throw TRException("[CpuBackend::reshape] Shape mismatch: tensor has " +
@@ -1398,11 +1393,6 @@ void CpuBackend::reshape_inplace(Tensor& tensor_a, const Shape& shape) {
     // 检查数据类型必须是FP32
     if (tensor_a.dtype() != DType::FP32) {
         throw TRException("[CpuBackend::reshape_inplace] Only FP32 tensors are supported");
-    }
-
-    // 检查形状是否有效（不能为0）
-    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
-        throw TRException("[CpuBackend::reshape_inplace] Reshape target shape cannot have zero dimensions");
     }
 
     // 检查元素数量是否相等
@@ -1437,11 +1427,6 @@ void CpuBackend::reshape_into(const Tensor& tensor_a, Tensor& result, const Shap
     // 检查数据类型必须是FP32
     if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
         throw TRException("[CpuBackend::reshape_into] Only FP32 tensors are supported");
-    }
-
-    // 检查形状是否有效（不能为0）
-    if (shape.n() == 0 || shape.c() == 0 || shape.h() == 0 || shape.w() == 0) {
-        throw TRException("[CpuBackend::reshape_into] Reshape target shape cannot have zero dimensions");
     }
 
     // 检查元素数量是否相等

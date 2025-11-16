@@ -57,6 +57,7 @@ public:
     std::string fetch_response(const std::string& msg, uint32_t timeout_ms = 10000) const;  // 发送请求并等待响应
     void send_tensor(const Tensor& tensor, const std::string& tag) const;
     Tensor fetch_tensor(const std::string& msg, uint32_t timeout_ms = 10000) const;
+    Tensor calculate(const std::string& msg, uint32_t timeout_ms = 10000) const;
     Tensor calculate(const std::string& msg, const Tensor& tensor_a, uint32_t timeout_ms = 10000) const;
     Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, uint32_t timeout_ms = 10000) const;
     Tensor calculate(const std::string& msg, const Tensor& tensor_a, const Tensor& tensor_b, const Tensor& tensor_c, uint32_t timeout_ms = 10000) const;

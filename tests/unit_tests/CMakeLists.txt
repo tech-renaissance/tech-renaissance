@@ -749,4 +749,10 @@ if(TR_BUILD_PYTHON_SESSION)
     endif()
 endif()
 
+if(TR_BUILD_PYTHON_SESSION)
+    configure_simple_test(test_mlp test_mlp.cpp)
+    register_test(test_mlp "MLP Test")
+endif()
+
 message(STATUS "All tests configured successfully (optimized version)")
+

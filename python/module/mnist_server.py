@@ -39,7 +39,7 @@ from tech_renaissance import TechRenaissanceServer
 from tech_renaissance import import_tsr
 from tech_renaissance import export_tsr
 
-
+samples = None
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
@@ -48,11 +48,14 @@ class MLP(nn.Module):
         self.make_layers()
 
     def forward(self, x):
+        global samples
         size = x.size()[1:]
         num_features = 1
         for s in size:
             num_features *= s
         x = x.view(-1, num_features)
+        if samples is None:
+            samples = x
         x = self.classifier(x)
         return x
 
@@ -84,7 +87,9 @@ class SimpleHelloServer(TechRenaissanceServer):
             self.send_tensors(data_list[data_batch_id])
             data_batch_id += 1
         elif command.lower() == 'label':
-            self.send_tensors(label_list[label_batch_id])
+            result = label_list[label_batch_id]
+            result = result.to(torch.float)
+            self.send_tensors(result)
             label_batch_id += 1
         elif command.lower() == 'output':
             self.send_tensors(output_list[output_batch_id])
@@ -92,6 +97,8 @@ class SimpleHelloServer(TechRenaissanceServer):
         elif command.lower() == 'loss':
             self.send_tensors(loss_list[loss_batch_id])
             loss_batch_id += 1
+        elif command.lower() == 'samples':
+            self.send_tensors(samples)
         elif command.lower() == 'matmul':    # 执行矩阵乘法！
             if DEBUG_MODE: print(f"[PYTHON_DEBUG] Processing matmul command")
             tensors = self.get_tensors(parameters, 2)
@@ -126,6 +133,7 @@ def main():
 
 
 
+
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
@@ -134,12 +142,12 @@ def main():
         transforms.ToTensor(),
     ])
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='../../..', train=False, transform=test_transform),
+        datasets.MNIST(root='R:\\', train=False, transform=test_transform),
         batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
     model = MLP()
     criterion = nn.CrossEntropyLoss()
-    model.load_state_dict(torch.load('models/best_model.pth', map_location='cpu'))
+    model.load_state_dict(torch.load('R:\\tech-renaissance\\python\\module\\models\\best_model.pth', map_location='cpu'))
     model.eval()
     with torch.no_grad():
         for data, target in test_loader:
@@ -149,6 +157,7 @@ def main():
             output_list.append(output)
             loss_list.append(criterion(output, target))
 
+    print('Hello World3!')
     # 创建服务器实例（可启用调试模式）
     server = SimpleHelloServer(debug=False)
 
