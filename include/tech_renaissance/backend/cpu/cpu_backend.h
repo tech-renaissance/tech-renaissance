@@ -278,6 +278,10 @@ public:
     // 计算预测张量和标签张量之间的交叉熵损失
     float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean");
 
+    // MSE损失函数（V1.42.7新增）
+    // 计算预测张量和目标张量之间的均方误差损失
+    float mse(const Tensor& pred, const Tensor& target, std::string reduction = "mean");
+
 private:
     void validate_same_device(const Device& device) const;
     void validate_tensor_shape(const Tensor& a, const Tensor& b) const;

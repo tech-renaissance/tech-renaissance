@@ -275,8 +275,135 @@ void test_end_to_end() {
     }
 }
 
+void test_mse_basic() {
+    std::cout << "\n=== Testing Basic MSE Loss ===" << std::endl;
+
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 测试1: 完美匹配的MSE
+    {
+        std::cout << "Test 1: Perfect match (MSE should be 0)..." << std::endl;
+
+        // 预测张量和目标张量完全相同
+        Tensor pred = cpu_backend->ones(Shape(2, 3), DType::FP32);
+        Tensor target = cpu_backend->ones(Shape(2, 3), DType::FP32);
+
+        float loss = cpu_backend->mse(pred, target, "mean");
+        std::cout << "Perfect match MSE loss: " << loss << std::endl;
+
+        assert(std::abs(loss) < 1e-6f);  // 应该接近0
+        std::cout << "[PASS] Perfect match test passed!" << std::endl;
+    }
+
+    // 测试2: 简单误差的MSE
+    {
+        std::cout << "Test 2: Simple prediction error..." << std::endl;
+
+        // 预测张量：[1, 2, 3], [4, 5, 6]
+        Tensor pred = cpu_backend->zeros(Shape(2, 3), DType::FP32);
+        float* pred_data = static_cast<float*>(pred.data_ptr());
+        pred_data[0] = 1.0f; pred_data[1] = 2.0f; pred_data[2] = 3.0f;
+        pred_data[3] = 4.0f; pred_data[4] = 5.0f; pred_data[5] = 6.0f;
+
+        // 目标张量：[0, 2, 4], [4, 6, 5]
+        Tensor target = cpu_backend->zeros(Shape(2, 3), DType::FP32);
+        float* target_data = static_cast<float*>(target.data_ptr());
+        target_data[0] = 0.0f; target_data[1] = 2.0f; target_data[2] = 4.0f;
+        target_data[3] = 4.0f; target_data[4] = 6.0f; target_data[5] = 5.0f;
+
+        float loss = cpu_backend->mse(pred, target, "mean");
+        std::cout << "Prediction error MSE loss: " << loss << std::endl;
+
+        // 手动计算：((1-0)^2 + (2-2)^2 + (3-4)^2 + (4-4)^2 + (5-6)^2 + (6-5)^2) / 6
+        // = (1 + 0 + 1 + 0 + 1 + 1) / 6 = 4 / 6 = 0.666667
+        assert(std::abs(loss - 0.666667f) < 1e-6f);
+        std::cout << "[PASS] Prediction error test passed!" << std::endl;
+    }
+
+    // 测试3: reduction模式对比
+    {
+        std::cout << "Test 3: Reduction modes (sum vs mean)..." << std::endl;
+
+        // 创建有误差的张量
+        Tensor pred = cpu_backend->zeros(Shape(3, 2), DType::FP32);
+        float* pred_data = static_cast<float*>(pred.data_ptr());
+        pred_data[0] = 1.0f; pred_data[1] = 0.0f;
+        pred_data[2] = 0.0f; pred_data[3] = 1.0f;
+        pred_data[4] = 1.0f; pred_data[5] = 0.0f;
+
+        Tensor target = cpu_backend->zeros(Shape(3, 2), DType::FP32);
+        float* target_data = static_cast<float*>(target.data_ptr());
+        target_data[0] = 0.0f; target_data[1] = 0.0f;
+        target_data[2] = 0.0f; target_data[3] = 0.0f;
+        target_data[4] = 0.0f; target_data[5] = 1.0f;
+
+        float loss_mean = cpu_backend->mse(pred, target, "mean");
+        float loss_sum = cpu_backend->mse(pred, target, "sum");
+
+        std::cout << "MSE (mean): " << loss_mean << std::endl;
+        std::cout << "MSE (sum): " << loss_sum << std::endl;
+
+        // 手动验证：((1-0)^2 + (0-0)^2 + (0-0)^2 + (1-0)^2 + (1-0)^2 + (0-1)^2) = 4
+        float expected_sum = 4.0f / 3.0f;  // 除以batch_size
+        float expected_mean = 4.0f / 6.0f;  // 除以total_elements
+
+        assert(std::abs(loss_sum - expected_sum) < 1e-6f);
+        assert(std::abs(loss_mean - expected_mean) < 1e-6f);
+
+        std::cout << "[PASS] Reduction modes test passed!" << std::endl;
+    }
+}
+
+void test_mse_error_handling() {
+    std::cout << "\n=== Testing MSE Error Handling ===" << std::endl;
+
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 测试1: 错误的数据类型
+    {
+        std::cout << "Test 1: Wrong data type handling..." << std::endl;
+
+        try {
+            Tensor pred = cpu_backend->ones(Shape(2, 3), DType::FP32);
+            Tensor target = cpu_backend->ones(Shape(2, 3), DType::INT8);  // 应该是FP32
+            auto loss = cpu_backend->mse(pred, target);
+            assert(false); // 不应该到达这里
+        } catch (const tr::TypeError& e) {
+            std::cout << "[PASS] Correctly caught TypeError: " << e.what() << std::endl;
+        }
+    }
+
+    // 测试2: 错误的维度
+    {
+        std::cout << "Test 2: Wrong dimension handling..." << std::endl;
+
+        try {
+            Tensor pred = cpu_backend->ones(Shape(6), DType::FP32);  // 应该是2D
+            Tensor target = cpu_backend->ones(Shape(6), DType::FP32);
+            auto loss = cpu_backend->mse(pred, target);
+            assert(false); // 不应该到达这里
+        } catch (const tr::ShapeError& e) {
+            std::cout << "[PASS] Correctly caught ShapeError: " << e.what() << std::endl;
+        }
+    }
+
+    // 测试3: 形状不匹配
+    {
+        std::cout << "Test 3: Shape mismatch handling..." << std::endl;
+
+        try {
+            Tensor pred = cpu_backend->ones(Shape(2, 3), DType::FP32);
+            Tensor target = cpu_backend->ones(Shape(3, 2), DType::FP32);  // 形状不同
+            auto loss = cpu_backend->mse(pred, target);
+            assert(false); // 不应该到达这里
+        } catch (const tr::ShapeError& e) {
+            std::cout << "[PASS] Correctly caught ShapeError: " << e.what() << std::endl;
+        }
+    }
+}
+
 void test_error_handling() {
-    std::cout << "\n=== Testing Error Handling ===" << std::endl;
+    std::cout << "\n=== Testing CrossEntropy Error Handling ===" << std::endl;
 
     auto cpu_backend = BackendManager::get_cpu_backend();
 
@@ -343,6 +470,8 @@ int main() {
         test_one_hot_into();
         test_crossentropy_basic();
         test_end_to_end();
+        test_mse_basic();
+        test_mse_error_handling();
         test_error_handling();
 
         std::cout << "\nAll tests passed successfully!" << std::endl;

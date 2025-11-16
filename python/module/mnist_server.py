@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torchvision import datasets, transforms
 from six.moves import urllib
+import torch.nn.functional as F
 
 
 BATCH_SIZE = 4
@@ -154,6 +155,7 @@ def main():
 
     model = MLP()
     criterion = nn.CrossEntropyLoss()
+    # criterion = nn.MSELoss()
     model.load_state_dict(torch.load('R:\\tech-renaissance\\python\\module\\models\\best_model.pth', map_location='cpu'))
     model.eval()
     for name, param in model.named_parameters():
@@ -166,6 +168,10 @@ def main():
             label_list.append(target)
             output = model(data)
             output_list.append(output)
+
+            # targets_onehot = F.one_hot(target, num_classes=10).float()
+            # loss = F.mse_loss(F.softmax(output, 1), targets_onehot, reduction='mean') * 100000.
+            # loss_list.append(loss)
             loss_list.append(criterion(output, target))
 
     # 创建服务器实例（可启用调试模式）

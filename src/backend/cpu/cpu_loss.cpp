@@ -216,4 +216,61 @@ float CpuBackend::crossentropy(const Tensor& pred, const Tensor& label, std::str
     }
 }
 
+float CpuBackend::mse(const Tensor& pred, const Tensor& target, std::string reduction) {
+    // 输入验证
+    if (pred.dtype() != DType::FP32 || target.dtype() != DType::FP32) {
+        TR_THROW_TYPE_ERROR("mse function requires FP32 input tensors");
+    }
+
+    if (pred.ndim() != 2 || target.ndim() != 2) {
+        TR_THROW_SHAPE_ERROR("mse function requires 2D input tensors, got " +
+                            std::to_string(pred.ndim()) + "D and " +
+                            std::to_string(target.ndim()) + "D tensors");
+    }
+
+    if (pred.shape() != target.shape()) {
+        TR_THROW_SHAPE_ERROR("Prediction tensor shape " + pred.shape().to_string() +
+                            " doesn't match target tensor shape " + target.shape().to_string());
+    }
+
+    int32_t batch_size = pred.dim_size(0);
+    int32_t num_elements = pred.dim_size(1);
+    int32_t total_elements = batch_size * num_elements;
+
+    // 获取数据指针
+    const float* pred_data = static_cast<const float*>(pred.data_ptr());
+    const float* target_data = static_cast<const float*>(target.data_ptr());
+
+    float total_loss = 0.0f;
+
+#ifdef TR_USE_EIGEN
+    // 使用Eigen进行高效计算
+    Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+        pred_map(pred_data, batch_size, num_elements);
+    Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+        target_map(target_data, batch_size, num_elements);
+
+    // 逐元素计算(pred - target)^2并累加
+    for (int32_t i = 0; i < batch_size; ++i) {
+        for (int32_t j = 0; j < num_elements; ++j) {
+            float diff = pred_map(i, j) - target_map(i, j);
+            total_loss += diff * diff;  // (pred - target)^2
+        }
+    }
+#else
+    // 纯C++实现
+    for (int32_t idx = 0; idx < total_elements; ++idx) {
+        float diff = pred_data[idx] - target_data[idx];
+        total_loss += diff * diff;  // (pred - target)^2
+    }
+#endif
+
+    // 应用reduction
+    if (reduction == "sum") {
+        return total_loss / static_cast<float>(batch_size);
+    } else {  // 默认为"mean"
+        return total_loss / static_cast<float>(total_elements);
+    }
+}
+
 } // namespace tr

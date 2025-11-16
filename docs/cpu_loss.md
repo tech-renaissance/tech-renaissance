@@ -2,9 +2,9 @@
 
 ## 概述
 
-本文档介绍Tech Renaissance框架V1.42.7版本中实现的CPU损失函数，包括one-hot编码和交叉熵损失计算功能。
+本文档介绍Tech Renaissance框架V1.42.8版本中实现的CPU损失函数，包括one-hot编码、交叉熵损失和MSE损失计算功能。
 
-**版本**: V1.42.7
+**版本**: V1.42.8
 **更新日期**: 2025-11-16
 **作者**: 技术觉醒团队
 
@@ -14,8 +14,9 @@
 
 1. **One-Hot编码** - 将1D INT32标签张量转换为2D FP32 one-hot编码
 2. **交叉熵损失** - 计算预测张量和标签张量之间的交叉熵损失
-3. **标签平滑** - 支持标签平滑技术，提高模型泛化能力
-4. **数值稳定性** - 使用epsilon避免log(0)问题
+3. **MSE损失** - 计算预测张量和目标张量之间的均方误差损失
+4. **标签平滑** - 支持标签平滑技术，提高模型泛化能力
+5. **数值稳定性** - 使用epsilon避免log(0)问题
 
 ### 📋 实现函数
 
@@ -34,6 +35,12 @@ void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, floa
 float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction = "mean");
 ```
 
+#### MSE损失函数
+```cpp
+// 计算MSE损失
+float mse(const Tensor& pred, const Tensor& target, std::string reduction = "mean");
+```
+
 ## 技术规格
 
 ### 🔧 输入要求
@@ -47,6 +54,11 @@ float crossentropy(const Tensor& pred, const Tensor& label, std::string reductio
 #### crossentropy函数
 - **预测张量**: 2D FP32张量，已softmax的概率分布
 - **标签张量**: 2D FP32张量，与预测张量同形
+- **reduction**: "sum"或"mean"，默认"mean"
+
+#### mse函数
+- **预测张量**: 2D FP32张量，预测值
+- **目标张量**: 2D FP32张量，与预测张量同形
 - **reduction**: "sum"或"mean"，默认"mean"
 
 ### 🎛️ 标签平滑公式
@@ -63,6 +75,18 @@ crossentropy = -sum(yi * log(pi))
 // 数值稳定性处理
 pi = max(pi, epsilon)  // epsilon = 1e-12
 ```
+
+### 📊 MSE计算
+
+```cpp
+MSE = sum((pred - target)^2) / total_elements  // for "mean"
+MSE = sum((pred - target)^2) / batch_size    // for "sum"
+```
+
+**说明**:
+- 不再使用传统的0.5系数，直接计算平方误差
+- **"mean"模式**: 除以总元素数(batch_size × num_elements)
+- **"sum"模式**: 除以batch_size
 
 ## 实现特性
 
@@ -128,6 +152,21 @@ Tensor pred = /* 模型输出，已softmax */;
 float loss = cpu_backend->crossentropy(pred, label_onehot, "mean");
 ```
 
+### MSE损失计算
+
+```cpp
+// 创建预测和目标张量
+Tensor pred = /* 模型输出 */;
+Tensor target = /* 真实标签值 */;
+
+// 计算MSE损失
+float mse_loss = cpu_backend->mse(pred, target, "mean");
+
+// 使用不同的reduction模式
+float mse_sum = cpu_backend->mse(pred, target, "sum");    // 除以batch_size
+float mse_mean = cpu_backend->mse(pred, target, "mean");  // 除以总元素数
+```
+
 ## 文件结构
 
 ### 📁 实现文件
@@ -165,10 +204,16 @@ src/backend/cpu/cpu_loss.cpp
    - 数值稳定性
    - reduction模式
 
-3. **端到端测试**
+3. **MSE损失测试**
+   - 完美匹配验证（MSE=0）
+   - 简单误差计算
+   - reduction模式对比
+   - 数学公式验证
+
+4. **端到端测试**
    - 标签→one-hot→交叉熵流程
 
-4. **异常处理测试**
+5. **异常处理测试**
    - 类型错误
    - 形状错误
    - 索引越界
@@ -187,6 +232,8 @@ Starting CPU Loss Functions Tests...
 [PASS] Numerical stability test passed!
 [PASS] Reduction modes test passed!
 [PASS] End-to-end pipeline test passed!
+[PASS] MSE loss tests passed!
+[PASS] MSE error handling tests passed!
 [PASS] Error handling tests passed!
 All tests passed successfully!
 ======================================
@@ -206,6 +253,7 @@ All tests passed successfully!
 - **编译优化**: Release模式 + /O2 /arch:AVX2
 - **数值精度**: IEEE 754单精度浮点
 - **内存管理**: RAII自动管理
+- **MSE计算精度**: 完全符合数学公式，无数值误差
 
 ## 设计原则
 
@@ -228,7 +276,7 @@ All tests passed successfully!
 ### 🚀 V1.43.0计划
 
 1. **GPU后端支持** - CUDA版本的损失函数
-2. **更多损失函数** - MSE、MAE、Huber Loss等
+2. **更多损失函数** - MAE、Huber Loss等
 3. **混合精度支持** - FP16/BF16类型支持
 4. **批处理优化** - 大批量数据的性能优化
 
