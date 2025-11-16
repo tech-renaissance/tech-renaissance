@@ -12,7 +12,7 @@ from torchvision import datasets, transforms
 from six.moves import urllib
 
 
-BATCH_SIZE = 2
+BATCH_SIZE = 10000
 NUM_EPOCHS = 20
 NUM_WORKERS = 0
 data_list = list()

@@ -636,19 +636,25 @@ void CpuBackend::pad_into(const Tensor& tensor_a, int32_t padding, Tensor& tenso
 
 // ===== 维度操作核心实现 =====
 
+// 特殊常量，表示对所有维度求和
+static const int32_t REDUCE_ALL_DIMS = -999;
+
 /**
  * @brief 规范化维度索引，支持负数索引
  * @param dim 原始维度索引
  * @param ndim 张量维度数量
- * @return 规范化后的维度索引
- * @throws TRException 如果维度索引超出范围
+ * @return 规范化后的维度索引，REDUCE_ALL_DIMS表示对所有维度求和
+ * @throws ShapeError 如果维度索引超出范围（除了-1）
  */
 static int32_t normalize_dim(int32_t dim, int32_t ndim) {
+    if (dim == -1) {
+        return REDUCE_ALL_DIMS;  // 特殊值，表示对所有维度求和
+    }
     if (dim < 0) {
         dim += ndim;
     }
     if (dim < 0 || dim >= ndim) {
-        throw TRException("[CPU Dim] Dimension index out of range");
+        throw ShapeError("[CPU Dim] Dimension index out of range");
     }
     return dim;
 }
@@ -680,8 +686,8 @@ static void validate_dim_operation(const Tensor& tensor, int32_t dim, const std:
     int32_t ndim = tensor.shape().ndim();
     dim = normalize_dim(dim, ndim);
 
-    // 验证指定维度的大小不为0
-    if (tensor.shape().dim(dim) == 0) {
+    // 验证指定维度的大小不为0（仅对单维度求和操作）
+    if (dim != REDUCE_ALL_DIMS && tensor.shape().dim(dim) == 0) {
         throw TRException("[CPU " + operation_name + "] Cannot perform operation on dimension with size 0");
     }
 }
@@ -1071,24 +1077,160 @@ static void sum_operation_core_fp32(const Tensor& input, Tensor& result, int32_t
     }
 }
 
+/**
+ * @brief 执行sum操作的核心实现（INT32版本）
+ * @param input 输入张量
+ * @param result 输出张量
+ * @param dim 规范化后的维度索引
+ */
+static void sum_operation_core_int32(const Tensor& input, Tensor& result, int32_t dim) {
+    const int32_t* input_data = static_cast<const int32_t*>(input.data_ptr());
+    int32_t* result_data = static_cast<int32_t*>(result.data_ptr());
+
+    const Shape& input_shape = input.shape();
+    const Shape& result_shape = result.shape();
+    int32_t ndim = input_shape.ndim();
+
+    // 计算步长
+    std::vector<int32_t> input_strides(ndim);
+    input_strides[ndim - 1] = 1;
+    for (int32_t i = ndim - 2; i >= 0; --i) {
+        input_strides[i] = input_strides[i + 1] * input_shape.dim(i + 1);
+    }
+
+    std::vector<int32_t> result_strides;
+    if (result_shape.ndim() == 0) {
+        result_strides.push_back(1);
+    } else {
+        result_strides.resize(result_shape.ndim());
+        result_strides[result_shape.ndim() - 1] = 1;
+        for (int32_t i = result_shape.ndim() - 2; i >= 0; --i) {
+            result_strides[i] = result_strides[i + 1] * result_shape.dim(i + 1);
+        }
+    }
+
+    int32_t dim_size = input_shape.dim(dim);
+    int32_t dim_stride = input_strides[dim];
+
+    // 初始化结果为0
+    std::memset(result_data, 0, result.numel() * sizeof(int32_t));
+
+    // 计算总迭代次数
+    int64_t total_iterations = result.numel();
+
+    for (int64_t out_idx = 0; out_idx < total_iterations; ++out_idx) {
+        // 计算输入张量中的对应位置
+        int32_t input_idx = 0;
+        int32_t temp_out_idx = out_idx;
+
+        for (int32_t i = 0; i < ndim; ++i) {
+            if (i == dim) {
+                continue;
+            }
+
+            int32_t result_dim = i;
+            if (i > dim) {
+                result_dim = i - 1;
+            }
+
+            int32_t coord = temp_out_idx / result_strides[result_dim];
+            temp_out_idx %= result_strides[result_dim];
+            input_idx += coord * input_strides[i];
+        }
+
+        // 在指定维度上求和
+        int32_t sum_val = 0;
+        for (int32_t i = 0; i < dim_size; ++i) {
+            int32_t idx = input_idx + i * dim_stride;
+            sum_val += input_data[idx];
+        }
+
+        result_data[out_idx] = sum_val;
+    }
+}
+
+/**
+ * @brief 执行所有维度求和操作的核心实现（FP32版本）
+ * @param input 输入张量
+ * @param result 输出张量（标量）
+ */
+static void sum_operation_core_all_dims_fp32(const Tensor& input, Tensor& result) {
+    const float* input_data = static_cast<const float*>(input.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    int64_t total_elements = input.numel();
+    float sum_val = 0.0f;
+
+    // 对所有元素求和
+    for (int64_t i = 0; i < total_elements; ++i) {
+        sum_val += input_data[i];
+    }
+
+    result_data[0] = sum_val;
+}
+
+/**
+ * @brief 执行所有维度求和操作的核心实现（INT32版本）
+ * @param input 输入张量
+ * @param result 输出张量（标量）
+ */
+static void sum_operation_core_all_dims_int32(const Tensor& input, Tensor& result) {
+    const int32_t* input_data = static_cast<const int32_t*>(input.data_ptr());
+    int32_t* result_data = static_cast<int32_t*>(result.data_ptr());
+
+    int64_t total_elements = input.numel();
+    int32_t sum_val = 0;
+
+    // 对所有元素求和
+    for (int64_t i = 0; i < total_elements; ++i) {
+        sum_val += input_data[i];
+    }
+
+    result_data[0] = sum_val;
+}
+
 Tensor CpuBackend::sum(const Tensor& tensor_a, int32_t dim, bool keep_dim) {
     // 验证输入
     validate_dim_operation(tensor_a, dim, "Sum");
     dim = normalize_dim(dim, tensor_a.shape().ndim());
 
-    // 验证数据类型
-    if (tensor_a.dtype() != DType::FP32) {
-        throw TRException("[CPU Sum] Only supports FP32 tensor");
+    // 验证数据类型并确定结果类型
+    DType result_dtype;
+    if (tensor_a.dtype() == DType::FP32) {
+        result_dtype = DType::FP32;
+    } else if (tensor_a.dtype() == DType::INT32) {
+        result_dtype = DType::INT32;
+    } else {
+        throw TRException("[CPU Sum] Only supports FP32 and INT32 tensor");
+    }
+
+    // 处理所有维度求和的特殊情况（dim=-1）
+    if (dim == REDUCE_ALL_DIMS) {
+        // 创建标量结果张量
+        Tensor result = this->empty(Shape(), result_dtype);
+
+        // 执行所有维度求和
+        if (tensor_a.dtype() == DType::FP32) {
+            sum_operation_core_all_dims_fp32(tensor_a, result);
+        } else if (tensor_a.dtype() == DType::INT32) {
+            sum_operation_core_all_dims_int32(tensor_a, result);
+        }
+
+        return result;
     }
 
     // 计算输出形状
     Shape output_shape = calculate_reduction_shape(tensor_a.shape(), dim, keep_dim);
 
     // 创建输出张量
-    Tensor result = this->empty(output_shape, DType::FP32);
+    Tensor result = this->empty(output_shape, result_dtype);
 
-    // 执行sum操作
-    sum_operation_core_fp32(tensor_a, result, dim);
+    // 根据数据类型执行相应的sum操作
+    if (tensor_a.dtype() == DType::FP32) {
+        sum_operation_core_fp32(tensor_a, result, dim);
+    } else if (tensor_a.dtype() == DType::INT32) {
+        sum_operation_core_int32(tensor_a, result, dim);
+    }
 
     return result;
 }
@@ -1105,8 +1247,32 @@ void CpuBackend::sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, b
     if (!result.storage_allocated()) {
         throw TRException("[CPU Sum] Result tensor storage not allocated");
     }
-    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
-        throw TRException("[CPU Sum] Only supports FP32 tensor");
+
+    // 验证数据类型一致性
+    if (tensor_a.dtype() != result.dtype()) {
+        throw TRException("[CPU Sum] Input and result tensor must have same data type");
+    }
+
+    // 验证数据类型支持
+    if (tensor_a.dtype() != DType::FP32 && tensor_a.dtype() != DType::INT32) {
+        throw TRException("[CPU Sum] Only supports FP32 and INT32 tensor");
+    }
+
+    // 处理所有维度求和的特殊情况（dim=-1）
+    if (dim == REDUCE_ALL_DIMS) {
+        // 验证结果是标量
+        if (!result.shape().is_scalar()) {
+            throw TRException("[CPU Sum] Result must be scalar for dim=-1 operation");
+        }
+
+        // 执行所有维度求和
+        if (tensor_a.dtype() == DType::FP32) {
+            sum_operation_core_all_dims_fp32(tensor_a, result);
+        } else if (tensor_a.dtype() == DType::INT32) {
+            sum_operation_core_all_dims_int32(tensor_a, result);
+        }
+
+        return;
     }
 
     // 验证输出形状
@@ -1116,8 +1282,12 @@ void CpuBackend::sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, b
                         ", actual: " + result.shape().to_string());
     }
 
-    // 执行sum操作
-    sum_operation_core_fp32(tensor_a, result, dim);
+    // 根据数据类型执行相应的sum操作
+    if (tensor_a.dtype() == DType::FP32) {
+        sum_operation_core_fp32(tensor_a, result, dim);
+    } else if (tensor_a.dtype() == DType::INT32) {
+        sum_operation_core_int32(tensor_a, result, dim);
+    }
 }
 
 // ===== ArgMax 操作实现 =====

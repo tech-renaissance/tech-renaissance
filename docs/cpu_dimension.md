@@ -4,10 +4,28 @@
 
 CPU后端张量维度操作功能是Tech Renaissance框架V1.34.1版本新增的重要特性，提供了丰富的张量维度变换和reduction操作。该功能支持多种数据类型、负数维度索引，以及与PyTorch兼容的API设计。
 
+## V1.42.6版本重要更新（2025-11-16）
+
+### Sum操作重大增强
+- **新增INT32支持**：Sum操作现在支持FP32和INT32两种数据类型
+- **dim=-1特殊行为**：当dim=-1时，无视keep_dim参数，对所有维度求和，返回标量张量
+- **类型一致性**：输出张量数据类型与输入张量保持一致
+- **性能优化**：针对所有维度求和场景进行了专门优化
+
+### 关键特性
+```cpp
+// INT32张量求和
+Tensor int32_tensor = backend->ones({3, 4}, DType::INT32);
+Tensor sum_result = backend->sum(int32_tensor, 0);  // (4,) - INT32类型
+
+// 所有维度求和（V1.42.6新增）
+Tensor total_sum = backend->sum(int32_tensor, -1);  // 标量 - 无视keep_dim
+```
+
 ## 版本信息
 
-- **版本号**: V1.34.1
-- **发布日期**: 2025-11-03
+- **版本号**: V1.42.6
+- **发布日期**: 2025-11-16
 - **作者**: 技术觉醒团队
 - **所属系列**: backend
 
@@ -113,7 +131,7 @@ Tensor result = cpu->max(input, 1, false);  // 输出: (2, 4)
 Tensor result = cpu->max(input, 1, true);   // 输出: (2, 1, 4)
 ```
 
-#### 3. Sum操作
+#### 3. Sum操作（V1.42.6新增INT32支持）
 沿指定维度求和，支持keep_dim参数控制输出形状。
 
 ```cpp
@@ -122,10 +140,24 @@ void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim
 ```
 
 **特性**:
-- **数据类型**: 仅支持FP32
+- **数据类型**: 支持FP32和INT32（V1.42.6新增）
 - **keep_dim参数**: 同max操作
-- **输出类型**: 总是FP32类型
+- **输出类型**: 与输入张量相同的数据类型
 - **累加精度**: 不考虑溢出问题
+- **特殊行为**: 当dim=-1时，无视keep_dim，对所有维度求和，返回标量张量（V1.42.6新增）
+
+**dim=-1特殊行为**（V1.42.6新增）:
+```cpp
+// 创建INT32张量
+Tensor tensor = backend->zeros({2, 3}, DType::INT32);
+// 设置数据...
+int32_t* data = static_cast<int32_t*>(tensor.data_ptr());
+data[0] = 1; data[1] = 2; data[2] = 3; data[3] = 4; data[4] = 5; data[5] = 6;
+
+// 所有维度求和（无视keep_dim）
+Tensor total_sum = backend->sum(tensor, -1);  // 返回标量: 21
+Tensor total_sum2 = backend->sum(tensor, -1, true);  // 同样返回标量: 21
+```
 
 #### 4. ArgMax操作
 沿指定维度寻找最大值所在的索引，返回第一个出现的最大值位置。
@@ -286,9 +318,17 @@ Tensor softmax_neg = cpu->softmax(tensor, -1); // 负数索引
 Tensor max_false = cpu->max(tensor, 1, false);  // (2, 4)
 Tensor max_true = cpu->max(tensor, 1, true);   // (2, 1, 4)
 
-// Sum操作
-Tensor sum_false = cpu->sum(tensor, 2, false);  // (2, 3)
-Tensor sum_true = cpu->sum(tensor, 2, true);   // (2, 3, 1)
+// Sum操作（支持FP32和INT32）
+Tensor sum_false = cpu->sum(tensor, 2, false);  // (2, 3) - 与输入同类型
+Tensor sum_true = cpu->sum(tensor, 2, true);   // (2, 3, 1) - 与输入同类型
+
+// Sum操作 - dim=-1特殊行为（V1.42.6新增）
+Tensor total_sum = cpu->sum(tensor, -1);  // 标量张量，所有元素总和
+
+// INT32 Sum示例（V1.42.6新增）
+Tensor int32_tensor = backend->ones({3, 4}, DType::INT32);
+Tensor int32_sum = cpu->sum(int32_tensor, 0);  // (4,) - INT32类型
+Tensor int32_total = cpu->sum(int32_tensor, -1);  // 标量 - INT32类型
 
 // ArgMax操作
 Tensor argmax_false = cpu->argmax(tensor, 1, false);  // (2, 4) - INT32类型
@@ -306,6 +346,15 @@ cpu->softmax_into(tensor, result, 1);
 cpu->max_into(tensor, result, 1, true);
 cpu->sum_into(tensor, result, 2, false);
 cpu->argmax_into(tensor, result, 1, false);  // result必须为INT32类型
+
+// INT32 Sum_into示例（V1.42.6新增）
+Tensor int32_input = backend->ones({2, 3}, DType::INT32);
+Tensor int32_result = backend->empty({2}, DType::INT32);
+cpu->sum_into(int32_input, int32_result, 0);  // 沿维度0求和
+
+// dim=-1特殊行为示例（V1.42.6新增）
+Tensor scalar_result = backend->empty(Shape(), DType::INT32);
+cpu->sum_into(int32_input, scalar_result, -1);  // 所有维度求和，结果必须是标量
 ```
 
 ### 多数据类型支持
@@ -314,11 +363,18 @@ cpu->argmax_into(tensor, result, 1, false);  // result必须为INT32类型
 // FP32张量
 Tensor fp32_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::FP32);
 Tensor fp32_max = cpu->max(fp32_tensor, 1);  // FP32输出
+Tensor fp32_sum = cpu->sum(fp32_tensor, 1);  // FP32输出
 
 // INT8张量
 Tensor int8_tensor = cpu->randint(Shape(2, 3), -10, 10, DType::INT8);
 Tensor int8_max = cpu->max(int8_tensor, 1);  // INT8输出
 Tensor int8_argmax = cpu->argmax(int8_tensor, 1);  // INT32输出
+
+// INT32张量（V1.42.6新增）
+Tensor int32_tensor = cpu->randint(Shape(2, 3), 0, 10, DType::INT32);
+Tensor int32_max = cpu->max(int32_tensor, 1);  // INT32输出
+Tensor int32_sum = cpu->sum(int32_tensor, 1);  // INT32输出
+Tensor int32_total = cpu->sum(int32_tensor, -1);  // 标量-INT32输出
 ```
 
 ## 性能特性
@@ -489,4 +545,4 @@ cd build && cmake --build . --config Release --target test_cpu_dim_ops
 
 ---
 
-*本文档最后更新时间: 2025-11-03*
+*本文档最后更新时间: 2025-11-16*
