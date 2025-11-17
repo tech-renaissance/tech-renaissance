@@ -28,12 +28,12 @@ namespace tr {
 
 Tensor::Tensor()
     : shape_(), dtype_(DType::FP32), device_(tr::CPU),
-      storage_(nullptr), offset_(0), strides_(), is_view_(false) {
+      storage_(nullptr), offset_(0), strides_(), is_view_(false), grad_(nullptr) {
 }
 
 Tensor::Tensor(const Shape& shape, DType dtype, const Device& device)
     : shape_(shape), dtype_(dtype), device_(device), storage_(nullptr),
-      offset_(0), strides_(shape), is_view_(false) {
+      offset_(0), strides_(shape), is_view_(false), grad_(nullptr) {
 
     // 验证形状和数据类型
     validate_shape_dtype();
@@ -557,8 +557,54 @@ Tensor::Tensor(std::shared_ptr<Storage> storage, const Shape& shape, const Strid
       storage_(storage),  // 关键：共享传入的storage
       offset_(offset),
       strides_(strides),
-      is_view_(true) {  // 标记为视图
+      is_view_(true),     // 标记为视图
+      grad_(nullptr) {    // 梯度初始化为空
     validate_shape_dtype();
+}
+
+// ===== 梯度管理方法实现 =====
+
+Tensor& Tensor::grad() {
+    if (!grad_) {
+        // 如果梯度不存在，创建一个与当前张量相同形状和类型的零梯度张量
+        grad_ = std::make_shared<Tensor>(create_and_allocate(shape_, dtype_, device_));
+    }
+    return *grad_;
+}
+
+const Tensor& Tensor::grad() const {
+    if (!grad_) {
+        throw TRException("[Tensor::grad] Gradient tensor not initialized. Call non-const grad() first.");
+    }
+    return *grad_;
+}
+
+void Tensor::set_grad(const Tensor& grad) {
+    if (grad.shape() != shape_ || grad.dtype() != dtype_) {
+        throw TRException("[Tensor::set_grad] Gradient tensor shape or dtype mismatch");
+    }
+    grad_ = std::make_shared<Tensor>(grad);
+}
+
+void Tensor::set_grad(Tensor&& grad) {
+    if (grad.shape() != shape_ || grad.dtype() != dtype_) {
+        throw TRException("[Tensor::set_grad] Gradient tensor shape or dtype mismatch");
+    }
+    grad_ = std::make_shared<Tensor>(std::move(grad));
+}
+
+bool Tensor::has_grad() const {
+    return grad_ != nullptr && grad_->storage_allocated();
+}
+
+void Tensor::zero_grad() {
+    if (grad_ && grad_->storage_allocated()) {
+        auto backend = get_backend();
+        if (!backend) {
+            throw TRException("[Tensor::zero_grad] Backend not available");
+        }
+        backend->fill(*grad_, 0.0f);
+    }
 }
 
 std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {

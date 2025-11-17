@@ -49,8 +49,11 @@ int main() {
             cpu_backend->transpose_inplace(weights2);
             weights2.summary("weights2");
 
-            auto my_samples = cpu_backend->reshape(data, Shape(4,784));
+            auto my_samples = cpu_backend->view(data, Shape(4,784));
             my_samples.summary("my_samples");
+            if (my_samples.is_view()) {
+                std::cout << "my_samples is a view" << std::endl;
+            }
 
             bool ok = cpu_backend->is_close(my_samples, samples);
             if (ok) {

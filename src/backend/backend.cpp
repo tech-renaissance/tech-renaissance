@@ -42,6 +42,10 @@ namespace tr {
 // 视图操作
 DEFINE_NOT_IMPLEMENTED_METHOD(view, Tensor, (const Tensor& input, const Shape& new_shape), )
 
+// 转置操作
+DEFINE_NOT_IMPLEMENTED_METHOD(transpose, Tensor, (const Tensor& input), const)
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(transpose_into, (const Tensor& input, Tensor& output), const)
+
 // 形状变换操作
 DEFINE_NOT_IMPLEMENTED_METHOD(reshape, Tensor, (const Tensor& tensor_a, const Shape& shape), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(reshape_inplace, (Tensor& tensor_a, const Shape& shape), )

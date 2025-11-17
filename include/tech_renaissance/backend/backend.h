@@ -154,6 +154,20 @@ public:
      */
     virtual void mm_into(const Tensor& a, const Tensor& b, Tensor& result) = 0;
 
+    /**
+     * @brief 张量转置（2D矩阵）
+     * @param input 输入张量
+     * @return 转置后的张量
+     */
+    virtual Tensor transpose(const Tensor& input) const;
+
+    /**
+     * @brief 张量转置（2D矩阵，into版本）
+     * @param input 输入张量
+     * @param output 输出张量
+     */
+    virtual void transpose_into(const Tensor& input, Tensor& output) const;
+
     // ===== 设备转换方法 =====
 
     /**

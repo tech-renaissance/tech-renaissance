@@ -1,37 +1,35 @@
-# Tensor Class Documentation
+# Tensor类文档
+
+## 概述
+
+Tensor类是技术觉醒框架的核心数据结构，表示带有相关元数据的多维数组。它作为张量元数据和存储句柄的轻量级容器，同时将所有计算操作委托给后端实现。Tensor类支持完整的梯度管理，为深度学习模型的训练和推理提供了基础支撑。
+
+## 版本信息
+
+- **版本**: V1.45.0
+- **日期**: 2025-11-17
+- **作者**: 技术觉醒团队
+- **所属系列**: data
 
 ## 重要警告：不要直接使用Tensor构造函数！
 
-### # 不要直接使用Tensor构造函数创建张量！
-
-**警告：Tensor类的构造函数不会分配内存！**
+### 警告：Tensor类的构造函数不会分配内存！
 
 执行Tensor构造函数只会创建对象的元数据（形状、类型、设备等），但不会为张量数据分配实际的内存空间。
 
 **重要区别**：
 - **Tensor构造函数**：创建Tensor对象但**不分配内存**（段错误！）
-- **Tensor::empty() / Backend::empty()**：**分配内存但未初始化数据**
+- **Backend::empty() / Backend::zeros()**：**分配内存**
 - **Backend::null_tensor()**：真正的空张量，**不占用内存**
-
-**后果：**
-- 使用构造函数创建的张量无法进行任何数据操作
-- 会导致段错误或内存访问错误
-- 违反了框架的设计原则
 
 **正确的张量创建方式：**
 ```cpp
-// 正确：使用Backend子类的方法
-auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(
-    BackendManager::instance().get_backend(CPU));
-Tensor tensor1 = cpu_backend->zeros(shape, dtype);
-Tensor tensor2 = cpu_backend->ones(shape, dtype);
-Tensor tensor3 = cpu_backend->full(shape, value, dtype);
-Tensor tensor4 = cpu_backend->empty(shape, dtype);
-
-// 或者使用其他Backend子类的方法
-auto cuda_backend = std::dynamic_pointer_cast<CudaBackend>(
-    BackendManager::instance().get_backend(CUDA));
-Tensor tensor5 = cuda_backend->zeros(shape, dtype);
+// 正确：使用Backend方法
+auto backend = BackendManager::get_cpu_backend();
+Tensor tensor1 = backend->zeros(shape, dtype);
+Tensor tensor2 = backend->ones(shape, dtype);
+Tensor tensor3 = backend->full(shape, value, dtype);
+Tensor tensor4 = backend->empty(shape, dtype);
 ```
 
 **错误的方式：**
@@ -40,27 +38,18 @@ Tensor tensor5 = cuda_backend->zeros(shape, dtype);
 Tensor tensor(shape, dtype, device);  // 没有分配内存！
 ```
 
-## Overview
+## 设计特点
 
-The Tensor class is the core data structure in Tech Renaissance framework, representing multi-dimensional arrays with associated metadata. It serves as a lightweight container for tensor metadata and a handle to storage, while delegating all computational operations to backend implementations.
+Tensor类遵循轻量级设计理念：
 
-## Version Information
+- **元数据容器**: Tensor存储形状、数据类型、设备信息和存储句柄
+- **后端委托**: 所有计算操作都委托给后端实现
+- **设备无关**: 支持跨不同设备的操作（CPU、CUDA）
+- **内存高效**: 使用共享存储和引用计数进行内存管理
+- **维度限制**: 出于性能考虑支持最多4维张量
+- **梯度管理**: 内置完整的梯度管理系统（V1.45.0新增）
 
-- **Version**: V1.44.1
-- **Date**: 2025-11-16
-- **Author**: 技术觉醒团队
-
-## Design Philosophy
-
-The Tensor class follows a lightweight design philosophy:
-
-- **Metadata Container**: Tensor stores shape, data type, device information, and storage handle
-- **Backend Delegation**: All computational operations are delegated to backend implementations
-- **Device Agnostic**: Supports operations across different devices (CPU, CUDA)
-- **Memory Efficient**: Uses shared storage and reference counting for memory management
-- **Dimension Limited**: Supports tensors up to 4 dimensions for performance considerations
-
-## Class Structure
+## 类定义
 
 ```cpp
 class Tensor {
@@ -94,7 +83,17 @@ public:
     bool is_scalar() const noexcept;
     bool is_contiguous() const noexcept;
 
-    // ===== View and Strides Methods =====
+    // ===== V1.45.0新增：梯度管理方法 =====
+
+    // 梯度访问和管理
+    Tensor& grad();                           // 获取梯度（延迟分配）
+    const Tensor& grad() const;               // 获取梯度（const版本）
+    void set_grad(const Tensor& grad);        // 设置梯度
+    void set_grad(Tensor&& grad);             // 设置梯度（移动版本）
+    bool has_grad() const;                    // 检查是否有梯度
+    void zero_grad();                         // 清零梯度
+
+    // ===== 视图和步长方法 =====
 
     /**
      * @brief 获取张量的步长
@@ -148,21 +147,99 @@ public:
 
 ## Core Features
 
-### 1. Metadata Management
+### 1. 元数据管理
 
-The Tensor class maintains comprehensive metadata about the tensor:
+Tensor类维护关于张量的全面元数据：
 
-- **Shape**: Multi-dimensional dimensions (up to 4D)
-- **Data Type**: FP32 or INT8 support
-- **Device**: CPU or CUDA device specification
-- **Storage**: Shared memory handle with reference counting
-- **Offset**: Memory offset within storage (currently always 0)
-- **Strides**: Step size for each dimension to compute memory offsets
-- **View Flag**: Indicates whether the tensor is a view of another tensor
+- **形状**: 多维维度（最多4D）
+- **数据类型**: 支持FP32或INT8
+- **设备**: CPU或CUDA设备规格
+- **存储**: 带引用计数的共享内存句柄
+- **偏移**: 存储内的内存偏移（当前始终为0）
+- **步长**: 每个维度的步长用于计算内存偏移
+- **视图标志**: 指示张量是否为另一个张量的视图
 
-### 2. Static Factory Methods
+### 2. V1.45.0新增：梯度管理系统
 
-Tensor creation is done through static factory methods:
+Tensor类现在支持完整的梯度管理，为深度学习模型训练提供支撑：
+
+#### 梯度访问方法
+```cpp
+// 获取梯度（延迟分配）
+Tensor& grad();
+
+// 获取梯度（const版本）
+const Tensor& grad() const;
+
+// 检查是否有梯度
+bool has_grad() const;
+
+// 清零梯度
+void zero_grad();
+```
+
+#### 梯度设置方法
+```cpp
+// 设置梯度（复制版本）
+void set_grad(const Tensor& grad);
+
+// 设置梯度（移动版本）
+void set_grad(Tensor&& grad);
+```
+
+#### 梯度管理特点
+
+1. **延迟分配**: 梯度张量只有在首次访问时才分配内存
+2. **自动管理**: 梯度张量的生命周期由智能指针自动管理
+3. **形状一致**: 梯度张量与原张量具有相同的形状和数据类型
+4. **设备一致性**: 梯度张量与原张量位于同一设备
+
+#### 梯度使用示例
+```cpp
+#include "tech_renaissance.h"
+
+using namespace tr;
+
+// 创建一个参数张量
+auto backend = BackendManager::get_cpu_backend();
+Tensor weight = backend->randn(Shape(256, 128));
+
+std::cout << "Has grad: " << weight.has_grad() << std::endl;  // false
+
+// 首次访问梯度时自动分配
+Tensor& weight_grad = weight.grad();
+std::cout << "Has grad: " << weight.has_grad() << std::endl;  // true
+std::cout << "Grad shape: " << weight_grad.shape().to_string() << std::endl;  // (256,128)
+
+// 清零梯度
+weight.zero_grad();
+
+// 手动设置梯度
+Tensor new_grad = backend->ones(weight.shape());
+weight.set_grad(new_grad);
+```
+
+#### 内存优化效果
+
+梯度管理系统显著优化了内存使用：
+
+```cpp
+// 传统方法：默认为所有参数分配梯度
+Tensor param1 = backend->randn(Shape(1000, 1000));  // 4MB
+Tensor param1_grad = backend->zeros(Shape(1000, 1000));  // 额外4MB
+// 总内存：8MB
+
+// 新方法：延迟分配梯度
+Tensor param2 = backend->randn(Shape(1000, 1000));  // 4MB
+// 梯度尚未分配，总内存：4MB
+
+Tensor& param2_grad = param2.grad();  // 现在分配梯度
+// 总内存：8MB（但分配是按需的）
+```
+
+### 3. 静态工厂方法
+
+张量创建通过静态工厂方法完成：
 
 #### Basic Creation Methods
 ```cpp
@@ -323,7 +400,76 @@ int32_t height = tensor.height();        // 4 (H dimension)
 int32_t width = tensor.width();          // 5 (W dimension)
 ```
 
-### 5. Memory Management
+### 5. Gradient Management
+
+#### Overview (V1.45.0)
+
+Starting from V1.45.0, Tensor class includes comprehensive gradient management functionality for neural network training. This feature enables automatic gradient tracking and storage during backward propagation.
+
+#### Gradient Interface
+
+Tensor provides the following gradient management methods:
+
+```cpp
+// Get gradient tensor (creates one if doesn't exist)
+Tensor& grad();
+
+// Get gradient tensor (const version)
+const Tensor& grad() const;
+
+// Set gradient tensor
+void set_grad(const Tensor& grad);
+void set_grad(Tensor&& grad);
+
+// Check if gradient exists
+bool has_grad() const;
+
+// Clear gradient (set to zero)
+void zero_grad();
+```
+
+#### Lazy Allocation
+
+Gradients are allocated lazily to avoid unnecessary memory usage:
+
+```cpp
+Tensor param = backend->zeros(Shape(100, 100));  // No gradient allocated yet
+bool has_grad = param.has_grad();               // Returns false
+
+Tensor& grad = param.grad();                    // Gradient allocated now
+has_grad = param.has_grad();                    // Returns true
+```
+
+#### Memory Efficiency
+
+- **Default behavior**: Tensors don't have gradients by default
+- **Lazy allocation**: Gradients only allocated when accessed via `grad()`
+- **Automatic cleanup**: Gradients follow RAII pattern with smart pointers
+- **Shape matching**: Gradient tensors automatically match parent tensor shape and dtype
+
+#### Usage in Neural Networks
+
+Gradient management is designed for Module classes during training:
+
+```cpp
+// During forward pass (no gradients yet)
+Tensor output = module.forward(input);
+
+// During backward pass (gradients automatically managed)
+module.backward(grad_output);
+
+// Access gradients for parameter updates
+for (auto& [name, param] : module.parameters()) {
+    if (param.has_grad()) {
+        optimizer.update(param, param.grad());
+    }
+}
+
+// Clear gradients for next iteration
+module.zero_grad();
+```
+
+### 6. Memory Management
 
 ### Storage Model
 

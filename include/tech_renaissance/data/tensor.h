@@ -192,6 +192,43 @@ public:
      */
     size_t memory_size() const noexcept;
 
+    // ===== 梯度管理方法 =====
+
+    /**
+     * @brief 获取梯度张量
+     * @return 梯度张量的引用，如果不存在则自动创建
+     */
+    Tensor& grad();
+
+    /**
+     * @brief 获取梯度张量（const版本）
+     * @return 梯度张量的const引用
+     */
+    const Tensor& grad() const;
+
+    /**
+     * @brief 设置梯度张量
+     * @param grad 梯度张量
+     */
+    void set_grad(const Tensor& grad);
+
+    /**
+     * @brief 设置梯度张量（移动版本）
+     * @param grad 梯度张量
+     */
+    void set_grad(Tensor&& grad);
+
+    /**
+     * @brief 检查是否有梯度
+     * @return 如果有梯度则返回true
+     */
+    bool has_grad() const;
+
+    /**
+     * @brief 将梯度张量清零
+     */
+    void zero_grad();
+
     // ===== 静态工厂方法 =====
 
     // ========== 重要：张量创建方法警告 ==========
@@ -408,6 +445,7 @@ private:
     size_t offset_;                        ///< 在Storage中的偏移量（目前为0）
     Strides strides_;                      ///< 步长信息
     bool is_view_;                         ///< 视图标识
+    std::shared_ptr<Tensor> grad_;         ///< 梯度张量（延迟分配）
 
     // 友元声明：Backend类可以访问protected成员
     friend class Backend;

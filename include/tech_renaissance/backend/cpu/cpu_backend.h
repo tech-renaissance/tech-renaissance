@@ -118,7 +118,7 @@ public:
     Tensor negative(const Tensor& input) const;
     Tensor reciprocal(const Tensor& input) const;
     Tensor round(const Tensor& input) const;
-    Tensor transpose(const Tensor& input) const;
+    Tensor transpose(const Tensor& input) const override;
 
     // 原地运算
     void zeros_inplace(Tensor& input) const;
@@ -144,7 +144,7 @@ public:
     void negative_into(const Tensor& input, Tensor& output) const;
     void reciprocal_into(const Tensor& input, Tensor& output) const;
     void round_into(const Tensor& input, Tensor& output) const;
-    void transpose_into(const Tensor& input, Tensor& output) const;
+    void transpose_into(const Tensor& input, Tensor& output) const override;
 
     // 张量复制操作（V1.26.5新增）
     Tensor copy(const Tensor& tensor) const override;

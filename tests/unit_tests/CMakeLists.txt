@@ -758,7 +758,19 @@ endif()
 if(TR_BUILD_PYTHON_SESSION)
     configure_simple_test(test_mlp test_mlp.cpp)
     register_test(test_mlp "MLP Test")
+
+    configure_simple_test(test_mlp_module test_mlp_module.cpp)
+    register_test(test_mlp_module "MLP Module Test")
 endif()
+
+# =============================================================================
+# Module测试（新增）
+# =============================================================================
+configure_simple_test(test_module_gradient test_module_gradient.cpp)
+register_test(test_module_gradient "Module Gradient Check Test")
+
+configure_simple_test(test_memory_allocation test_memory_allocation.cpp)
+register_test(test_memory_allocation "Memory Allocation Verification Test")
 
 message(STATUS "All tests configured successfully (optimized version)")
 
