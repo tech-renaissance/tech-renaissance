@@ -787,5 +787,8 @@ register_test(test_model_logits "Model Logits Interface Test")
 configure_simple_test(test_memory_analysis test_memory_analysis.cpp)
 register_test(test_memory_analysis "Memory Analysis Test")
 
+configure_simple_test(test_lr_schedulers test_lr_schedulers.cpp)
+register_test(test_lr_schedulers "Learning Rate Schedulers Test")
+
 message(STATUS "All tests configured successfully (optimized version)")
 

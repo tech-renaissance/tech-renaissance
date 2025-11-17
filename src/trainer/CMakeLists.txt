@@ -9,6 +9,13 @@
 set(TRAINER_SOURCES
     loss.cpp
     cross_entropy_loss.cpp
+    scheduler.cpp
+    step_lr.cpp
+    multi_step_lr.cpp
+    exponential_lr.cpp
+    cosine_annealing_lr.cpp
+    cosine_annealing_warm_restarts.cpp
+    constant_lr.cpp
 )
 
 # 创建trainer库
