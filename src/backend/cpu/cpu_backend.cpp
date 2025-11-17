@@ -210,6 +210,86 @@ void CpuBackend::add(Tensor& result, const Tensor& a, const Tensor& b) {
 #endif
 }
 
+void CpuBackend::add_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+    validate_same_device(result.device());
+    validate_tensor_shape(a, b);
+    validate_tensor_shape(a, result);
+
+    // 检查Storage是否已分配
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::add_into] Result tensor has no allocated Storage");
+    }
+    if (a.is_empty()) {
+        throw TRException("[CpuBackend::add_into] Input tensor 'a' has no allocated Storage");
+    }
+    if (b.is_empty()) {
+        throw TRException("[CpuBackend::add_into] Input tensor 'b' has no allocated Storage");
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::add_into] add_into only supports FP32");
+    }
+
+    const float* a_data = static_cast<const float*>(a.data_ptr());
+    const float* b_data = static_cast<const float*>(b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = a.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
+    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
+    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
+    result_vec = a_vec + b_vec;
+#else
+    for (size_t i = 0; i < count; ++i) {
+        result_data[i] = a_data[i] + b_data[i];
+    }
+#endif
+}
+
+void CpuBackend::sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim) const {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    // 检查Storage是否已分配
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::sum_into] Input tensor has no allocated Storage");
+    }
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::sum_into] Result tensor has no allocated Storage");
+    }
+
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::sum_into] sum_into only supports FP32");
+    }
+
+    // 简化实现：只支持dim=0的求和
+    if (dim != 0) {
+        throw TRException("[CpuBackend::sum_into] Currently only supports dim=0");
+    }
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    // 计算沿dim=0的求和
+    int32_t batch_size = tensor_a.shape().dim(0);
+    int32_t element_size = 1;
+    for (int i = 1; i < tensor_a.shape().ndim(); ++i) {
+        element_size *= tensor_a.shape().dim(i);
+    }
+
+    // 对每个元素求和所有batch
+    for (int i = 0; i < element_size; ++i) {
+        float sum = 0.0f;
+        for (int j = 0; j < batch_size; ++j) {
+            sum += input_data[j * element_size + i];
+        }
+        result_data[i] = sum;
+    }
+}
+
 void CpuBackend::mul(Tensor& result, const Tensor& a, const Tensor& b) {
     validate_same_device(a.device());
     validate_same_device(b.device());

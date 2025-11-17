@@ -27,10 +27,17 @@ void Tanh::forward_into(const Tensor& input, Tensor& output) {
 void Tanh::backward_into(const Tensor& grad_output, Tensor& grad_input) {
     auto backend = get_backend();
 
-    // tanh的导数：1 - tanh(x)^2
-    // 简化实现：暂时使用梯度传播
-    // TODO: 实现完整的tanh导数计算
-    backend->copy_into(grad_output, grad_input);
+    // tanh的导数：d/dx tanh(x) = 1 - tanh(x)^2
+    // 使用链式法则：grad_input = grad_output * dtanh(cached_input_)
+    // 其中dtanh(x) = 1 - tanh(x)^2
+
+    // 使用dtanh_into方法直接计算导数
+    Tensor dtanh_output = backend->zeros(cached_input_.shape(), DType::FP32);
+    backend->dtanh_into(cached_input_, dtanh_output);
+
+    // 应用链式法则：grad_input = grad_output * dtanh_output
+    // 使用逐元素乘法
+    backend->mul_broadcast_into(grad_output, dtanh_output, grad_input);
 
     clear_cache();
 }

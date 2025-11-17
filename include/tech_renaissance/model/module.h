@@ -313,22 +313,121 @@ protected:
     }
 
     void save_tensor(std::ostream& os, const Tensor& tensor) const {
-        // 简化实现：暂时保存基本元数据
-        save_string(os, tensor.shape().to_string());
-        save_string(os, std::to_string(static_cast<int>(tensor.dtype())));
-        save_string(os, tensor.device().to_string());
+        // TSR格式头部结构 (64字节)
+        struct TSRHeader {
+            char magic[4];          // 魔数标识 'TSR!'
+            int32_t version;        // 格式版本，当前为1
+            int32_t header_size;    // 头部大小，固定为64
+            int32_t reserved_1;     // 保留字段，设置为0
+            int32_t dtype;         // 数据类型枚举
+            int32_t ndim;          // 维度数量 (0-4)
+            int32_t dims[4];       // 各维度尺寸，按NCHW顺序
+            int64_t total_elements; // 元素总数
+            int64_t reserved_2;     // 保留字段
+            int64_t reserved_3;     // 保留字段
+        };
 
-        // TODO: 实现完整的数据序列化
+        // 准备TSR头部
+        TSRHeader header = {};
+        std::memcpy(header.magic, "TSR!", 4);
+        header.version = 1;
+        header.header_size = 64;
+        header.dtype = static_cast<int32_t>(tensor.dtype());
+        header.ndim = tensor.shape().ndim();
+        header.total_elements = static_cast<int64_t>(tensor.shape().numel());
+
+        // 填充维度数组 (NCHW顺序，右对齐存储)
+        int32_t dims[4] = {1, 1, 1, 1};
+        if (header.ndim == 0) {
+            dims[0] = 1; dims[1] = 1; dims[2] = 1; dims[3] = 1;  // 标量
+        } else if (header.ndim == 1) {
+            dims[3] = tensor.shape().dim(0);  // 1D: [W]
+        } else if (header.ndim == 2) {
+            dims[2] = tensor.shape().dim(0);  // 2D: [H,W]
+            dims[3] = tensor.shape().dim(1);
+        } else if (header.ndim == 3) {
+            dims[1] = tensor.shape().dim(0);  // 3D: [C,H,W]
+            dims[2] = tensor.shape().dim(1);
+            dims[3] = tensor.shape().dim(2);
+        } else if (header.ndim == 4) {
+            dims[0] = tensor.shape().dim(0);  // 4D: [N,C,H,W]
+            dims[1] = tensor.shape().dim(1);
+            dims[2] = tensor.shape().dim(2);
+            dims[3] = tensor.shape().dim(3);
+        }
+        std::memcpy(header.dims, dims, sizeof(dims));
+
+        // 写入TSR头部 (64字节)
+        os.write(reinterpret_cast<const char*>(&header), sizeof(TSRHeader));
+
+        // 写入张量数据
+        if (tensor.storage_allocated()) {
+            const void* data = tensor.data_ptr();
+            size_t data_size = tensor.memory_size();
+            os.write(reinterpret_cast<const char*>(data), data_size);
+        }
     }
 
     Tensor load_tensor(std::istream& is) const {
-        // 简化实现：暂时只加载元数据
-        std::string shape_str = load_string(is);
-        std::string dtype_str = load_string(is);
-        std::string device_str = load_string(is);
+        // TSR格式头部结构 (64字节)
+        struct TSRHeader {
+            char magic[4];          // 魔数标识 'TSR!'
+            int32_t version;        // 格式版本
+            int32_t header_size;    // 头部大小
+            int32_t reserved_1;     // 保留字段
+            int32_t dtype;         // 数据类型枚举
+            int32_t ndim;          // 维度数量
+            int32_t dims[4];       // 各维度尺寸，按NCHW顺序
+            int64_t total_elements; // 元素总数
+            int64_t reserved_2;     // 保留字段
+            int64_t reserved_3;     // 保留字段
+        };
 
-        // TODO: 实现完整的数据反序列化
-        return backend_->empty(Shape({1}), static_cast<DType>(std::stoi(dtype_str)));
+        // 读取TSR头部
+        TSRHeader header;
+        is.read(reinterpret_cast<char*>(&header), sizeof(TSRHeader));
+
+        // 验证魔数和版本
+        if (std::memcmp(header.magic, "TSR!", 4) != 0) {
+            throw TRException("[Module::load_tensor] Invalid TSR file magic number");
+        }
+        if (header.version != 1) {
+            throw TRException("[Module::load_tensor] Unsupported TSR version: " + std::to_string(header.version));
+        }
+
+        // 重建Tensor形状 (从NCHW格式转换)
+        Shape shape;
+        if (header.ndim == 0) {
+            shape = Shape();  // 标量
+        } else if (header.ndim == 1) {
+            shape = Shape(header.dims[3]);  // 1D: [W]
+        } else if (header.ndim == 2) {
+            shape = Shape(header.dims[2], header.dims[3]);  // 2D: [H,W]
+        } else if (header.ndim == 3) {
+            shape = Shape(header.dims[1], header.dims[2], header.dims[3]);  // 3D: [C,H,W]
+        } else if (header.ndim == 4) {
+            shape = Shape(header.dims[0], header.dims[1], header.dims[2], header.dims[3]);  // 4D: [N,C,H,W]
+        } else {
+            throw TRException("[Module::load_tensor] Unsupported tensor dimensions: " + std::to_string(header.ndim));
+        }
+
+        // 验证元素总数
+        if (static_cast<int64_t>(shape.numel()) != header.total_elements) {
+            throw TRException("[Module::load_tensor] Tensor element count mismatch");
+        }
+
+        // 创建张量
+        DType dtype = static_cast<DType>(header.dtype);
+        Tensor tensor = backend_->empty(shape, dtype);
+
+        // 读取张量数据
+        if (tensor.storage_allocated() && header.total_elements > 0) {
+            void* data = tensor.data_ptr();
+            size_t data_size = tensor.memory_size();
+            is.read(reinterpret_cast<char*>(data), data_size);
+        }
+
+        return tensor;
     }
 
 protected:

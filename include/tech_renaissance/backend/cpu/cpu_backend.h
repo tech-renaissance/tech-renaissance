@@ -45,6 +45,8 @@ public:
 
     // 基本运算
     void add(Tensor& result, const Tensor& a, const Tensor& b) override;
+    void add_into(const Tensor& a, const Tensor& b, Tensor& result) const override;
+    void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false) const override;
     void mul(Tensor& result, const Tensor& a, const Tensor& b) override;
     Tensor mm(const Tensor& a, const Tensor& b) override;
     void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override;

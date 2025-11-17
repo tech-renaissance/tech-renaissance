@@ -131,6 +131,23 @@ public:
     virtual void add(Tensor& result, const Tensor& a, const Tensor& b) = 0;
 
     /**
+     * @brief 张量加法（into版本，张量加张量）
+     * @param a 输入张量A
+     * @param b 输入张量B
+     * @param result 结果张量（A + B）
+     */
+    virtual void add_into(const Tensor& a, const Tensor& b, Tensor& result) const;
+
+    /**
+     * @brief 张量求和（into版本，沿指定维度求和）
+     * @param tensor_a 输入张量
+     * @param result 结果张量
+     * @param dim 求和维度
+     * @param keep_dim 是否保持维度
+     */
+    virtual void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false) const;
+
+    /**
      * @brief 张量乘法
      * @param result 结果张量
      * @param a 输入张量A

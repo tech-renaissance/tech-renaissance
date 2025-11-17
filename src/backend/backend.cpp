@@ -66,6 +66,10 @@ DEFINE_NOT_IMPLEMENTED_METHOD(crossentropy, float, (const Tensor& pred, const Te
 DEFINE_NOT_IMPLEMENTED_METHOD(one_hot, Tensor, (const Tensor& label, int32_t num_classes, float label_smoothing), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(one_hot_into, (const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing), )
 
+// 张量运算（into版本）
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(add_into, (const Tensor& a, const Tensor& b, Tensor& result), const)
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sum_into, (const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim), const)
+
 // 标量运算（tensor - scalar）
 DEFINE_NOT_IMPLEMENTED_METHOD(minus, Tensor, (const Tensor& input, float scalar), const)
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(minus_inplace, (Tensor& input, float scalar), const)

@@ -70,27 +70,49 @@ public:
         auto backend = get_backend();
 
         // 获取权重
-        const Tensor& weight = get_parameter("weight");
+        Tensor& weight = get_parameter("weight");
 
         // 计算输入梯度：grad_input = grad_output @ weight^T
         // grad_output(batch, out_features) @ weight^T(out_features, in_features) = grad_input(batch, in_features)
         Tensor weight_transposed = backend->transpose(weight);
         backend->mm_into(grad_output, weight_transposed, grad_input);
 
-        // 计算权重梯度：grad_weight = grad_output.T @ input
+        // 计算权重梯度：grad_weight = grad_output^T @ input
         if (weight.has_grad()) {
-            // 这里需要转置grad_output，暂时简化实现
-            // Tensor& grad_weight = weight.grad();
-            // backend->fill(grad_weight, 0.0f);
+            // grad_output^T(out_features, batch) @ input(batch, in_features) = grad_weight(out_features, in_features)
+            Tensor grad_output_t = backend->transpose(grad_output);
+            Shape grad_weight_shape(grad_output_t.shape().dim(0), cached_input_.shape().dim(1));
+            Tensor grad_weight = backend->zeros(grad_weight_shape, DType::FP32);
+            backend->mm_into(grad_output_t, cached_input_, grad_weight);
+
+            // 累积权重梯度
+            if (!weight.grad().storage_allocated()) {
+                weight.set_grad(grad_weight);
+            } else {
+                // 实现梯度累积：新梯度 += 旧梯度
+                Tensor& existing_grad = weight.grad();
+                backend->add_into(grad_weight, existing_grad, existing_grad);
+            }
         }
 
         // 计算偏置梯度：grad_bias = sum(grad_output, dim=0)
         if (use_bias_ && has_parameter("bias")) {
-            const Tensor& bias = get_parameter("bias");
+            Tensor& bias = get_parameter("bias");
             if (bias.has_grad()) {
-                // 简化实现：对grad_output的batch维度求和
-                // Tensor& grad_bias = bias.grad();
-                // backend->fill(grad_bias, 0.0f);
+                // 对grad_output的batch维度求和：grad_bias(out_features)
+                Tensor grad_bias = backend->zeros(bias.shape(), DType::FP32);
+
+                // 使用sum_into方法对dim=0进行求和
+                backend->sum_into(grad_output, grad_bias, 0, false);
+
+                // 累积偏置梯度
+                if (!bias.grad().storage_allocated()) {
+                    bias.set_grad(grad_bias);
+                } else {
+                    // 实现梯度累积：新梯度 += 旧梯度
+                    Tensor& existing_grad = bias.grad();
+                    backend->add_into(grad_bias, existing_grad, existing_grad);
+                }
             }
         }
 
