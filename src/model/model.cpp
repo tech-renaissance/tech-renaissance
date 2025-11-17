@@ -151,11 +151,18 @@ Tensor Model::forward(const Tensor& input) {
         return input;  // 空模型直接返回输入
     }
 
-    Tensor x = input;
-    for (auto& module : modules_) {
-        x = module->forward(x);
+    // 确保预分配缓存已初始化
+    if (!ctx_.is_allocated()) {
+        ctx_.allocate(modules_, input.shape(), backend_);
     }
-    return x;
+
+    // 使用预分配缓存的性能路径
+    Tensor output = backend_->empty(
+        modules_.back()->infer_output_shape(input.shape()),
+        DType::FP32
+    );
+    forward_into(input, output);
+    return output;
 }
 
 void Model::forward_into(const Tensor& input, Tensor& output) {
@@ -170,24 +177,16 @@ void Model::forward_into(const Tensor& input, Tensor& output) {
         ctx_.allocate(modules_, input.shape(), backend_);
     }
 
-    Tensor x = input;
+    // 第一层：输入到缓存0
+    modules_[0]->forward_into(input, ctx_.get_forward_cache(0));
 
-    // 第一层：输入到第一个缓存
-    if (!modules_.empty()) {
-        modules_[0]->forward_into(x, ctx_.get_forward_cache(0));
-        x = ctx_.get_forward_cache(0);
-    }
-
-    // 中间层：缓存到缓存
+    // 中间层：缓存i-1 到 缓存i
     for (size_t i = 1; i < modules_.size(); ++i) {
         modules_[i]->forward_into(ctx_.get_forward_cache(i-1), ctx_.get_forward_cache(i));
-        x = ctx_.get_forward_cache(i);
     }
 
-    // 最后一个缓存到输出
-    if (!modules_.empty()) {
-        backend_->copy_into(ctx_.get_forward_cache(modules_.size() - 1), output);
-    }
+    // 最后一层：缓存到输出
+    backend_->copy_into(ctx_.get_forward_cache(modules_.size() - 1), output);
 }
 
 Tensor Model::backward(const Tensor& grad_output) {
@@ -195,14 +194,17 @@ Tensor Model::backward(const Tensor& grad_output) {
         return grad_output;  // 空模型直接返回梯度
     }
 
-    Tensor grad = grad_output;
-
-    // 反向遍历模块
-    for (int i = modules_.size() - 1; i >= 0; --i) {
-        grad = modules_[i]->backward(grad);
+    // 确保预分配缓存已初始化
+    if (!ctx_.is_allocated()) {
+        throw TRException("[Model::backward] InternalContext not allocated. Call forward first.");
     }
 
-    return grad;
+    // 使用预分配缓存的性能路径
+    // 输入梯度存储在backward_cache[0]中
+    backward_into(grad_output, ctx_.get_backward_cache(0));
+
+    // 返回输入梯度的副本
+    return ctx_.get_backward_cache(0);
 }
 
 void Model::backward_into(const Tensor& grad_output, Tensor& grad_input) {
@@ -214,27 +216,23 @@ void Model::backward_into(const Tensor& grad_output, Tensor& grad_input) {
 
     // 确保预分配缓存已初始化
     if (!ctx_.is_allocated()) {
-        throw TRException("[Model::backward_into] InternalContext not allocated. Call forward_into first.");
+        throw TRException("[Model::backward_into] InternalContext not allocated. Call forward first.");
     }
 
-    Tensor grad = grad_output;
+    // 将最终输出的梯度复制到最后一个反向缓存
+    size_t last_idx = modules_.size();
+    backend_->copy_into(grad_output, ctx_.get_backward_cache(last_idx));
 
-    // 从最后一层开始反向传播
+    // 逐层反向传播（逆序，全部使用into型）
     for (int i = modules_.size() - 1; i >= 0; --i) {
-        if (i == static_cast<int>(modules_.size()) - 1) {
-            // 最后一层：输出梯度到缓存
-            modules_[i]->backward_into(grad, ctx_.get_backward_cache(i));
-        } else {
-            // 中间层：缓存到缓存
-            modules_[i]->backward_into(ctx_.get_backward_cache(i + 1), ctx_.get_backward_cache(i));
-        }
-        grad = ctx_.get_backward_cache(i);
+        modules_[i]->backward_into(
+            ctx_.get_backward_cache(i + 1),  // 当前层的输出梯度
+            ctx_.get_backward_cache(i)      // 当前层的输入梯度
+        );
     }
 
-    // 第一个缓存到梯度输入
-    if (!modules_.empty()) {
-        backend_->copy_into(ctx_.get_backward_cache(0), grad_input);
-    }
+    // 将对模型输入的梯度复制到输出
+    backend_->copy_into(ctx_.get_backward_cache(0), grad_input);
 }
 
 // ===== 设备管理实现 =====

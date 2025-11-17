@@ -150,8 +150,7 @@ public:
     // === 设备转移 ===
 
     virtual void to(const Device& device) {
-        auto cpu_backend = BackendManager::get_cpu_backend().get();
-        backend_ = reinterpret_cast<Backend*>(cpu_backend);
+        backend_ = BackendManager::instance().get_backend(device).get();
 
         // 转移所有参数
         for (auto& [key, param] : parameters_) {
