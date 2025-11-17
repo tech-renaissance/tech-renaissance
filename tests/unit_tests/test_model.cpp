@@ -28,7 +28,7 @@ void test_model_constructors() {
         auto linear1 = std::make_shared<Linear>(10, 5);
         auto linear2 = std::make_shared<Linear>(5, 1);
 
-        model->set_backend(backend.get());
+        model->set_backend(backend);
         model->add_module(linear1);
         model->add_module(linear2);
 
@@ -42,7 +42,7 @@ void test_model_constructors() {
 
         auto model = std::make_shared<Model>("TestModel2",
                                            std::vector<std::shared_ptr<Module>>{linear1, linear2});
-        model->set_backend(backend.get());
+        model->set_backend(backend);
 
         std::cout << "  [PASS] Constructor 2: initializer list" << std::endl;
     }
@@ -52,7 +52,7 @@ void test_model_constructors() {
         auto model = Model::create("TestModel3",
                                   std::make_shared<Linear>(10, 5),
                                   std::make_shared<Linear>(5, 1));
-        model->set_backend(backend.get());
+        model->set_backend(backend);
 
         std::cout << "  [PASS] Constructor 3: factory method" << std::endl;
     }
@@ -75,7 +75,7 @@ void test_auto_naming() {
                               std::make_shared<Tanh>(),
                               std::make_shared<Linear>(1, 3));
 
-    model->set_backend(backend.get());
+    model->set_backend(backend);
 
     // Verify auto naming
     if (model->get_module(0)->instance_name() == "Linear1" &&
@@ -95,7 +95,7 @@ void test_auto_naming() {
 
     // Test manual naming
     auto custom_model = std::make_shared<Model>("CustomNamingTest");
-    custom_model->set_backend(backend.get());
+    custom_model->set_backend(backend);
     custom_model->add_module("input_layer", std::make_shared<Linear>(10, 5));
     custom_model->add_module("output_layer", std::make_shared<Linear>(5, 1));
 
@@ -124,7 +124,7 @@ void test_forward_propagation() {
                               std::make_shared<Tanh>(),
                               std::make_shared<Linear>(3, 2));
 
-    model->set_backend(backend.get());
+    model->set_backend(backend);
 
     // Create input tensor (batch=2, features=4)
     Tensor input = backend->randn(Shape(2, 4));
@@ -165,7 +165,7 @@ void test_preallocation_mechanism() {
                               std::make_shared<Linear>(3, 2),
                               std::make_shared<Linear>(2, 1));
 
-    model->set_backend(backend.get());
+    model->set_backend(backend);
 
     // Create input tensor
     Tensor input = backend->randn(Shape(4, 3));  // batch=4, features=3
@@ -206,7 +206,7 @@ void test_parameter_management() {
                               std::make_shared<Linear>(4, 3),
                               std::make_shared<Linear>(3, 2));
 
-    model->set_backend(backend.get());
+    model->set_backend(backend);
 
     // Get all parameters
     auto params = model->parameters();
@@ -229,11 +229,13 @@ void test_parameter_management() {
     }
 
     // Check parameter shapes
-    if (params["Linear1.weight"].shape() == Shape(4, 3) &&  // transposed storage
-        params["Linear2.weight"].shape() == Shape(3, 2)) {  // transposed storage
+    if (params["Linear1.weight"].shape() == Shape(3, 4) &&  // PyTorch standard format: (out_features, in_features)
+        params["Linear2.weight"].shape() == Shape(2, 3)) {  // PyTorch standard format: (out_features, in_features)
         std::cout << "  [PASS] Parameter shapes correct" << std::endl;
     } else {
         std::cout << "  [FAIL] Parameter shapes incorrect" << std::endl;
+        std::cout << "    Expected Linear1.weight: (3, 4), got: " << params["Linear1.weight"].shape().to_string() << std::endl;
+        std::cout << "    Expected Linear2.weight: (2, 3), got: " << params["Linear2.weight"].shape().to_string() << std::endl;
         return;
     }
 
@@ -263,7 +265,7 @@ void test_device_and_mode() {
                               std::make_shared<Linear>(3, 2),
                               std::make_shared<Tanh>());
 
-    model->set_backend(backend.get());
+    model->set_backend(backend);
 
     // Test device information
     Device device = model->device();
@@ -305,7 +307,7 @@ void test_edge_cases() {
     // Test empty model
     {
         auto empty_model = std::make_shared<Model>("EmptyModel");
-        empty_model->set_backend(backend.get());
+        empty_model->set_backend(backend);
 
         if (empty_model->num_modules() == 0) {
             std::cout << "  [PASS] Empty model" << std::endl;
@@ -329,7 +331,7 @@ void test_edge_cases() {
     {
         auto single_model = Model::create("SingleModule",
                                          std::make_shared<Linear>(3, 2));
-        single_model->set_backend(backend.get());
+        single_model->set_backend(backend);
 
         if (single_model->num_modules() == 1) {
             std::cout << "  [PASS] Single module model" << std::endl;

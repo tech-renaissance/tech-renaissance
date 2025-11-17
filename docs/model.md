@@ -6,12 +6,17 @@ Model类是技术觉醒框架中Module的容器和编排器，负责管理多个
 
 ## 版本信息
 
-- **版本**: V1.46.0
+- **版本**: V1.46.1
 - **日期**: 2025年11月17日
 - **作者**: 技术觉醒团队
 - **所属系列**: model
 
 ## 最新完成状态
+
+✅ **V1.46.1完成 - 中优先级专家意见修复 + 全面测试验证**:
+- 中优先级1: Backend获取方式优化 - 从原始指针改为智能指针，消除野指针风险
+- 中优先级2: Linear层权重存储格式优化 - 改为PyTorch标准格式，完全兼容
+- 全面测试验证通过 - 所有Model类功能测试正常
 
 ✅ **V1.46.0完成 - P0关键问题修复 + 100%全功能验证**:
 - P0-1: Model数据流逻辑修复 - 修复forward_into和backward_into的循环逻辑错误
@@ -191,11 +196,11 @@ size_t parameter_memory() const;
 ### 后端配置
 
 ```cpp
-// 设置后端（递归设置所有模块）
-void set_backend(Backend* backend);
+// 设置后端（递归设置所有模块）- V1.46.1更新：智能指针管理
+void set_backend(std::shared_ptr<Backend> backend);
 
 // 获取当前后端
-Backend* get_backend() const;
+std::shared_ptr<Backend> get_backend() const;
 ```
 
 ### 设备转移
@@ -602,9 +607,9 @@ public:
     void to(const Device& device);
     Device device() const;
 
-    // 后端管理
-    void set_backend(Backend* backend);
-    Backend* get_backend() const;
+    // 后端管理（V1.46.1更新：智能指针管理）
+    void set_backend(std::shared_ptr<Backend> backend);
+    std::shared_ptr<Backend> get_backend() const;
 
     // 模式管理
     void train();
@@ -701,6 +706,18 @@ Model类通过了以下完整的测试验证：
 **性能验证**: 内存分配减少80%，计算性能达标
 
 ## 历史版本
+
+- **V1.46.1** (2025-11-17): 中优先级专家意见修复
+  - Backend获取方式优化：从原始指针改为智能指针管理
+  - Linear层权重格式标准化：与PyTorch完全兼容
+  - 全面测试验证：所有Model功能测试通过
+  - 内存管理安全性提升：消除野指针风险
+
+- **V1.46.0** (2025-11-17): P0关键问题修复
+  - P0-1: Model数据流逻辑修复
+  - P0-2: 初始化检查修复，激活预分配机制
+  - P0-3: 设备转移修复
+  - 100%全功能验证通过
 
 - **V1.45.0** (2025-11-17): 完整实现
   - 完整的三种构造方式

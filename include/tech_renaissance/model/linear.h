@@ -26,13 +26,13 @@ public:
     Linear(int in_features, int out_features, const std::string& name = "Linear", bool use_bias = false)
         : Module(name), in_features_(in_features), out_features_(out_features), use_bias_(use_bias) {}
 
-    void set_backend(Backend* backend) override {
+    void set_backend(std::shared_ptr<Backend> backend) override {
         Module::set_backend(backend);
 
         // 创建并注册权重参数
         if (!has_parameter("weight")) {
-            // 权重：in_features × out_features (转置的权重，避免运行时转置)
-            Tensor weight = backend->zeros(Shape(in_features_, out_features_), DType::FP32);
+            // 权重：out_features × in_features (PyTorch标准格式)
+            Tensor weight = backend->zeros(Shape(out_features_, in_features_), DType::FP32);
             register_parameter("weight", weight);
         }
 
@@ -53,10 +53,11 @@ public:
         // 获取权重
         const Tensor& weight = get_parameter("weight");
 
-        // 计算：output = input @ weight
-        // Linear层权重存储形状为：(in_features, out_features) (转置的权重)
-        // 矩阵乘法：input(batch, in_features) @ weight(in_features, out_features) = output(batch, out_features)
-        backend->mm_into(input, weight, output);
+        // 计算：output = input @ weight^T
+        // Linear层权重存储形状为：(out_features, in_features) (PyTorch标准格式)
+        // 矩阵乘法：input(batch, in_features) @ weight^T(in_features, out_features) = output(batch, out_features)
+        Tensor weight_transposed = backend->transpose(weight);
+        backend->mm_into(input, weight_transposed, output);
 
         // 如果使用偏置，进行广播加法
         if (use_bias_ && has_parameter("bias")) {
@@ -73,9 +74,8 @@ public:
         Tensor& weight = get_parameter("weight");
 
         // 计算输入梯度：grad_input = grad_output @ weight^T
-        // grad_output(batch, out_features) @ weight^T(out_features, in_features) = grad_input(batch, in_features)
-        Tensor weight_transposed = backend->transpose(weight);
-        backend->mm_into(grad_output, weight_transposed, grad_input);
+        // grad_output(batch, out_features) @ weight^T(in_features, out_features)^T = grad_input(batch, in_features)
+        backend->mm_into(grad_output, weight, grad_input);
 
         // 计算权重梯度：grad_weight = grad_output^T @ input
         if (weight.has_grad()) {
@@ -141,7 +141,7 @@ public:
 
         if (has_parameter("weight")) {
             const Tensor& weight = get_parameter("weight");
-            std::cout << "  Weight shape: " << weight.shape().to_string() << std::endl;
+            std::cout << "  Weight shape: " << weight.shape().to_string() << " (PyTorch standard: out_features, in_features)" << std::endl;
         }
 
         if (has_parameter("bias")) {

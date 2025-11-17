@@ -55,10 +55,10 @@ int main() {
 
         // 创建一个小的Linear层用于测试
         Linear layer(3, 2, "TestLinear");
-        layer.set_backend(backend.get());
+        layer.set_backend(backend);
 
-        // 创建正确形状的权重：(in_features, out_features) = (3, 2) (转置的权重)
-        Tensor weight = backend->randn(Shape(3, 2), 123);  // in_features × out_features
+        // 创建正确形状的权重：(out_features, in_features) = (2, 3) (PyTorch标准格式)
+        Tensor weight = backend->randn(Shape(2, 3), 123);  // out_features × in_features
         layer.register_parameter("weight", weight);
 
         // 创建测试输入
@@ -81,7 +81,7 @@ int main() {
         std::cout << "\n=== Testing Flatten Layer ===" << std::endl;
 
         Flatten flatten_layer(1, -1, "TestFlatten");
-        flatten_layer.set_backend(backend.get());
+        flatten_layer.set_backend(backend);
 
         // 创建4D输入 (N, C, H, W)
         Tensor input_4d = backend->randn(Shape(2, 3, 4, 5), 123);

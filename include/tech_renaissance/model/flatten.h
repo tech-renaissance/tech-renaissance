@@ -32,7 +32,7 @@ public:
     Flatten(int start_dim, int end_dim)
         : Module("Flatten"), start_dim_(start_dim), end_dim_(end_dim) {}
 
-    void set_backend(Backend* backend) override {
+    void set_backend(std::shared_ptr<Backend> backend) override {
         Module::set_backend(backend);
         // Flatten层没有可训练参数，不需要初始化
     }

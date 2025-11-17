@@ -110,10 +110,10 @@ void test_linear_layer_memory() {
 
     // 创建Linear层
     Linear layer(784, 256, "TestLinear");
-    layer.set_backend(backend.get());
+    layer.set_backend(backend);
 
-    // 创建正确形状的权重：(in_features, out_features) = (784, 256) (转置的权重)
-    Tensor weight = backend->randn(Shape(784, 256), 456);  // in_features × out_features
+    // 创建正确形状的权重：(out_features, in_features) = (256, 784) (PyTorch标准格式)
+    Tensor weight = backend->randn(Shape(256, 784), 456);  // out_features × in_features
     layer.register_parameter("weight", weight);
 
     // 创建输入数据

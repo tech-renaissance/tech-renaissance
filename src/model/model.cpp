@@ -20,7 +20,7 @@ namespace tr {
 
 void Model::InternalContext::allocate(const std::vector<std::shared_ptr<Module>>& modules,
                                      const Shape& input_shape,
-                                     Backend* backend) {
+                                     std::shared_ptr<Backend> backend) {
     if (allocated_) {
         return;
     }
@@ -238,7 +238,7 @@ void Model::backward_into(const Tensor& grad_output, Tensor& grad_input) {
 // ===== 设备管理实现 =====
 
 void Model::to(const Device& device) {
-    backend_ = BackendManager::instance().get_backend(device).get();
+    backend_ = BackendManager::instance().get_backend(device);
 
     // 递归设置所有模块的后端
     initialize_modules_backend();
@@ -256,7 +256,7 @@ Device Model::device() const {
 
 // ===== 后端管理实现 =====
 
-void Model::set_backend(Backend* backend) {
+void Model::set_backend(std::shared_ptr<Backend> backend) {
     if (!backend) {
         throw TRException("[Model::set_backend] Cannot set null backend");
     }

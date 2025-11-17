@@ -136,11 +136,11 @@ public:
 
     // === 后端管理 ===
 
-    virtual void set_backend(Backend* backend) {
+    virtual void set_backend(std::shared_ptr<Backend> backend) {
         backend_ = backend;
     }
 
-    Backend* get_backend() const {
+    std::shared_ptr<Backend> get_backend() const {
         if (!backend_) {
             throw TRException("[Module] Backend not set for " + instance_name());
         }
@@ -150,7 +150,7 @@ public:
     // === 设备转移 ===
 
     virtual void to(const Device& device) {
-        backend_ = BackendManager::instance().get_backend(device).get();
+        backend_ = BackendManager::instance().get_backend(device);
 
         // 转移所有参数
         for (auto& [key, param] : parameters_) {
@@ -189,6 +189,9 @@ public:
     // === 梯度管理 ===
 
     void zero_grad() {
+        if (!backend_) {
+            throw TRException("[Module::zero_grad] Backend not set for " + instance_name());
+        }
         for (auto& [key, param] : parameters_) {
             if (param.grad().storage_allocated()) {
                 backend_->fill(param.grad(), 0.0f);
@@ -288,10 +291,16 @@ protected:
 
     virtual Tensor create_output_tensor(const Tensor& input) const {
         Shape output_shape = infer_output_shape(input.shape());
+        if (!backend_) {
+            throw TRException("[Module::create_output_tensor] Backend not set for " + instance_name());
+        }
         return backend_->empty(output_shape, input.dtype());
     }
 
     virtual Tensor create_input_gradient_tensor() const {
+        if (!backend_) {
+            throw TRException("[Module::create_input_gradient_tensor] Backend not set for " + instance_name());
+        }
         return backend_->empty(cached_input_.shape(), cached_input_.dtype());
     }
 
@@ -417,6 +426,9 @@ protected:
 
         // 创建张量
         DType dtype = static_cast<DType>(header.dtype);
+        if (!backend_) {
+            throw TRException("[Module::load_tensor] Backend not set for " + instance_name());
+        }
         Tensor tensor = backend_->empty(shape, dtype);
 
         // 读取张量数据
@@ -433,7 +445,7 @@ protected:
     // === 成员变量 ===
     std::string name_;                                    // 类型名（如"Linear"）
     std::string instance_name_;                          // 实例名（如"Linear1"）
-    Backend* backend_;                                   // 后端指针
+    std::shared_ptr<Backend> backend_;                           // 后端智能指针
     std::unordered_map<std::string, Tensor> parameters_; // 可训练参数
     std::unordered_map<std::string, Tensor> buffers_;    // 非训练状态
     bool training_;                                      // 训练/推理标志

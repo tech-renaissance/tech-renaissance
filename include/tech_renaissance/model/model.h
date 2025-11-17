@@ -37,11 +37,11 @@ private:
          * @brief 预分配所有层的缓存空间
          * @param modules 模块列表
          * @param input_shape 输入形状
-         * @param backend 后端指针
+         * @param backend 后端智能指针
          */
         void allocate(const std::vector<std::shared_ptr<Module>>& modules,
                      const Shape& input_shape,
-                     Backend* backend);
+                     std::shared_ptr<Backend> backend);
 
         /**
          * @brief 清空所有缓存
@@ -72,7 +72,7 @@ private:
     // === 成员变量 ===
     std::string model_name_;                                    // 模型名称
     std::vector<std::shared_ptr<Module>> modules_;              // 有序模块列表
-    Backend* backend_ = nullptr;                                // 全局后端
+    std::shared_ptr<Backend> backend_;                           // 全局后端智能指针
     InternalContext ctx_;                                       // 内部上下文（预分配管理）
     std::unordered_map<std::string, int> type_counters_;        // 类型计数器（用于自动命名）
     bool training_ = true;                                      // 训练/推理模式
@@ -176,15 +176,15 @@ public:
 
     /**
      * @brief 设置后端
-     * @param backend 后端指针
+     * @param backend 后端智能指针
      */
-    void set_backend(Backend* backend);
+    void set_backend(std::shared_ptr<Backend> backend);
 
     /**
      * @brief 获取后端
-     * @return 后端指针
+     * @return 后端智能指针
      */
-    Backend* get_backend() const { return backend_; }
+    std::shared_ptr<Backend> get_backend() const { return backend_; }
 
     // === 训练模式管理 ===
 

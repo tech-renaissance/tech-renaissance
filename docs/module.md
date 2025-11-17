@@ -6,12 +6,17 @@ Module基类是技术觉醒框架中所有神经网络层的抽象基类。它�
 
 ## 版本信息
 
-- **版本**: V1.46.0
+- **版本**: V1.46.1
 - **日期**: 2025年11月17日
 - **作者**: 技术觉醒团队
 - **所属系列**: model
 
 ## 最新完成状态
+
+✅ **V1.46.1完成 - 中优先级专家意见修复 + PyTorch完全兼容**:
+- 中优先级1: Backend获取方式优化 - 从原始指针改为智能指针，消除野指针风险
+- 中优先级2: Linear层权重存储格式优化 - 改为PyTorch标准格式(out_features, in_features)
+- 全面测试验证通过 - 与PyTorch数值精度完全一致（diff: 0.0000）
 
 ✅ **V1.46.0完成 - P0关键问题修复 + 全功能验证**:
 - P0-1: Model数据流逻辑修复 - 修复forward_into和backward_into的循环逻辑错误
@@ -128,11 +133,11 @@ size_t parameter_memory() const;
 ### 后端配置
 
 ```cpp
-// 为所有操作设置后端
-virtual void set_backend(Backend* backend);
+// 为所有操作设置后端（V1.46.1更新：智能指针管理）
+virtual void set_backend(std::shared_ptr<Backend> backend);
 
 // 获取当前后端
-Backend* get_backend() const;
+std::shared_ptr<Backend> get_backend() const;
 ```
 
 ### 设备转移
@@ -386,9 +391,9 @@ public:
     // 内存分析
     size_t parameter_memory() const;
 
-    // 后端管理
-    virtual void set_backend(Backend* backend);
-    Backend* get_backend() const;
+    // 后端管理（V1.46.1更新：智能指针管理）
+    virtual void set_backend(std::shared_ptr<Backend> backend);
+    std::shared_ptr<Backend> get_backend() const;
 
     // 设备转移
     virtual void to(const Device& device);
@@ -437,7 +442,7 @@ virtual Shape infer_output_shape(const Shape& input_shape) const override = 0;
 ### 推荐重写的方法
 
 ```cpp
-virtual void set_backend(Backend* backend) override;
+virtual void set_backend(std::shared_ptr<Backend> backend) override;
 virtual void train() override;
 virtual void eval() override;
 ```
@@ -516,6 +521,23 @@ Module loss matches PyTorch loss (diff: 0.0000)
 **数值精度**: 与PyTorch完全一致，差值为0.0000
 
 ## 历史版本
+
+- **V1.46.1** (2025-11-17): 中优先级专家意见修复
+  - Backend获取方式优化：从原始指针改为智能指针管理
+  - Linear层权重格式标准化：与PyTorch完全兼容
+  - 全面测试验证：PyTorch数值精度完全一致（diff: 0.0000）
+  - 内存管理安全性提升：消除野指针风险
+
+- **V1.46.0** (2025-11-17): P0关键问题修复 + 全功能验证
+  - P0-1: Model数据流逻辑修复
+  - P0-2: 初始化检查修复，激活预分配机制
+  - P0-3: 设备转移修复
+  - 双版本API设计（返回型和into型）
+  - 参数管理和梯度系统
+  - 内存优化的into型方法
+  - 设备转移和TSR序列化支持
+  - 完整的反向传播实现
+  - 单元测试全覆盖（梯度、内存、端到端）
 
 - **V1.45.0** (2025-11-17): 完整实现
   - 完整的双版本API设计

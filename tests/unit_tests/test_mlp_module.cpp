@@ -37,18 +37,15 @@ int main() {
 
             // 获取权重
             // PyTorch导出的权重形状是(out_features, in_features)
-            // 我们的Linear层期望权重形状是(in_features, out_features)
-            // 所以需要转置一次以适配我们的内部格式
+            // 我们的Linear层现在也使用PyTorch标准格式(out_features, in_features)
+            // 所以不需要转置，直接使用即可
             Tensor weights0 = ps.calculate("weights0", 10000);
-            cpu_backend->transpose_inplace(weights0);  // 转置为(in_features, out_features)
             weights0.summary("weights0");
 
             Tensor weights1 = ps.calculate("weights1", 10000);
-            cpu_backend->transpose_inplace(weights1);  // 转置为(in_features, out_features)
             weights1.summary("weights1");
 
             Tensor weights2 = ps.calculate("weights2", 10000);
-            cpu_backend->transpose_inplace(weights2);  // 转置为(in_features, out_features)
             weights2.summary("weights2");
 
             // 验证输入数据一致性
@@ -77,16 +74,15 @@ int main() {
             Linear fc3(256, 10, "fc3");
 
             // 设置后端
-            flatten.set_backend(cpu_backend.get());
-            fc1.set_backend(cpu_backend.get());
-            act1.set_backend(cpu_backend.get());
-            fc2.set_backend(cpu_backend.get());
-            act2.set_backend(cpu_backend.get());
-            fc3.set_backend(cpu_backend.get());
+            flatten.set_backend(cpu_backend);
+            fc1.set_backend(cpu_backend);
+            act1.set_backend(cpu_backend);
+            fc2.set_backend(cpu_backend);
+            act2.set_backend(cpu_backend);
+            fc3.set_backend(cpu_backend);
 
             // 设置权重（从Python获取的权重）
-            // 注意：我们的权重形状需要是 (out_features, in_features)
-            // Python获取的权重已经是转置后的形状
+            // PyTorch权重格式和我们的Linear层现在都是 (out_features, in_features)
             // Linear层默认不使用偏置
             fc1.register_parameter("weight", weights0);
             fc2.register_parameter("weight", weights1);
