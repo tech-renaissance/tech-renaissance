@@ -13,6 +13,7 @@
 #include "tech_renaissance/backend/backend_manager.h"
 #include <fstream>
 #include <sstream>
+#include <iomanip>  // 用于std::setprecision和std::fixed
 
 namespace tr {
 
@@ -363,23 +364,95 @@ void Model::initialize(const Shape& input_shape) {
     ctx_.allocate(modules_, input_shape, backend_);
 }
 
-std::string Model::analyze_memory() const {
-    std::stringstream ss;
-    ss << "=== Model Memory Analysis ===" << std::endl;
-    ss << "Model name: " << model_name_ << std::endl;
-    ss << "Number of modules: " << modules_.size() << std::endl;
-    ss << "Parameter memory: " << parameter_memory() << " bytes" << std::endl;
+Model::MemoryProfile Model::analyze_memory(const Shape& input_shape) const {
+    MemoryProfile profile;
 
-    if (ctx_.is_allocated()) {
-        ss << "Internal context: ALLOCATED" << std::endl;
-        ss << "Forward cache size: " << ctx_.forward_cache_.size() << " tensors" << std::endl;
-        ss << "Backward cache size: " << ctx_.backward_cache_.size() << " tensors" << std::endl;
-    } else {
-        ss << "Internal context: NOT ALLOCATED" << std::endl;
+    // 初始化分析结果
+    profile.parameter_memory = 0;
+    profile.activation_memory = 0;
+    profile.gradient_memory = 0;
+    profile.total_memory = 0;
+    profile.layer_activations.clear();
+    profile.layer_parameters.clear();
+
+    // 预分配空间以提高性能
+    profile.layer_activations.reserve(modules_.size());
+    profile.layer_parameters.reserve(modules_.size());
+
+    Shape current_shape = input_shape;
+
+    for (const auto& module : modules_) {
+        if (!module) {
+            continue;
+        }
+
+        // 计算参数内存（仅基于数学计算，不分配实际内存）
+        size_t param_mem = module->parameter_memory();
+        profile.parameter_memory += param_mem;
+        profile.layer_parameters.push_back(param_mem);
+
+        // 使用infer_output_shape推断输出形状
+        Shape output_shape = module->infer_output_shape(current_shape);
+
+        // 计算激活值内存（假设FP32数据类型）
+        size_t activation_mem = output_shape.numel() * sizeof(float);
+        profile.activation_memory += activation_mem;
+        profile.layer_activations.push_back(activation_mem);
+
+        current_shape = output_shape;
     }
 
-    ss << "=============================" << std::endl;
-    return ss.str();
+    // 梯度内存 = 参数内存（每个参数都有对应的梯度）
+    profile.gradient_memory = profile.parameter_memory;
+
+    // 总内存（训练模式）
+    profile.total_memory = profile.parameter_memory +
+                          profile.activation_memory +
+                          profile.gradient_memory;
+
+    return profile;
+}
+
+void Model::print_memory_profile(const Shape& input_shape) const {
+    auto profile = analyze_memory(input_shape);
+
+    std::cout << "=== Memory Profile ===" << std::endl;
+    std::cout << "Model: " << model_name_ << std::endl;
+    std::cout << "Input Shape: " << input_shape.to_string() << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Layer-wise Breakdown:" << std::endl;
+    for (size_t i = 0; i < modules_.size(); ++i) {
+        std::cout << "  [" << i << "] " << modules_[i]->instance_name() << std::endl;
+        std::cout << "    Parameters: " << format_bytes(profile.layer_parameters[i]) << std::endl;
+        std::cout << "    Activations: " << format_bytes(profile.layer_activations[i]) << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << "Total Summary:" << std::endl;
+    std::cout << "  Parameters: " << format_bytes(profile.parameter_memory) << std::endl;
+    std::cout << "  Activations: " << format_bytes(profile.activation_memory) << std::endl;
+    std::cout << "  Gradients: " << format_bytes(profile.gradient_memory) << std::endl;
+    std::cout << "  Total (Training): " << format_bytes(profile.total_memory) << std::endl;
+    std::cout << "  Total (Inference): "
+              << format_bytes(profile.inference_memory()) << std::endl;
+}
+
+// ===== 私有辅助方法实现 =====
+
+std::string Model::format_bytes(size_t bytes) const {
+    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    int unit_idx = 0;
+    double size = static_cast<double>(bytes);
+
+    while (size >= 1024.0 && unit_idx < 4) {
+        size /= 1024.0;
+        unit_idx++;
+    }
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << size << " " << units[unit_idx];
+    return oss.str();
 }
 
 // ===== 序列化实现 =====

@@ -23,6 +23,37 @@ namespace tr {
  * @details Module的容器和编排器，提供三种构造方式和预分配内存优化
  */
 class Model {
+public:
+    /**
+     * @brief 内存分析结果结构体
+     * @details 提供详细的内存使用分析数据
+     */
+    struct MemoryProfile {
+        size_t parameter_memory;                     // 参数占用内存（字节）
+        size_t activation_memory;                    // 激活值占用内存（字节）
+        size_t gradient_memory;                      // 梯度占用内存（字节）
+        size_t total_memory;                         // 总占用内存（训练模式）
+
+        std::vector<size_t> layer_activations;       // 各层激活值内存
+        std::vector<size_t> layer_parameters;        // 各层参数内存
+
+        /**
+         * @brief 获取推理模式总内存（不包含梯度）
+         * @return 推理模式内存大小
+         */
+        size_t inference_memory() const {
+            return parameter_memory + activation_memory;
+        }
+
+        /**
+         * @brief 获取训练模式总内存
+         * @return 训练模式内存大小
+         */
+        size_t training_memory() const {
+            return total_memory;
+        }
+    };
+
 private:
     /**
      * @brief 内部上下文（私有实现细节）
@@ -258,10 +289,27 @@ public:
     void initialize(const Shape& input_shape);
 
     /**
-     * @brief 分析内存使用情况
-     * @return 内存使用信息字符串
+     * @brief 分析模型内存使用情况
+     * @param input_shape 输入张量形状
+     * @return 内存分析结果
+     * @note 轻量级方法，仅基于形状进行数学计算，不分配实际内存
      */
-    std::string analyze_memory() const;
+    MemoryProfile analyze_memory(const Shape& input_shape) const;
+
+    /**
+     * @brief 打印详细的内存使用报告
+     * @param input_shape 输入张量形状
+     * @note 提供美观的层级内存分布展示
+     */
+    void print_memory_profile(const Shape& input_shape) const;
+
+private:
+    /**
+     * @brief 格式化字节数为可读字符串
+     * @param bytes 字节数
+     * @return 格式化后的字符串（如 "1.23 MB"）
+     */
+    std::string format_bytes(size_t bytes) const;
 
     // === 序列化 ===
 

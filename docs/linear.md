@@ -6,14 +6,19 @@ Linear层（全连接层）是深度学习中最基础和重要的层之一。�
 
 ## 版本信息
 
-- **版本**: V1.46.1
+- **版本**: V1.47.0
 - **日期**: 2025年11月17日
 - **作者**: 技术觉醒团队
 - **所属系列**: model
 
-## V1.46.1重要更新
+## 最新完成状态
 
-✅ **PyTorch权重格式完全兼容**:
+✅ **V1.47.0完成 - 形状推断接口实现**:
+- **infer_output_shape方法**：智能计算batch_size和输出形状
+- **静态图分析支持**：基于形状数学计算，零内存分配
+- **编译时强制实现**：确保所有Linear层都能进行内存分析
+
+✅ **V1.46.1重要更新 - PyTorch权重格式完全兼容**:
 - 权重存储格式从转置格式 `(in_features, out_features)` 改为PyTorch标准格式 `(out_features, in_features)`
 - 与PyTorch模型权重可直接交换，无需转置操作
 - 序列化格式与PyTorch `state_dict()` 完全一致
@@ -107,8 +112,17 @@ Tensor backward(const Tensor& grad_output) override;
 // 反向传播（into型）
 void backward_into(const Tensor& grad_output, Tensor& grad_input) override;
 
-// 形状推断
+// 形状推断（V1.47.0新增）
 Shape infer_output_shape(const Shape& input_shape) const override;
+
+// 形状推断实现
+Shape infer_output_shape(const Shape& input_shape) const override {
+    // 输入: (batch, in_features) 或展平后的其他形状
+    // 输出: (batch, out_features)
+    // 假设输入的最后一维是in_features，其他维度展平为batch
+    int64_t batch_size = input_shape.numel() / in_features_;
+    return Shape(batch_size, out_features_);
+}
 ```
 
 ### 访问方法
