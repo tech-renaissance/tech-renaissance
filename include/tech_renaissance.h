@@ -33,6 +33,8 @@
 #include "tech_renaissance/model/flatten.h"
 #include "tech_renaissance/model/tanh.h"
 #include "tech_renaissance/model/model.h"
+#include "tech_renaissance/trainer/loss.h"
+#include "tech_renaissance/trainer/cross_entropy_loss.h"
 #include "tech_renaissance/utils/logger.h"
 #include "tech_renaissance/utils/tr_exception.h"
 #include "tech_renaissance/utils/profiler.h"

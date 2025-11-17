@@ -17,6 +17,9 @@ add_subdirectory(backend)
 # 添加Model模块子目录
 add_subdirectory(model)
 
+# 添加Trainer模块子目录
+add_subdirectory(trainer)
+
 # 创建主库目标（聚合所有模块）
 add_library(tech_renaissance INTERFACE)
 
@@ -26,6 +29,7 @@ target_link_libraries(tech_renaissance INTERFACE
     data
     backend
     model
+    trainer
 )
 
 # 设置包含目录

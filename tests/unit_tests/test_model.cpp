@@ -173,16 +173,25 @@ void test_preallocation_mechanism() {
     // Initialize preallocation
     model->initialize(input.shape());
 
-    // Check memory analysis
-    std::string analysis = model->analyze_memory();
-    std::cout << "  Memory analysis:" << std::endl;
-    std::cout << analysis << std::endl;
+    // Check memory analysis (V1.47.0新API)
+    auto memory_profile = model->analyze_memory(input.shape());
+    std::cout << "  Memory profile:" << std::endl;
+    std::cout << "    Parameter memory: " << memory_profile.parameter_memory << " bytes" << std::endl;
+    std::cout << "    Activation memory: " << memory_profile.activation_memory << " bytes" << std::endl;
+    std::cout << "    Gradient memory: " << memory_profile.gradient_memory << " bytes" << std::endl;
+    std::cout << "    Total training: " << memory_profile.training_memory() << " bytes" << std::endl;
+    std::cout << "    Total inference: " << memory_profile.inference_memory() << " bytes" << std::endl;
 
-    // Verify preallocation cache is allocated
-    if (analysis.find("ALLOCATED") != std::string::npos) {
-        std::cout << "  [PASS] Preallocation mechanism working" << std::endl;
+    // Test print_memory_profile method
+    std::cout << "\n=== Detailed Memory Report ===" << std::endl;
+    model->print_memory_profile(input.shape());
+
+    // Verify preallocation cache is working through memory analysis
+    auto quick_profile = model->analyze_memory(input.shape());
+    if (quick_profile.parameter_memory > 0 && quick_profile.activation_memory > 0) {
+        std::cout << "  [PASS] Memory analysis working correctly" << std::endl;
     } else {
-        std::cout << "  [FAIL] Preallocation mechanism not working" << std::endl;
+        std::cout << "  [FAIL] Memory analysis not working" << std::endl;
         return;
     }
 

@@ -118,23 +118,42 @@ int main() {
                 std::cout << "Module outputs are NOT equal to PyTorch outputs" << std::endl;
             }
 
-            // 计算loss（与原始代码相同的计算方式）
-            label.print("label");
-            auto oh = cpu_backend->one_hot(label, 10);
-            oh.print("one-hot");
-            my_results.print("my_results_module");
-            auto pred = cpu_backend->softmax(my_results, 1);
-            pred.print("pred_module");
-            auto my_loss = cpu_backend->crossentropy(pred, oh);
-            std::cout << "my_loss_module: " << my_loss << std::endl;
-            std::cout << "loss: " << loss.item<float>() << std::endl;
+            // 使用我们的CrossEntropyLoss计算loss
+            std::cout << "\n=== Using CrossEntropyLoss ===" << std::endl;
+
+            // 创建CrossEntropyLoss实例
+            CrossEntropyLoss cross_entropy_loss(0.0f);  // 不使用标签平滑
+            cross_entropy_loss.set_backend(cpu_backend);
+            cross_entropy_loss.eval();  // 设置为评估模式，只计算损失值
+
+            // 使用CrossEntropyLoss计算损失
+            float my_loss = cross_entropy_loss.criterion(my_results, label, "mean");
+
+            std::cout << "my_loss_module (CrossEntropyLoss): " << my_loss << std::endl;
+            std::cout << "loss (PyTorch): " << loss.item<float>() << std::endl;
 
             // 验证loss是否一致
             float loss_diff = std::abs(my_loss - loss.item<float>());
             if (loss_diff < 1e-4f) {
-                std::cout << "Module loss matches PyTorch loss (diff: " << loss_diff << ")" << std::endl;
+                std::cout << "[PASS] Module loss matches PyTorch loss (diff: " << loss_diff << ")" << std::endl;
             } else {
-                std::cout << "Module loss does NOT match PyTorch loss (diff: " << loss_diff << ")" << std::endl;
+                std::cout << "[FAIL] Module loss does NOT match PyTorch loss (diff: " << loss_diff << ")" << std::endl;
+            }
+
+            // 同时验证训练模式下的梯度计算
+            std::cout << "\n=== Testing Gradient Calculation ===" << std::endl;
+            cross_entropy_loss.train();  // 切换到训练模式
+
+            // 创建logits的副本用于梯度计算
+            Tensor logits_copy = cpu_backend->copy(my_results);
+            float grad_loss = cross_entropy_loss.criterion(logits_copy, label, "mean");
+
+            // 检查梯度是否计算
+            if (logits_copy.has_grad()) {
+                std::cout << "[PASS] Gradient computed successfully" << std::endl;
+                std::cout << "Gradient shape: " << logits_copy.grad().shape().to_string() << std::endl;
+            } else {
+                std::cout << "[FAIL] No gradient computed" << std::endl;
             }
 
             ps.please_exit();
