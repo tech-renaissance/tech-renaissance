@@ -31,15 +31,19 @@ class Tensor;
  * @details 所有方法默认抛出NotImplementedError异常，防止直接使用
  */
 class Backend {
-public:
+protected:
     /**
-     * @brief 构造函数 - 防止直接实例化
-     * @throws TRException 直接实例化时抛出异常
+     * @brief 受保护的默认构造函数 - 防止直接实例化
+     * @param allow_construction 是否允许构造（仅派生类应传入true）
      */
-    Backend() {
-        throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+    explicit Backend(bool allow_construction = false) {
+        // 当且仅当派生类显式调用时才允许构造
+        if (!allow_construction) {
+            throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
+        }
     }
 
+public:
     virtual ~Backend() = default;
 
     // ===== 内存管理接口 =====
@@ -373,16 +377,6 @@ public:
     virtual Tensor mul_broadcast(const Tensor& tensor_a, const Tensor& tensor_b) const;
     virtual void mul_broadcast_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
 
-protected:
-    /**
-     * @brief 受保护的构造函数 - 允许派生类构造
-     */
-    Backend(bool allow_construction) {
-        // 当且仅当派生类调用时才允许构造
-        if (!allow_construction) {
-            throw TRException("Backend class cannot be instantiated directly! Use specific backend implementations instead.");
-        }
-    }
 };
 
 } // namespace tr

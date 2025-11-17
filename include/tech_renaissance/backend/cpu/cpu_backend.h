@@ -23,7 +23,14 @@ namespace tr {
 
 class CpuBackend : public Backend {
 public:
-    CpuBackend();
+    /**
+     * @brief CPU后端构造函数
+     */
+    explicit CpuBackend();
+
+    /**
+     * @brief 析构函数
+     */
     ~CpuBackend() override = default;
 
     // 内存管理

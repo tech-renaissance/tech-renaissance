@@ -41,7 +41,15 @@ namespace tr {
 
 class CudaBackend : public Backend {
 public:
+    /**
+     * @brief CUDA后端构造函数
+     * @param device_id CUDA设备ID，默认为0
+     */
     explicit CudaBackend(int device_id = 0);
+
+    /**
+     * @brief 析构函数
+     */
     ~CudaBackend() override;
 
     // 内存管理
