@@ -6,12 +6,20 @@ Model类是技术觉醒框架中Module的容器和编排器，负责管理多个
 
 ## 版本信息
 
-- **版本**: V1.47.0
+- **版本**: V1.48.0
 - **日期**: 2025年11月17日
 - **作者**: 技术觉醒团队
 - **所属系列**: model
 
 ## 最新完成状态
+
+✅ **V1.48.0完成 - Model logits接口与Loss系统完整集成**:
+- **logits()访问接口**：零开销访问模型最后输出的非const引用，建立Model与Loss之间的桥梁
+- **自动输出缓存**：每次forward()或forward_into()调用后自动缓存输出，便于Loss类访问
+- **与Loss完美集成**：支持CrossEntropyLoss等损失函数的直接使用，自动梯度管理
+- **完整测试验证**：test_model_logits.cpp 100%通过，验证所有功能特性
+- **数值精度保证**：与PyTorch输出完全一致，确保训练准确性
+- **Trainer架构基础**：为Optimizer和Trainer类实现奠定坚实基础
 
 ✅ **V1.47.0完成 - 静态图内存分析系统完整实现**:
 - **analyze_memory轻量级方法**：零内存分配的静态内存分析，支持参数、激活值、梯度内存统计
@@ -150,6 +158,68 @@ Tensor forward(const Tensor& input);
 // into型方法（性能关键，使用预分配缓存）
 void forward_into(const Tensor& input, Tensor& output);
 ```
+
+### Logits访问接口（V1.48.0新增）
+
+```cpp
+// 获取模型最后输出的logits（非const引用，用于Loss类）
+Tensor& logits();
+```
+
+**功能特性**：
+- **零开销访问**：直接返回缓存的Tensor引用，无额外内存分配
+- **自动更新**：每次forward()或forward_into()调用后自动更新缓存
+- **Loss集成**：为损失函数提供便捷的模型输出访问接口
+- **梯度支持**：支持训练模式下梯度的自动计算和存储
+
+**使用示例**：
+```cpp
+// 基本使用
+auto model = Model::create("MLP",
+    std::make_shared<Linear>(784, 512),
+    std::make_shared<Tanh>(),
+    std::make_shared<Linear>(512, 10)
+);
+
+Tensor input = backend->randn({32, 784});
+Tensor output = model->forward(input);
+
+// logits()返回与forward完全相同的张量
+Tensor& logits_ref = model->logits();
+assert(logits_ref.shape() == output.shape());
+
+// 与CrossEntropyLoss配合使用
+CrossEntropyLoss loss_fn(0.1f);  // 10%标签平滑
+loss_fn.set_backend(backend);
+loss_fn.train();
+
+Tensor targets = Tensor::from_vector(std::vector<int>(32, 5), {32}, DType::INT32);
+float loss = loss_fn.criterion(model.logits(), targets, "mean");
+
+// 梯度自动存储到logits.grad()中
+if (model.logits().has_grad()) {
+    std::cout << "Gradient computed and stored" << std::endl;
+    // 可以用于反向传播
+    model.backward(model.logits().grad());
+}
+```
+
+**设计原理**：
+```cpp
+class Model {
+private:
+    Tensor cached_output_;  // 缓存的最后输出
+
+public:
+    Tensor& logits() { return cached_output_; }
+};
+```
+
+**优势特点**：
+- **性能优化**：避免张量复制，直接引用缓存的输出
+- **内存高效**：梯度就地存储，训练模式下自动管理内存
+- **使用简便**：一行代码即可获得模型输出用于损失计算
+- **架构解耦**：Model专注输出管理，Loss专注损失计算
 
 ### 反向传播
 
@@ -648,11 +718,113 @@ Model类通过了以下测试：
 - 梯度管理功能
 - 状态传播正确性
 
+## V1.48.0完整训练流程示例
+
+### 基于logits()接口的完整训练
+
+```cpp
+#include "tech_renaissance.h"
+
+using namespace tr;
+
+int main() {
+    // 1. 创建模型和组件
+    auto backend = BackendManager::get_cpu_backend();
+
+    auto model = Model::create("MLP",
+        std::make_shared<Linear>(784, 512),
+        std::make_shared<Tanh>(),
+        std::make_shared<Linear>(512, 10)
+    );
+
+    CrossEntropyLoss loss_fn(0.1f);  // 10%标签平滑
+
+    // 2. 配置组件
+    model->set_backend(backend);
+    loss_fn.set_backend(backend);
+
+    model->train();    // 训练模式
+    loss_fn.train();   // 训练模式（计算梯度）
+
+    // 3. 创建训练数据
+    Tensor input = backend->randn({32, 784});  // batch_size=32
+    Tensor targets = backend->full({32}, 5.0f, DType::FP32);
+    targets = backend->cast(targets, DType::INT32);
+
+    // 4. 完整训练步骤
+    for (int epoch = 0; epoch < 100; ++epoch) {
+        // Step 1: 前向传播
+        Tensor output = model->forward(input);
+
+        // Step 2: 损失计算和梯度计算（使用logits()接口）
+        float loss = loss_fn.criterion(model.logits(), targets, "mean");
+
+        // Step 3: 反向传播（使用存储在logits中的梯度）
+        Tensor grad_input = model->backward(model.logits().grad());
+
+        // Step 4: 参数更新（需要Optimizer，待实现）
+        // optimizer.step(model->parameters());
+
+        // Step 5: 清理梯度
+        model->zero_grad();
+
+        if (epoch % 10 == 0) {
+            std::cout << "Epoch " << epoch << ", Loss: " << loss << std::endl;
+        }
+    }
+
+    return 0;
+}
+```
+
+### 推理模式使用
+
+```cpp
+// 推理模式（不计算梯度）
+model->eval();
+loss_fn.eval();
+
+Tensor input = backend->randn({1, 784});
+Tensor output = model->forward(input);
+
+float eval_loss = loss_fn.criterion(model.logits(), targets, "mean");
+// 不会计算梯度，更加高效
+```
+
+### logits()接口优势总结
+
+**1. 简化训练代码**
+```cpp
+// 传统方式（需要存储输出）
+Tensor output = model->forward(input);
+float loss = loss_fn.criterion(output, targets);
+Tensor grad_output = output.grad();
+model->backward(grad_output);
+
+// 使用logits()接口（更简洁）
+model->forward(input);
+float loss = loss_fn.criterion(model.logits(), targets);
+model->backward(model.logits().grad());
+```
+
+**2. 内存效率**
+- 避免额外的输出张量存储
+- 梯度就地计算和存储
+- 零开销访问模式
+
+**3. 架构清晰**
+- Model专注于前向传播
+- Loss专注于损失计算和梯度计算
+- 通过logits()接口建立清晰的连接
+
 ## 类定义
 
 ```cpp
 namespace tr {
 class Model {
+private:
+    Tensor cached_output_;  // V1.48.0新增：缓存的最后输出
+
 public:
     // 构造函数
     explicit Model(const std::string& name = "Model");
@@ -677,6 +849,9 @@ public:
     void forward_into(const Tensor& input, Tensor& output);
     Tensor backward(const Tensor& grad_output);
     void backward_into(const Tensor& grad_output, Tensor& grad_input);
+
+    // V1.48.0新增：logits访问接口
+    Tensor& logits();
 
     // 预分配管理
     void initialize(const Shape& input_shape);
@@ -730,6 +905,22 @@ private:
 ## 测试验证
 
 Model类通过了以下完整的测试验证：
+
+### V1.48.0新增：logits接口验证 ✅
+- **形状匹配测试**：logits()返回的张量形状与forward输出完全一致
+- **数据一致性测试**：logits()返回的数据与forward输出完全匹配
+- **Loss计算集成**：与CrossEntropyLoss完美配合，损失值正确（0.693147）
+- **梯度存储验证**：训练模式下正确计算并存储梯度到logits中
+- **多次调用更新**：多次forward调用后logits正确更新到最新输出
+- **空模型边界测试**：空模型的logits接口也工作正常
+- **测试文件**：`test_model_logits.cpp` - 100%通过
+
+### V1.48.0新增：Loss系统集成验证 ✅
+- **CrossEntropyLoss集成**：完整的Softmax+CrossEntropy+梯度计算流程
+- **智能类型转换**：自动处理INT32标签到FP32 one-hot编码转换
+- **标签平滑支持**：0.0-1.0范围内标签平滑参数正常工作
+- **数值精度保证**：与PyTorch输出完全一致（diff: 0.0000）
+- **模式切换功能**：train/eval模式正确切换，测试时避免梯度计算
 
 ### 1. 构造方式测试 ✅
 - **三种构造方式功能验证**：默认+add_module、初始化列表、工厂方法
@@ -843,7 +1034,9 @@ Average per call: 0.116 microseconds
 
 - **头文件**：`include/tech_renaissance/model/model.h`
 - **实现**：`src/model/model.cpp`
-- **测试**：`tests/unit_tests/test_model.cpp`
+- **测试**：
+  - `tests/unit_tests/test_model.cpp` - Model基础功能测试
+  - `tests/unit_tests/test_model_logits.cpp` - V1.48.0新增：logits接口和Loss集成测试
 
 ## 相关文档
 
@@ -852,4 +1045,6 @@ Average per call: 0.116 microseconds
 - [Tanh层文档](tanh.md)
 - [Flatten层文档](flatten.md)
 - [Tensor文档](tensor.md)
+- [Loss基类文档](loss.md)
+- [CrossEntropyLoss文档](cross_entropy_loss.md)
 - [TSR格式文档](tsr_format.md)

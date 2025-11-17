@@ -108,6 +108,7 @@ private:
     std::unordered_map<std::string, int> type_counters_;        // 类型计数器（用于自动命名）
     bool training_ = true;                                      // 训练/推理模式
     bool frozen_ = false;                                       // 结构冻结标志
+    Tensor cached_output_;                                      // 缓存的最后输出（用于logits访问）
 
 public:
     /**
@@ -174,6 +175,13 @@ public:
      * @param output 输出张量
      */
     void forward_into(const Tensor& input, Tensor& output);
+
+    /**
+     * @brief 获取模型最后输出的logits（非const引用，用于Loss类）
+     * @return 缓存的输出张量引用
+     * @note 必须在forward()或forward_into()调用后使用
+     */
+    Tensor& logits();
 
     /**
      * @brief 反向传播

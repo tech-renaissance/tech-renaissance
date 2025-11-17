@@ -778,6 +778,9 @@ register_test(test_memory_allocation "Memory Allocation Verification Test")
 configure_simple_test(test_model test_model.cpp)
 register_test(test_model "Model Class Test")
 
+configure_simple_test(test_model_logits test_model_logits.cpp)
+register_test(test_model_logits "Model Logits Interface Test")
+
 # =============================================================================
 # 内存分析功能测试（新增）
 # =============================================================================

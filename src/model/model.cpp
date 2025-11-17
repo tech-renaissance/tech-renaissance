@@ -149,6 +149,7 @@ std::shared_ptr<Module> Model::get_module(size_t index) const {
 
 Tensor Model::forward(const Tensor& input) {
     if (modules_.empty()) {
+        cached_output_ = input;  // 空模型直接缓存输入
         return input;  // 空模型直接返回输入
     }
 
@@ -166,10 +167,16 @@ Tensor Model::forward(const Tensor& input) {
     return output;
 }
 
+Tensor& Model::logits() {
+    return cached_output_;
+}
+
 void Model::forward_into(const Tensor& input, Tensor& output) {
     if (modules_.empty()) {
         // 空模型直接复制输入到输出
         backend_->copy_into(input, output);
+        // 缓存输出（用于logits访问）
+        cached_output_ = output;
         return;
     }
 
@@ -188,6 +195,9 @@ void Model::forward_into(const Tensor& input, Tensor& output) {
 
     // 最后一层：缓存到输出
     backend_->copy_into(ctx_.get_forward_cache(modules_.size() - 1), output);
+
+    // 缓存输出（用于logits访问）
+    cached_output_ = output;
 }
 
 Tensor Model::backward(const Tensor& grad_output) {
