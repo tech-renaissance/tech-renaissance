@@ -772,5 +772,11 @@ register_test(test_module_gradient "Module Gradient Check Test")
 configure_simple_test(test_memory_allocation test_memory_allocation.cpp)
 register_test(test_memory_allocation "Memory Allocation Verification Test")
 
+# =============================================================================
+# Model测试（新增）
+# =============================================================================
+configure_simple_test(test_model test_model.cpp)
+register_test(test_model "Model Class Test")
+
 message(STATUS "All tests configured successfully (optimized version)")
 

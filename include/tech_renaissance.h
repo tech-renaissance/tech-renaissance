@@ -32,6 +32,7 @@
 #include "tech_renaissance/model/linear.h"
 #include "tech_renaissance/model/flatten.h"
 #include "tech_renaissance/model/tanh.h"
+#include "tech_renaissance/model/model.h"
 #include "tech_renaissance/utils/logger.h"
 #include "tech_renaissance/utils/tr_exception.h"
 #include "tech_renaissance/utils/profiler.h"

@@ -11,6 +11,7 @@ add_library(model STATIC
     linear.cpp
     flatten.cpp
     tanh.cpp
+    model.cpp
 )
 
 # 设置包含目录
