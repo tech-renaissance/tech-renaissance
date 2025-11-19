@@ -22,6 +22,10 @@ private:
     int out_features_;
     bool use_bias_;
 
+    // 权重转置缓存
+    mutable Tensor weight_transposed_;      // 缓存的转置权重
+    mutable bool weight_transposed_valid_ = false;
+
 public:
     Linear(int in_features, int out_features, const std::string& name = "Linear", bool use_bias = false)
         : Module(name), in_features_(in_features), out_features_(out_features), use_bias_(use_bias) {}
@@ -42,6 +46,9 @@ public:
             Tensor bias = backend->zeros(Shape(out_features_), DType::FP32);
             register_parameter("bias", bias);
         }
+
+        // 初始化转置缓存（在权重创建之后）
+        invalidate_weight_cache();
     }
 
     // === 核心计算（into型） ===
@@ -53,11 +60,19 @@ public:
         // 获取权重
         const Tensor& weight = get_parameter("weight");
 
+        // 确保转置权重缓存有效
+        if (!weight_transposed_valid_) {
+            // 预计算并缓存转置权重：weight^T (in_features, out_features)
+            weight_transposed_ = backend->transpose(weight);
+            weight_transposed_valid_ = true;
+        }
+
         // 计算：output = input @ weight^T
-        // Linear层权重存储形状为：(out_features, in_features) (PyTorch标准格式)
+        // Linear层权重存储为：(out_features, in_features) (PyTorch标准格式)
+        // 缓存的转置权重为：(in_features, out_features)
         // 矩阵乘法：input(batch, in_features) @ weight^T(in_features, out_features) = output(batch, out_features)
-        Tensor weight_transposed = backend->transpose(weight);
-        backend->mm_into(input, weight_transposed, output);
+        // ⭐ 使用缓存的转置权重，避免运行时转置开销
+        backend->mm_into(input, weight_transposed_, output);
 
         // 如果使用偏置，进行广播加法
         if (use_bias_ && has_parameter("bias")) {
@@ -117,6 +132,9 @@ public:
         }
 
         clear_cache();
+
+        // 权重更新后，转置缓存失效
+        invalidate_weight_cache();
     }
 
 protected:
@@ -129,6 +147,26 @@ protected:
     }
 
 public:
+    // === 设备转移 ===
+    void to(const Device& device) override {
+        // 调用基类方法
+        Module::to(device);
+
+        // 设备转移后，转置缓存失效
+        invalidate_weight_cache();
+    }
+
+    // === 缓存管理 ===
+    void invalidate_weight_cache() const {
+        auto backend = get_backend();
+        if (backend && has_parameter("weight")) {
+            const Tensor& weight = get_parameter("weight");
+            // 预分配转置权重缓存
+            weight_transposed_ = backend->zeros(Shape(in_features_, out_features_), weight.dtype());
+        }
+        weight_transposed_valid_ = false;
+    }
+
     // === 访问器方法 ===
     int in_features() const { return in_features_; }
     int out_features() const { return out_features_; }
@@ -138,6 +176,7 @@ public:
         std::cout << "Linear Layer (" << instance_name() << "):" << std::endl;
         std::cout << "  Input features: " << in_features_ << std::endl;
         std::cout << "  Output features: " << out_features_ << std::endl;
+        std::cout << "  Weight transposed cache: " << (weight_transposed_valid_ ? "VALID ✅" : "INVALID ❌") << std::endl;
 
         if (has_parameter("weight")) {
             const Tensor& weight = get_parameter("weight");

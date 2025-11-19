@@ -81,12 +81,12 @@ Tensor& Model::InternalContext::get_backward_cache(size_t index) {
 // ===== Model 构造函数实现 =====
 
 Model::Model(const std::string& name)
-    : model_name_(name) {
+    : model_name_(name), last_cached_device_(tr::CPU) {
 }
 
 Model::Model(const std::string& name,
              const std::vector<std::shared_ptr<Module>>& modules)
-    : model_name_(name) {
+    : model_name_(name), last_cached_device_(tr::CPU) {
     for (auto& module : modules) {
         add_module(module);
     }
@@ -158,13 +158,19 @@ Tensor Model::forward(const Tensor& input) {
         ctx_.allocate(modules_, input.shape(), backend_);
     }
 
-    // 使用预分配缓存的性能路径
-    Tensor output = backend_->empty(
-        modules_.back()->infer_output_shape(input.shape()),
-        DType::FP32
-    );
-    forward_into(input, output);
-    return output;
+    // ⭐ 零拷贝优化：直接使用预分配缓存，避免最后一次内存拷贝
+    // 原来的实现：forward_into(input, output) → backend_->copy_into(cache, output)
+    // 优化后：直接返回缓存张量，零拷贝访问
+    modules_[0]->forward_into(input, ctx_.get_forward_cache(0));
+
+    // 中间层：缓存i-1 到 缓存i
+    for (size_t i = 1; i < modules_.size(); ++i) {
+        modules_[i]->forward_into(ctx_.get_forward_cache(i-1), ctx_.get_forward_cache(i));
+    }
+
+    // 直接返回缓存张量，零拷贝！
+    cached_output_ = ctx_.get_forward_cache(modules_.size() - 1);
+    return cached_output_;
 }
 
 Tensor& Model::logits() {
@@ -194,6 +200,8 @@ void Model::forward_into(const Tensor& input, Tensor& output) {
     }
 
     // 最后一层：缓存到输出
+    // 注意：forward_into仍然需要拷贝到用户指定的output张量
+    // 而forward()现在直接返回缓存张量，实现零拷贝
     backend_->copy_into(ctx_.get_forward_cache(modules_.size() - 1), output);
 
     // 缓存输出（用于logits访问）
@@ -256,6 +264,9 @@ void Model::to(const Device& device) {
 
     // 清空预分配缓存（需要重新分配）
     ctx_.clear();
+
+    // ⭐ 设备转移后，使参数缓存失效
+    invalidate_all_param_caches();
 }
 
 Device Model::device() const {
@@ -279,6 +290,9 @@ void Model::set_backend(std::shared_ptr<Backend> backend) {
 
     // 清空预分配缓存（需要重新分配）
     ctx_.clear();
+
+    // ⭐ 后端设置后，使参数缓存失效
+    invalidate_all_param_caches();
 }
 
 // ===== 训练模式管理实现 =====
@@ -314,50 +328,29 @@ std::unordered_map<std::string, Tensor> Model::parameters() const {
     return all_params;
 }
 
-// 零拷贝参数指针接口实现
+// ⭐ 智能缓存零拷贝参数指针接口实现
 std::vector<Tensor*> Model::trainable_parameters() {
-    std::vector<Tensor*> param_ptrs;
-
-    // 预分配空间以提高性能
-    size_t total_params = 0;
-    for (auto& module : modules_) {
-        total_params += module->parameters().size();
-    }
-    param_ptrs.reserve(total_params);
-
-    // 直接收集参数指针，无内存拷贝
-    for (auto& module : modules_) {
-        auto& module_params = module->parameters();  // 使用非const版本
-        for (auto& [key, param] : module_params) {
-            param_ptrs.push_back(&param);  // 直接返回指针，零拷贝！
-        }
+    // 检查缓存是否有效：设备变化或缓存未构建
+    Device current_device = backend_ ? backend_->device() : tr::CPU;
+    if (!param_cache_valid_ || last_cached_device_ != current_device) {
+        rebuild_param_cache();
+        param_cache_valid_ = true;
+        last_cached_device_ = current_device;
     }
 
-    return param_ptrs;
+    return cached_param_ptrs_;
 }
 
 std::vector<Tensor*> Model::all_parameters() {
-    std::vector<Tensor*> all_ptrs;
-
-    // 预分配空间（目前只包含parameters，因为buffers没有公共接口）
-    size_t total_params = 0;
-    for (auto& module : modules_) {
-        total_params += module->parameters().size();
-    }
-    all_ptrs.reserve(total_params);
-
-    // 收集训练参数
-    for (auto& module : modules_) {
-        auto& module_params = module->parameters();  // 使用非const版本
-        for (auto& [key, param] : module_params) {
-            all_ptrs.push_back(&param);
-        }
+    // 检查缓存是否有效：设备变化或缓存未构建
+    Device current_device = backend_ ? backend_->device() : tr::CPU;
+    if (!all_cache_valid_ || last_cached_device_ != current_device) {
+        rebuild_all_cache();
+        all_cache_valid_ = true;
+        last_cached_device_ = current_device;
     }
 
-    // TODO: 当buffers()接口可用时，添加buffer收集
-    // 目前buffers没有公共访问接口，所以暂时只返回parameters
-
-    return all_ptrs;
+    return cached_all_ptrs_;
 }
 
 std::unordered_map<std::string, Tensor> Model::gradients() const {
@@ -560,6 +553,57 @@ void Model::validate_model() const {
                              " has no backend set");
         }
     }
+}
+
+// ===== ⭐ 参数缓存机制实现 =====
+
+void Model::rebuild_param_cache() const {
+    // 清空现有缓存
+    cached_param_ptrs_.clear();
+
+    // 预分配空间以提高性能
+    size_t total_params = 0;
+    for (auto& module : modules_) {
+        total_params += module->parameters().size();
+    }
+    cached_param_ptrs_.reserve(total_params);
+
+    // 直接收集参数指针，无内存拷贝
+    for (auto& module : modules_) {
+        auto& module_params = module->parameters();  // 使用非const版本
+        for (auto& [key, param] : module_params) {
+            cached_param_ptrs_.push_back(&param);  // 直接返回指针，零拷贝！
+        }
+    }
+}
+
+void Model::rebuild_all_cache() const {
+    // 清空现有缓存
+    cached_all_ptrs_.clear();
+
+    // 预分配空间（目前只包含parameters，因为buffers没有公共接口）
+    size_t total_params = 0;
+    for (auto& module : modules_) {
+        total_params += module->parameters().size();
+    }
+    cached_all_ptrs_.reserve(total_params);
+
+    // 收集训练参数
+    for (auto& module : modules_) {
+        auto& module_params = module->parameters();  // 使用非const版本
+        for (auto& [key, param] : module_params) {
+            cached_all_ptrs_.push_back(&param);
+        }
+    }
+
+    // TODO: 当buffers()接口可用时，添加buffer收集
+    // 目前buffers没有公共访问接口，所以暂时只返回parameters
+}
+
+void Model::invalidate_all_param_caches() const {
+    param_cache_valid_ = false;
+    all_cache_valid_ = false;
+    // 注意：不清空vector本身，只标记为无效，下次访问时重新构建
 }
 
 

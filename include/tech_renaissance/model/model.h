@@ -110,6 +110,13 @@ private:
     bool frozen_ = false;                                       // 结构冻结标志
     Tensor cached_output_;                                      // 缓存的最后输出（用于logits访问）
 
+    // ⭐ 新增：参数缓存失效机制
+    mutable std::vector<Tensor*> cached_param_ptrs_;             // 缓存的参数指针
+    mutable std::vector<Tensor*> cached_all_ptrs_;               // 缓存的所有参数指针
+    mutable bool param_cache_valid_ = false;                    // 参数缓存有效性
+    mutable bool all_cache_valid_ = false;                      // 所有参数缓存有效性
+    mutable Device last_cached_device_;                         // 上次缓存时的设备
+
 public:
     /**
      * @brief 构造函数1：默认构造
@@ -371,6 +378,11 @@ private:
      * @brief 验证模型结构
      */
     void validate_model() const;
+
+    // ⭐ 新增：参数缓存重建方法
+    void rebuild_param_cache() const;
+    void rebuild_all_cache() const;
+    void invalidate_all_param_caches() const;
 };
 
 // ===== 模板实现 =====
