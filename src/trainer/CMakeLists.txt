@@ -12,6 +12,7 @@ set(TRAINER_SOURCES
     optimizer.cpp
     sgd.cpp
     adam.cpp
+    adamw.cpp
     state_manager.cpp
     scheduler.cpp
     step_lr.cpp
