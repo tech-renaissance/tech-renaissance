@@ -252,6 +252,20 @@ public:
     std::unordered_map<std::string, Tensor> parameters() const;
 
     /**
+     * @brief 获取所有可训练参数的指针（零拷贝）
+     * @return 参数指针向量，用于高效优化器更新
+     * @details 返回所有模块的可训练参数指针，无内存拷贝
+     */
+    std::vector<Tensor*> trainable_parameters();
+
+    /**
+     * @brief 获取所有参数的指针（包括buffers，零拷贝）
+     * @return 所有参数指针向量，用于完整性检查
+     * @details 包含buffers等非训练参数，无内存拷贝
+     */
+    std::vector<Tensor*> all_parameters();
+
+    /**
      * @brief 获取所有参数的梯度（递归聚合）
      * @return 参数梯度映射表
      */

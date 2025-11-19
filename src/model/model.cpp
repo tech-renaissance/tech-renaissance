@@ -314,6 +314,52 @@ std::unordered_map<std::string, Tensor> Model::parameters() const {
     return all_params;
 }
 
+// 零拷贝参数指针接口实现
+std::vector<Tensor*> Model::trainable_parameters() {
+    std::vector<Tensor*> param_ptrs;
+
+    // 预分配空间以提高性能
+    size_t total_params = 0;
+    for (auto& module : modules_) {
+        total_params += module->parameters().size();
+    }
+    param_ptrs.reserve(total_params);
+
+    // 直接收集参数指针，无内存拷贝
+    for (auto& module : modules_) {
+        auto& module_params = module->parameters();  // 使用非const版本
+        for (auto& [key, param] : module_params) {
+            param_ptrs.push_back(&param);  // 直接返回指针，零拷贝！
+        }
+    }
+
+    return param_ptrs;
+}
+
+std::vector<Tensor*> Model::all_parameters() {
+    std::vector<Tensor*> all_ptrs;
+
+    // 预分配空间（目前只包含parameters，因为buffers没有公共接口）
+    size_t total_params = 0;
+    for (auto& module : modules_) {
+        total_params += module->parameters().size();
+    }
+    all_ptrs.reserve(total_params);
+
+    // 收集训练参数
+    for (auto& module : modules_) {
+        auto& module_params = module->parameters();  // 使用非const版本
+        for (auto& [key, param] : module_params) {
+            all_ptrs.push_back(&param);
+        }
+    }
+
+    // TODO: 当buffers()接口可用时，添加buffer收集
+    // 目前buffers没有公共访问接口，所以暂时只返回parameters
+
+    return all_ptrs;
+}
+
 std::unordered_map<std::string, Tensor> Model::gradients() const {
     std::unordered_map<std::string, Tensor> all_grads;
 
