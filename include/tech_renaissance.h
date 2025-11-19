@@ -37,6 +37,7 @@
 #include "tech_renaissance/trainer/cross_entropy_loss.h"
 #include "tech_renaissance/trainer/optimizer.h"
 #include "tech_renaissance/trainer/sgd.h"
+#include "tech_renaissance/trainer/adam.h"
 #include "tech_renaissance/trainer/state_manager.h"
 #include "tech_renaissance/trainer/scheduler.h"
 #include "tech_renaissance/trainer/step_lr.h"

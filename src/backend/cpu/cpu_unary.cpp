@@ -164,7 +164,7 @@ Tensor CpuBackend::sign(const Tensor& input) const {
     return result;
 }
 
-Tensor CpuBackend::square(const Tensor& input) const {
+Tensor CpuBackend::square(const Tensor& input) {
     validate_same_device(input.device());
 
     if (input.dtype() != DType::FP32) {
@@ -196,7 +196,7 @@ Tensor CpuBackend::square(const Tensor& input) const {
     return result;
 }
 
-Tensor CpuBackend::sqrt(const Tensor& input) const {
+Tensor CpuBackend::sqrt(const Tensor& input) {
     validate_same_device(input.device());
 
     if (input.dtype() != DType::FP32) {
@@ -544,7 +544,7 @@ void CpuBackend::sign_inplace(Tensor& input) const {
 #endif
 }
 
-void CpuBackend::square_inplace(Tensor& input) const {
+void CpuBackend::square_inplace(Tensor& input) {
     validate_same_device(input.device());
 
     if (input.dtype() != DType::FP32) {
@@ -568,7 +568,7 @@ void CpuBackend::square_inplace(Tensor& input) const {
 #endif
 }
 
-void CpuBackend::sqrt_inplace(Tensor& input) const {
+void CpuBackend::sqrt_inplace(Tensor& input) {
     validate_same_device(input.device());
 
     if (input.dtype() != DType::FP32) {
@@ -856,7 +856,7 @@ void CpuBackend::sign_into(const Tensor& input, Tensor& output) const {
 #endif
 }
 
-void CpuBackend::square_into(const Tensor& input, Tensor& output) const {
+void CpuBackend::square_into(const Tensor& input, Tensor& output) {
     validate_same_device(input.device());
     validate_same_device(output.device());
 
@@ -892,7 +892,7 @@ void CpuBackend::square_into(const Tensor& input, Tensor& output) const {
 #endif
 }
 
-void CpuBackend::sqrt_into(const Tensor& input, Tensor& output) const {
+void CpuBackend::sqrt_into(const Tensor& input, Tensor& output) {
     validate_same_device(input.device());
     validate_same_device(output.device());
 

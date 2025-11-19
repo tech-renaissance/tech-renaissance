@@ -390,6 +390,16 @@ public:
     virtual void dtanh_inplace(Tensor& tensor_a);
     virtual void dtanh_into(const Tensor& tensor_a, Tensor& result);
 
+    // 数学函数操作
+    virtual Tensor sqrt(const Tensor& input);
+    virtual void sqrt_inplace(Tensor& input);
+    virtual void sqrt_into(const Tensor& input, Tensor& output);
+
+    // 数学函数操作
+    virtual Tensor square(const Tensor& input);
+    virtual void square_inplace(Tensor& input);
+    virtual void square_into(const Tensor& input, Tensor& output);
+
     // 交叉熵损失函数
     virtual float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction);
 

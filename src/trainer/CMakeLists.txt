@@ -11,6 +11,7 @@ set(TRAINER_SOURCES
     cross_entropy_loss.cpp
     optimizer.cpp
     sgd.cpp
+    adam.cpp
     state_manager.cpp
     scheduler.cpp
     step_lr.cpp

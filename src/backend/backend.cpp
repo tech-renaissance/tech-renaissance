@@ -59,6 +59,13 @@ DEFINE_NOT_IMPLEMENTED_METHOD(dtanh, Tensor, (const Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(dtanh_inplace, (Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(dtanh_into, (const Tensor& tensor_a, Tensor& result), )
 
+DEFINE_NOT_IMPLEMENTED_METHOD(sqrt, Tensor, (const Tensor& input), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_inplace, (Tensor& input), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_into, (const Tensor& input, Tensor& output), )
+DEFINE_NOT_IMPLEMENTED_METHOD(square, Tensor, (const Tensor& input), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(square_inplace, (Tensor& input), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(square_into, (const Tensor& input, Tensor& output), )
+
 // 交叉熵损失函数
 DEFINE_NOT_IMPLEMENTED_METHOD(crossentropy, float, (const Tensor& pred, const Tensor& label, std::string reduction), )
 

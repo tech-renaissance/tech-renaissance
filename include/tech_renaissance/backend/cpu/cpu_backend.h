@@ -123,8 +123,8 @@ public:
     Tensor ones_like(const Tensor& input) const;
     Tensor relu(const Tensor& input) const;
     Tensor sign(const Tensor& input) const;
-    Tensor square(const Tensor& input) const;
-    Tensor sqrt(const Tensor& input) const;
+    Tensor square(const Tensor& input) override;
+    Tensor sqrt(const Tensor& input) override;
     Tensor abs(const Tensor& input) const;
     Tensor negative(const Tensor& input) const;
     Tensor reciprocal(const Tensor& input) const;
@@ -136,8 +136,8 @@ public:
     void ones_inplace(Tensor& input) const;
     void relu_inplace(Tensor& input) const;
     void sign_inplace(Tensor& input) const;
-    void square_inplace(Tensor& input) const;
-    void sqrt_inplace(Tensor& input) const;
+    void square_inplace(Tensor& input) override;
+    void sqrt_inplace(Tensor& input) override;
     void abs_inplace(Tensor& input) const;
     void negative_inplace(Tensor& input) const;
     void reciprocal_inplace(Tensor& input) const;
@@ -149,8 +149,8 @@ public:
     void ones_into(const Tensor& input, Tensor& output) const;
     void relu_into(const Tensor& input, Tensor& output) const;
     void sign_into(const Tensor& input, Tensor& output) const;
-    void square_into(const Tensor& input, Tensor& output) const;
-    void sqrt_into(const Tensor& input, Tensor& output) const;
+    void square_into(const Tensor& input, Tensor& output) override;
+    void sqrt_into(const Tensor& input, Tensor& output) override;
     void abs_into(const Tensor& input, Tensor& output) const;
     void negative_into(const Tensor& input, Tensor& output) const;
     void reciprocal_into(const Tensor& input, Tensor& output) const;
