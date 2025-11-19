@@ -33,16 +33,18 @@ private:
      * @param param 参数张量
      * @param grad 梯度张量
      * @param state 优化器状态
+     * @param param_index 参数索引
      */
-    void update_classic_sgd(Tensor& param, const Tensor& grad, OptimizerState& state);
+    void update_classic_sgd(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index);
 
     /**
      * @brief 更新Nesterov SGD
      * @param param 参数张量
      * @param grad 梯度张量
      * @param state 优化器状态
+     * @param param_index 参数索引
      */
-    void update_nesterov_sgd(Tensor& param, const Tensor& grad, OptimizerState& state);
+    void update_nesterov_sgd(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index);
 
     /**
      * @brief 应用权重衰减
@@ -58,7 +60,7 @@ protected:
      * @param state 优化器状态
      */
     void update_parameter(Tensor& param, const Tensor& grad,
-                        OptimizerState& state) override;
+                        OptimizerState& state, size_t param_index) override;
 
 public:
     /**

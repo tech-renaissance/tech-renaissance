@@ -32,7 +32,7 @@ protected:
 
     // 纯虚函数接口
     virtual void update_parameter(Tensor& param, const Tensor& grad,
-                                OptimizerState& state) = 0;
+                                OptimizerState& state, size_t param_index) = 0;
 
     // 辅助函数
     void validate_model(const Model& model) const;

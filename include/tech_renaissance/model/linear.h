@@ -42,8 +42,8 @@ public:
 
         // 只有需要时才创建偏置参数
         if (use_bias_ && !has_parameter("bias")) {
-            // 偏置：out_features
-            Tensor bias = backend->zeros(Shape(out_features_), DType::FP32);
+            // 偏置：(1, out_features) - 2D形状以便于广播
+            Tensor bias = backend->zeros(Shape(1, out_features_), DType::FP32);
             register_parameter("bias", bias);
         }
 
@@ -84,6 +84,7 @@ public:
 
     void backward_into(const Tensor& grad_output, Tensor& grad_input) override {
         auto backend = get_backend();
+        auto* cpu_backend = dynamic_cast<CpuBackend*>(backend.get());
 
         // 获取权重
         Tensor& weight = get_parameter("weight");

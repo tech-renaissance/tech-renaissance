@@ -182,7 +182,8 @@ def export_tsr(tensor: torch.Tensor, filename: str) -> None:
             f.write(header)
             # 按照NCHW顺序写入数据（对于非4D张量，已经按右对齐处理）
             # PyTorch张量的存储已经是连续的，直接写入即可
-            tensor_bytes = tensor.contiguous().numpy().tobytes()
+            # 对于需要梯度的张量，使用detach()来分离计算图
+            tensor_bytes = tensor.detach().contiguous().numpy().tobytes()
             f.write(tensor_bytes)
 
     except Exception as e:

@@ -71,7 +71,7 @@ void Optimizer::step(Model& model) {
         OptimizerState& state = state_manager_->get_state(i);
 
         // 调用子类的更新方法
-        update_parameter(param, grad, state);
+        update_parameter(param, grad, state, i);
     }
 
     // 递增时间步

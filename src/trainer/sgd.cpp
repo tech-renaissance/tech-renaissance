@@ -66,7 +66,7 @@ void SGD::initialize(const Model& model) {
 
 // ===== SGD 参数更新实现 =====
 
-void SGD::update_parameter(Tensor& param, const Tensor& grad, OptimizerState& state) {
+void SGD::update_parameter(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index) {
     // 1. 应用权重衰减（如果启用）
     if (weight_decay_ > 0.0f) {
         apply_weight_decay(param);
@@ -75,24 +75,19 @@ void SGD::update_parameter(Tensor& param, const Tensor& grad, OptimizerState& st
     // 2. 根据动量配置选择更新算法
     if (momentum_ > 0.0f) {
         if (use_nesterov_) {
-            update_nesterov_sgd(param, grad, state);
+            update_nesterov_sgd(param, grad, state, param_index);
         } else {
-            update_classic_sgd(param, grad, state);
+            update_classic_sgd(param, grad, state, param_index);
         }
     } else {
         // 纯SGD：param = param - lr * grad
-        // 使用预分配的临时缓冲区（如果可用）
-        if (!temp_buffers_.empty()) {
-            backend_->mul_into(grad, learning_rate_, temp_buffers_[0]);
-            backend_->minus_into(param, temp_buffers_[0], param);
-        } else {
-            Tensor lr_grad = backend_->mul(grad, learning_rate_);
-            backend_->minus_into(param, lr_grad, param);
-        }
+        // 使用预分配的临时缓冲区（P1优化）
+        backend_->mul_into(grad, learning_rate_, temp_buffers_[param_index]);
+        backend_->minus_into(param, temp_buffers_[param_index], param);
     }
 }
 
-void SGD::update_classic_sgd(Tensor& param, const Tensor& grad, OptimizerState& state) {
+void SGD::update_classic_sgd(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index) {
     Tensor& velocity = state.momentum;
 
     // 1. 更新动量：velocity = momentum * velocity + grad
@@ -100,16 +95,11 @@ void SGD::update_classic_sgd(Tensor& param, const Tensor& grad, OptimizerState& 
     backend_->add_into(velocity, grad, velocity);
 
     // 2. 更新参数：param = param - lr * velocity
-    if (!temp_buffers_.empty()) {
-        backend_->mul_into(velocity, learning_rate_, temp_buffers_[0]);
-        backend_->minus_into(param, temp_buffers_[0], param);
-    } else {
-        Tensor lr_velocity = backend_->mul(velocity, learning_rate_);
-        backend_->minus_into(param, lr_velocity, param);
-    }
+        backend_->mul_into(velocity, learning_rate_, temp_buffers_[param_index]);
+        backend_->minus_into(param, temp_buffers_[param_index], param);
 }
 
-void SGD::update_nesterov_sgd(Tensor& param, const Tensor& grad, OptimizerState& state) {
+void SGD::update_nesterov_sgd(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index) {
     Tensor& velocity = state.momentum;
 
     // 1. 更新动量：velocity = momentum * velocity + grad
@@ -117,23 +107,11 @@ void SGD::update_nesterov_sgd(Tensor& param, const Tensor& grad, OptimizerState&
     backend_->add_into(velocity, grad, velocity);
 
     // 2. 计算Nesterov梯度：nesterov_grad = grad + momentum * velocity
-    if (!temp_buffers_.empty()) {
-        // 使用预分配缓冲区避免临时分配
-        // temp = momentum * velocity
-        backend_->mul_into(velocity, momentum_, temp_buffers_[0]);
-        // temp = temp + grad (即 nesterov_grad)
-        backend_->add_into(temp_buffers_[0], grad, temp_buffers_[0]);
-        // temp = temp * lr
-        backend_->mul_into(temp_buffers_[0], learning_rate_, temp_buffers_[0]);
-        // param = param - temp
-        backend_->minus_into(param, temp_buffers_[0], param);
-    } else {
-        // 创建临时张量（次优方案）
-        Tensor momentum_term = backend_->mul(velocity, momentum_);
-        Tensor nesterov_grad = backend_->add(momentum_term, grad);
-        Tensor update = backend_->mul(nesterov_grad, learning_rate_);
-        backend_->minus_into(param, update, param);
-    }
+    // 使用预分配缓冲区优化
+    backend_->mul_into(velocity, momentum_, temp_buffers_[param_index]);  // temp = momentum * velocity
+    backend_->add_into(temp_buffers_[param_index], grad, temp_buffers_[param_index]);  // temp = temp + grad
+    backend_->mul_into(temp_buffers_[param_index], learning_rate_, temp_buffers_[param_index]);  // temp = temp * lr
+    backend_->minus_into(param, temp_buffers_[param_index], param);  // param = param - temp
 }
 
 void SGD::apply_weight_decay(Tensor& param) {
