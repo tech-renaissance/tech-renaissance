@@ -151,7 +151,7 @@ bool test_cuda_basic_operations() {
         std::cout << "CUDA fill operations completed" << std::endl;
 
         // 测试add操作
-        backend->add(result, tensor_a, tensor_b);
+        backend->add_into(tensor_a, tensor_b, result);
 
         std::cout << "CUDA add operation completed" << std::endl;
         std::cout << "CUDA basic operations test - SUCCESS!" << std::endl;

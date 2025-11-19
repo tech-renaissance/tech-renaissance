@@ -300,28 +300,61 @@ void CudaBackend::fill_int32(Tensor& dst, int32_t value) {
     fill(dst, value);
 }
 
-void CudaBackend::add(Tensor& result, const Tensor& a, const Tensor& b) {
+// ===== 新API实现 =====
+
+Tensor CudaBackend::add(const Tensor& a, const Tensor& b) const {
     validate_same_device(a.device());
     validate_same_device(b.device());
-    validate_same_device(result.device());
-    validate_tensor_shape(a, b);
-    validate_tensor_shape(a, result);
-    set_device();
 
-    // 新增：检查Storage是否已分配
-    if (result.is_empty()) {
-        throw TRException("[CudaBackend::add] Result tensor has no allocated Storage");
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::add] Shape mismatch: tensor_a shape " +
+                        a.shape().to_string() + " vs tensor_b shape " +
+                        b.shape().to_string());
     }
-    if (a.is_empty()) {
-        throw TRException("[CudaBackend::add] Input tensor 'a' has no allocated Storage");
-    }
-    if (b.is_empty()) {
-        throw TRException("[CudaBackend::add] Input tensor 'b' has no allocated Storage");
+
+    if (a.dtype() != b.dtype()) {
+        throw TRException("[CudaBackend::add] Data type mismatch: tensor_a dtype " +
+                        dtype_to_string(a.dtype()) + " vs tensor_b dtype " +
+                        dtype_to_string(b.dtype()));
     }
 
     if (a.dtype() != DType::FP32) {
-        throw TRException("[CudaBackend::add] add only supports FP32 in first phase");
+        throw TRException("[CudaBackend::add] Only FP32 tensors are supported for tensor addition. "
+                        "TODO: Consider implementing INT8 tensor operations in future versions.");
     }
+
+    // 创建输出张量
+    Tensor result = this->empty(a.shape(), a.dtype());
+    add_into(a, b, result);
+    return result;
+}
+
+void CudaBackend::add_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+    validate_same_device(result.device());
+
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::add_into] Shape mismatch: tensor_a shape " +
+                        a.shape().to_string() + " vs tensor_b shape " +
+                        b.shape().to_string());
+    }
+
+    if (a.shape() != result.shape()) {
+        throw TRException("[CudaBackend::add_into] Shape mismatch: input shape " +
+                        a.shape().to_string() + " vs output shape " +
+                        result.shape().to_string());
+    }
+
+    if (a.is_empty() || b.is_empty() || result.is_empty()) {
+        throw TRException("[CudaBackend::add_into] Input or output tensor has no allocated Storage");
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CudaBackend::add_into] Only FP32 tensors are supported for tensor addition.");
+    }
+
+    set_device();
 
     const float* a_data = static_cast<const float*>(a.data_ptr());
     const float* b_data = static_cast<const float*>(b.data_ptr());
@@ -338,28 +371,106 @@ void CudaBackend::add(Tensor& result, const Tensor& a, const Tensor& b) {
                             b_data, 1, result_data, 1));
 }
 
-void CudaBackend::mul(Tensor& result, const Tensor& a, const Tensor& b) {
+void CudaBackend::minus_into(const Tensor& a, const Tensor& b, Tensor& result) const {
     validate_same_device(a.device());
     validate_same_device(b.device());
     validate_same_device(result.device());
-    validate_tensor_shape(a, b);
-    validate_tensor_shape(a, result);
-    set_device();
 
-    // 新增：检查Storage是否已分配
-    if (result.is_empty()) {
-        throw TRException("[CudaBackend::mul] Result tensor has no allocated Storage");
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::minus_into] Shape mismatch: tensor_a shape " +
+                        a.shape().to_string() + " vs tensor_b shape " +
+                        b.shape().to_string());
     }
-    if (a.is_empty()) {
-        throw TRException("[CudaBackend::mul] Input tensor 'a' has no allocated Storage");
+
+    if (a.shape() != result.shape()) {
+        throw TRException("[CudaBackend::minus_into] Shape mismatch: input shape " +
+                        a.shape().to_string() + " vs output shape " +
+                        result.shape().to_string());
     }
-    if (b.is_empty()) {
-        throw TRException("[CudaBackend::mul] Input tensor 'b' has no allocated Storage");
+
+    if (a.is_empty() || b.is_empty() || result.is_empty()) {
+        throw TRException("[CudaBackend::minus_into] Input or output tensor has no allocated Storage");
     }
 
     if (a.dtype() != DType::FP32) {
-        throw TRException("[CudaBackend::mul] mul only supports FP32 in first phase");
+        throw TRException("[CudaBackend::minus_into] Only FP32 tensors are supported for tensor subtraction.");
     }
+
+    set_device();
+
+    const float* a_data = static_cast<const float*>(a.data_ptr());
+    const float* b_data = static_cast<const float*>(b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = a.numel();
+
+    // 使用cuBLAS: result = a - b
+    // 先拷贝a到result，再执行result += (-1.0) * b
+    CUDA_CHECK(cudaMemcpy(result_data, a_data,
+                         count * sizeof(float), cudaMemcpyDeviceToDevice));
+
+    float alpha = -1.0f;
+    CUBLAS_CHECK(cublasSaxpy(cublas_handle_, count, &alpha,
+                            b_data, 1, result_data, 1));
+}
+
+void CudaBackend::sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim) const {
+    // 暂时抛出未实现异常
+    throw TRException("[CudaBackend::sum_into] Not implemented yet");
+}
+
+Tensor CudaBackend::mul(const Tensor& a, const Tensor& b) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::mul] Shape mismatch: tensor_a shape " +
+                        a.shape().to_string() + " vs tensor_b shape " +
+                        b.shape().to_string());
+    }
+
+    if (a.dtype() != b.dtype()) {
+        throw TRException("[CudaBackend::mul] Data type mismatch: tensor_a dtype " +
+                        dtype_to_string(a.dtype()) + " vs tensor_b dtype " +
+                        dtype_to_string(b.dtype()));
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CudaBackend::mul] Only FP32 tensors are supported for tensor multiplication. "
+                        "TODO: Consider implementing INT8 tensor operations in future versions.");
+    }
+
+    // 创建输出张量
+    Tensor result = this->empty(a.shape(), a.dtype());
+    mul_into(a, b, result);
+    return result;
+}
+
+void CudaBackend::mul_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+    validate_same_device(result.device());
+
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::mul_into] Shape mismatch: tensor_a shape " +
+                        a.shape().to_string() + " vs tensor_b shape " +
+                        b.shape().to_string());
+    }
+
+    if (a.shape() != result.shape()) {
+        throw TRException("[CudaBackend::mul_into] Shape mismatch: input shape " +
+                        a.shape().to_string() + " vs output shape " +
+                        result.shape().to_string());
+    }
+
+    if (a.is_empty() || b.is_empty() || result.is_empty()) {
+        throw TRException("[CudaBackend::mul_into] Input or output tensor has no allocated Storage");
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CudaBackend::mul_into] Only FP32 tensors are supported for tensor multiplication.");
+    }
+
+    set_device();
 
     // 使用cuDNN的OpTensor实现逐元素乘法
     const float* a_data = static_cast<const float*>(a.data_ptr());
@@ -415,6 +526,8 @@ void CudaBackend::mul(Tensor& result, const Tensor& a, const Tensor& b) {
     CUDNN_CHECK(cudnnDestroyTensorDescriptor(b_desc));
     CUDNN_CHECK(cudnnDestroyTensorDescriptor(result_desc));
 }
+
+// ===== 旧方法实现结束 =====
 
 Device CudaBackend::device() const {
     return tr::CUDA[device_id_];
@@ -705,6 +818,18 @@ Tensor CudaBackend::empty(const Shape& shape, DType dtype) {
     auto memory_holder = this->allocate(result.numel() * result.dtype_size());
     result.storage_ = std::make_shared<Storage>(result.numel() * result.dtype_size(), tr::CUDA[device_id_]);
     result.storage_->set_data_ptr(this->get_data_ptr(memory_holder), memory_holder);
+
+    return result;
+}
+
+Tensor CudaBackend::empty(const Shape& shape, DType dtype) const {
+    const_cast<CudaBackend*>(this)->set_device();
+    Tensor result(shape, dtype, tr::CUDA[device_id_]);
+
+    // 分配CUDA内存
+    auto memory_holder = const_cast<CudaBackend*>(this)->allocate(result.numel() * result.dtype_size());
+    result.storage_ = std::make_shared<Storage>(result.numel() * result.dtype_size(), tr::CUDA[device_id_]);
+    result.storage_->set_data_ptr(const_cast<CudaBackend*>(this)->get_data_ptr(memory_holder), memory_holder);
 
     return result;
 }

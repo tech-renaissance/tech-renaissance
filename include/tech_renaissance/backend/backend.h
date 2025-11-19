@@ -128,11 +128,19 @@ public:
 
     /**
      * @brief 张量加法
-     * @param result 结果张量
      * @param a 输入张量A
      * @param b 输入张量B
+     * @return 结果张量（A + B）
      */
-    virtual void add(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+    virtual Tensor add(const Tensor& a, const Tensor& b) const;
+
+    /**
+     * @brief 张量乘法
+     * @param a 输入张量A
+     * @param b 输入张量B
+     * @return 结果张量（A * B）
+     */
+    virtual Tensor mul(const Tensor& a, const Tensor& b) const;
 
     /**
      * @brief 张量加法（into版本，张量加张量）
@@ -143,6 +151,29 @@ public:
     virtual void add_into(const Tensor& a, const Tensor& b, Tensor& result) const;
 
     /**
+     * @brief 标量加法 tensor + scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     * @return 结果张量
+     */
+    virtual Tensor add(const Tensor& input, float scalar) const;
+
+    /**
+     * @brief 标量加法（原地版） tensor += scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     */
+    virtual void add_inplace(Tensor& input, float scalar) const;
+
+    /**
+     * @brief 标量加法（指定输出张量） output = input + scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     * @param output 输出张量
+     */
+    virtual void add_into(const Tensor& input, float scalar, Tensor& output) const;
+
+    /**
      * @brief 张量求和（into版本，沿指定维度求和）
      * @param tensor_a 输入张量
      * @param result 结果张量
@@ -151,13 +182,29 @@ public:
      */
     virtual void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false) const;
 
+    
     /**
-     * @brief 张量乘法
-     * @param result 结果张量
-     * @param a 输入张量A
-     * @param b 输入张量B
+     * @brief 标量乘法 tensor * scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     * @return 结果张量
      */
-    virtual void mul(Tensor& result, const Tensor& a, const Tensor& b) = 0;
+    virtual Tensor mul(const Tensor& input, float scalar) const;
+
+    /**
+     * @brief 标量乘法（原地版） tensor *= scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     */
+    virtual void mul_inplace(Tensor& input, float scalar) const;
+
+    /**
+     * @brief 标量乘法（指定输出张量） output = input * scalar
+     * @param input 输入张量
+     * @param scalar 标量值
+     * @param output 输出张量
+     */
+    virtual void mul_into(const Tensor& input, float scalar, Tensor& output) const;
 
     /**
      * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N)
@@ -236,6 +283,7 @@ public:
      * @return 空张量
      */
     virtual Tensor empty(const Shape& shape, DType dtype) = 0;
+    virtual Tensor empty(const Shape& shape, DType dtype) const = 0;
 
     /**
      * @brief 创建零张量
@@ -358,6 +406,9 @@ public:
     virtual Tensor minus(float scalar, const Tensor& input) const;
     virtual void minus_inplace(float scalar, Tensor& input) const;
     virtual void minus_into(float scalar, const Tensor& input, Tensor& output) const;
+
+    // 张量间运算（tensor - tensor）
+    virtual void minus_into(const Tensor& a, const Tensor& b, Tensor& result) const;
 
     // 标量乘加运算
     virtual Tensor mac(const Tensor& input, float scalar_x, float scalar_y) const;

@@ -41,7 +41,7 @@ int main() {
         cpu->fill(cpu_b, 2.5f);
 
         // 执行加法
-        cpu->add(cpu_result, cpu_a, cpu_b);
+        cpu->add_into(cpu_a, cpu_b, cpu_result);
 
         // 打印结果
         cpu_a.print("cpu_a");
@@ -60,7 +60,7 @@ int main() {
             cuda->fill(gpu_b, -3.14f);
 
             // 执行加法
-            cuda->add(gpu_result, gpu_a, gpu_b);
+            cuda->add_into(gpu_a, gpu_b, gpu_result);
 
             // 打印结果
             gpu_a.print("gpu_a");

@@ -9,6 +9,9 @@
 set(TRAINER_SOURCES
     loss.cpp
     cross_entropy_loss.cpp
+    optimizer.cpp
+    sgd.cpp
+    state_manager.cpp
     scheduler.cpp
     step_lr.cpp
     multi_step_lr.cpp

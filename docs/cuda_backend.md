@@ -2,12 +2,19 @@
 
 ## 版本信息
 
-- **版本**: V1.46.3
-- **日期**: 2025年11月17日
+- **版本**: V1.51.0
+- **日期**: 2025年11月19日
 - **作者**: 技术觉醒团队
 - **所属系列**: backend
 
 ## 最新完成状态
+
+✅ **V1.51.0完成 - 新API实现与cuBLAS/cuDNN优化**:
+- 新增add/mul API实现 - 基于cuBLAS/cuDNN的高性能张量运算
+- const重载方法完善 - 所有接口支持const正确性
+- 设备一致性验证 - 完善的CUDA设备检查和错误处理
+- 与Backend基类完全对齐的接口设计
+- 高性能临时缓冲区管理
 
 ✅ **V1.46.3完成 - 构造函数设计和代码规范优化**:
 - 构造函数统一化 - 使用`explicit CudaBackend(int device_id = 0)`，防止隐式转换
@@ -15,11 +22,6 @@
 - 参数文档完善 - 添加device_id参数详细说明和默认值
 - Alpha编译验证 - 编译测试通过，无错误和警告
 - 类型安全增强 - explicit关键字确保构造函数明确调用
-
-✅ **V1.43.0完成 - 构造函数修复和后端重构兼容性**:
-- 构造函数修复 - 正确调用Backend基类构造函数
-- 重构兼容性 - 与Backend基类重构完全兼容
-- CUDA上下文管理 - 完善的CUDA设备管理和上下文初始化
 
 ## 概述
 
@@ -235,7 +237,144 @@ try {
 }
 ```
 
-## 已实现的核心接口
+## 🆕 V1.51.0新API实现
+
+### 张量算术运算
+
+#### `Tensor add(const Tensor& a, const Tensor& b) const override`
+
+高性能GPU张量加法，基于cuBLAS实现。
+
+**参数**：
+- `a` - 第一个操作数张量
+- `b` - 第二个操作数张量
+
+**返回值**：
+- `Tensor` - 结果张量（a + b）
+
+**特性**：
+- **设备一致性验证**：自动检查所有张量是否在同一CUDA设备
+- **形状和数据类型检查**：确保输入张量兼容
+- **FP32优化**：专门针对FP32张量优化
+- **cuBLAS加速**：使用cuBLAS的Saxpy函数实现高性能加法
+
+**实现**：
+```cpp
+Tensor CudaBackend::add(const Tensor& a, const Tensor& b) const {
+    // 设备和形状验证
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+
+    if (a.shape() != b.shape()) {
+        throw TRException("[CudaBackend::add] Shape mismatch");
+    }
+
+    // 创建结果张量
+    Tensor result = this->empty(a.shape(), a.dtype());
+
+    // 使用cuBLAS实现加法：result = a + b
+    const float* a_data = static_cast<const float*>(a.data_ptr());
+    const float* b_data = static_cast<const float*>(b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = a.numel();
+
+    // 先拷贝a到result，再执行result += b
+    CUDA_CHECK(cudaMemcpy(result_data, a_data, count * sizeof(float),
+                         cudaMemcpyDeviceToDevice));
+    float alpha = 1.0f;
+    CUBLAS_CHECK(cublasSaxpy(cublas_handle_, count, &alpha,
+                            b_data, 1, result_data, 1));
+    return result;
+}
+```
+
+#### `void add_into(const Tensor& a, const Tensor& b, Tensor& result) const override`
+
+就地张量加法，避免额外内存分配。
+
+**参数**：
+- `a` - 第一个操作数张量
+- `b` - 第二个操作数张量
+- `result` - 预分配的结果张量
+
+**优化特性**：
+- **零拷贝优化**：直接在预分配的结果张量中计算
+- **内存高效**：避免临时张量创建和销毁开销
+
+#### `Tensor mul(const Tensor& a, const Tensor& b) const override`
+
+高性能GPU张量逐元素乘法，基于cuDNN实现。
+
+**参数**：
+- `a` - 第一个操作数张量
+- `b` - 第二个操作数张量
+
+**返回值**：
+- `Tensor` - 结果张量（a * b）
+
+**特性**：
+- **cuDNN OpTensor**：使用cuDNN的高性能OpTensor API
+- **张量描述符管理**：自动创建和管理cuDNN张量描述符
+- **错误处理**：完善的异常处理和资源清理
+
+**实现**：
+```cpp
+Tensor CudaBackend::mul(const Tensor& a, const Tensor& b) const {
+    // 验证和创建结果张量
+    Tensor result = this->empty(a.shape(), a.dtype());
+    mul_into(a, b, result);
+    return result;
+}
+
+void CudaBackend::mul_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    // 使用cuDNN OpTensor实现逐元素乘法
+    cudnnTensorDescriptor_t a_desc, b_desc, result_desc;
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&a_desc));
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&b_desc));
+    CUDNN_CHECK(cudnnCreateTensorDescriptor(&result_desc));
+
+    try {
+        // 设置4D张量描述符（NCHW格式）
+        int n = a.batch(), c = a.channel(), h = a.height(), w = a.width();
+        CUDNN_CHECK(cudnnSetTensor4dDescriptor(a_desc, CUDNN_TENSOR_NCHW,
+                                             CUDNN_DATA_FLOAT, n, c, h, w));
+        CUDNN_CHECK(cudnnSetTensor4dDescriptor(b_desc, CUDNN_TENSOR_NCHW,
+                                             CUDNN_DATA_FLOAT, n, c, h, w));
+        CUDNN_CHECK(cudnnSetTensor4dDescriptor(result_desc, CUDNN_TENSOR_NCHW,
+                                             CUDNN_DATA_FLOAT, n, c, h, w));
+
+        // 创建并配置OpTensor描述符
+        cudnnOpTensorDescriptor_t op_desc;
+        CUDNN_CHECK(cudnnCreateOpTensorDescriptor(&op_desc));
+        CUDNN_CHECK(cudnnSetOpTensorDescriptor(op_desc, CUDNN_OP_TENSOR_MUL,
+                                              CUDNN_DATA_FLOAT, CUDNN_PROPAGATE_NAN));
+
+        // 执行逐元素乘法：result = a * b
+        const float alpha1 = 1.0f, alpha2 = 1.0f, beta = 0.0f;
+        CUDNN_CHECK(cudnnOpTensor(cudnn_handle_, op_desc,
+                                 &alpha1, a_desc, a_data,
+                                 &alpha2, b_desc, b_data,
+                                 &beta, result_desc, result_data));
+
+        CUDNN_CHECK(cudnnDestroyOpTensorDescriptor(op_desc));
+    } catch (...) {
+        // 异常安全：自动清理资源
+        CUDNN_CHECK(cudnnDestroyTensorDescriptor(a_desc));
+        CUDNN_CHECK(cudnnDestroyTensorDescriptor(b_desc));
+        CUDNN_CHECK(cudnnDestroyTensorDescriptor(result_desc));
+        throw;
+    }
+
+    // 正常清理资源
+    CUDNN_CHECK(cudnnDestroyTensorDescriptor(a_desc));
+    CUDNN_CHECK(cudnnDestroyTensorDescriptor(b_desc));
+    CUDNN_CHECK(cudnnDestroyTensorDescriptor(result_desc));
+}
+```
+
+#### `void mul_into(const Tensor& a, const Tensor& b, Tensor& result)`
+
+就地张量乘法实现，避免内存分配开销。
 
 ### 跨后端转换接口
 
@@ -273,47 +412,26 @@ try {
 
 ### 基础张量操作接口
 
-#### `void mm(Tensor& result, const Tensor& a, const Tensor& b) override`
+#### `Tensor mm(const Tensor& a, const Tensor& b) override`
 
 高性能GPU矩阵乘法。
 
 **参数**：
-- `result` - 结果张量，形状应为(M,N)
 - `a` - 输入张量A，形状应为(M,K)
 - `b` - 输入张量B，形状应为(K,N)
 
-**实现**：
-```cpp
-void CudaBackend::mm(Tensor& result, const Tensor& a, const Tensor& b) {
-    const float* a_data = static_cast<const float*>(a.data_ptr());
-    const float* b_data = static_cast<const float*>(b.data_ptr());
-    float* result_data = static_cast<float*>(result.data_ptr());
+**返回值**：
+- `Tensor` - 结果张量，形状为(M,N)
 
-    int32_t M = a.height();  // 行数
-    int32_t K = a.width();   // 列数
-    int32_t N = b.width();   // B的列数
-
-    // cuBLAS矩阵乘法（列主序存储）
-    const float alpha = 1.0f;
-    const float beta = 0.0f;
-
-    CUBLAS_CHECK(cublasSgemm(
-        cublas_handle_,
-        CUBLAS_OP_N, CUBLAS_OP_N,  // 无转置
-        N, M, K,                   // 结果维度
-        &alpha,
-        b_data, N,                 // B矩阵，leading dimension = N
-        a_data, K,                 // A矩阵，leading dimension = K
-        &beta,
-        result_data, N             // 结果矩阵，leading dimension = N
-    ));
-}
-```
-
-**性能特性**：
+**特性**：
 - **GPU加速**：利用大规模并行计算
 - **cuBLAS优化**：自动选择最优算法
 - **高吞吐量**：适合大批量矩阵运算
+- **算法缓存**：智能缓存最优GEMM算法配置
+
+#### `void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override`
+
+就地矩阵乘法，避免额外内存分配。
 
 #### `void fill(Tensor& dst, float value) override`
 
@@ -336,57 +454,92 @@ void CudaBackend::fill(Tensor& dst, float value) {
 }
 ```
 
-#### `void add(Tensor& result, const Tensor& a, const Tensor& b) override`
-
-GPU张量逐元素加法。
-
-**参数**：
-- `result` - 结果张量
-- `a` - 第一个操作数张量
-- `b` - 第二个操作数张量
-
-**特性**：
-- **GPU并行**：利用数千个GPU核心并行计算
-- **内存高效**：就地操作，减少内存分配
-
 ## 使用示例
 
-### 基础GPU操作
+### 🆕 V1.51.0新API使用示例
 
 ```cpp
 #include "tech_renaissance.h"
 using namespace tr;
 
-void basic_cuda_operations() {
+void v1_51_0_new_api_examples() {
     try {
         // 获取CUDA后端实例
         auto cuda_backend = BackendManager::get_cuda_backend();
         auto cpu_backend = BackendManager::get_cpu_backend();
 
-        // 1. 在CPU上创建随机张量
-        Tensor cpu_a = cpu_backend->randn({1024, 2048}, 42);
-        Tensor cpu_b = cpu_backend->randn({2048, 512}, 123);
+        // 1. 创建测试张量
+        Tensor cpu_a = cpu_backend->randn({256, 256}, 42);
+        Tensor cpu_b = cpu_backend->randn({256, 256}, 123);
 
-        // 2. 转换到CUDA（自动内存布局转换）
+        // 2. 转换到CUDA
         Tensor cuda_a = cuda_backend->from_cpu(cpu_a);
         Tensor cuda_b = cuda_backend->from_cpu(cpu_b);
 
-        // 3. 创建结果张量
-        Tensor cuda_result = Tensor::empty({1024, 512}, DType::FP32, tr::CUDA(0));
+        // 3. 🆕 使用新的add API
+        Tensor cuda_sum = cuda_backend->add(cuda_a, cuda_b);
+        std::cout << "Tensor addition completed with new API!" << std::endl;
 
-        // 4. GPU矩阵乘法（高性能）
-        cuda_backend->mm(cuda_result, cuda_a, cuda_b);
+        // 4. 🆕 使用新的mul API
+        Tensor cuda_product = cuda_backend->mul(cuda_a, cuda_b);
+        std::cout << "Tensor element-wise multiplication completed!" << std::endl;
 
-        // 5. 转换回CPU验证结果
+        // 5. 🆕 使用into版本避免内存分配
+        Tensor cuda_result = cuda_backend->empty({256, 256}, DType::FP32);
+        cuda_backend->add_into(cuda_a, cuda_b, cuda_result);
+        std::cout << "In-place addition completed!" << std::endl;
+
+        // 6. 转换回CPU验证结果
         Tensor cpu_result = cuda_backend->to_cpu(cuda_result);
-
-        std::cout << "CUDA matrix multiplication completed!" << std::endl;
+        std::cout << "Result transferred back to CPU!" << std::endl;
 
     } catch (const TRException& e) {
         std::cerr << "CUDA Backend error: " << e.what() << std::endl;
     }
 }
 ```
+
+### 性能对比示例
+
+```cpp
+void performance_comparison_new_api() {
+    auto cuda_backend = BackendManager::get_cuda_backend();
+    auto cpu_backend = BackendManager::get_cpu_backend();
+
+    // 测试数据大小
+    const int N = 1024, M = 1024;
+
+    // 创建测试数据
+    Tensor cpu_a = cpu_backend->randn({N, M});
+    Tensor cpu_b = cpu_backend->randn({N, M});
+
+    // 转换到CUDA
+    Tensor cuda_a = cuda_backend->from_cpu(cpu_a);
+    Tensor cuda_b = cuda_backend->from_cpu(cpu_b);
+
+    // 测试新的add API性能
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100; ++i) {
+        Tensor result = cuda_backend->add(cuda_a, cuda_b);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "V1.51.0 add API: " << duration.count() << " μs for 100 operations" << std::endl;
+
+    // 测试新的mul API性能
+    start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100; ++i) {
+        Tensor result = cuda_backend->mul(cuda_a, cuda_b);
+    }
+    end = std::chrono::high_resolution_clock::now();
+
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "V1.51.0 mul API: " << duration.count() << " μs for 100 operations" << std::endl;
+}
+```
+
+### 基础GPU操作
 
 ### 性能基准测试
 
@@ -530,15 +683,61 @@ try {
    - 动态形状支持
    - 自定义CUDA核函数
 
-## 版本信息
+## 版本历史
 
-- **版本**: V1.43.0
-- **更新日期**: 2025-11-16
+### V1.51.0 (2025-11-19)
+**重大更新 - 新API实现与cuBLAS/cuDNN优化**
+
+#### 🆕 新增功能
+- **add/mul API实现**: 基于cuBLAS/cuDNN的高性能张量算术运算
+- **const重载方法**: 所有接口支持const正确性，提供更好的类型安全
+- **设备一致性验证**: 完善的CUDA设备检查和错误处理机制
+- **与Backend基类完全对齐**: 接口设计与基类保持100%一致
+
+#### ⚡ 性能优化
+- **cuBLAS加速**: 张量加法使用cuBLAS Saxpy函数优化
+- **cuDNN OpTensor**: 张量乘法使用cuDNN高性能OpTensor API
+- **临时缓冲区管理**: 智能缓存最优算法配置和工作空间
+- **内存效率**: into版本API避免额外内存分配
+
+#### 🔧 技术改进
+- **异常安全**: 完善的异常处理和资源自动清理
+- **形状和数据类型检查**: 运行时验证确保输入张量兼容性
+- **设备验证**: 自动检查所有张量是否在同一CUDA设备
+- **FP32优化**: 专门针对FP32张量的性能优化
+
+### V1.46.3 (2025-11-17)
+**功能完善 - 构造函数设计和代码规范优化**
+
+#### 🔧 构造函数优化
+- **统一化设计**: 使用`explicit CudaBackend(int device_id = 0)`
+- **类型安全**: explicit关键字防止隐式转换
+- **参数文档**: 完善的device_id参数说明和默认值
+
+### V1.43.0 (2025-11-16)
+**基础重构 - 构造函数修复和后端重构兼容性**
+
+#### 🔧 核心修复
+- **构造函数修复**: 正确调用Backend基类构造函数
+- **宏系统继承**: 继承Backend基类的宏定义系统
+- **异常格式统一**: 统一的NotImplementedError异常格式
+
+#### ✅ 兼容性保证
+- **100%向后兼容**: 现有代码无需修改
+- **错误处理完善**: CUDA相关异常处理机制
+- **接口支持**: 支持V1.43.0新增接口的异常处理
+
+---
+
+## 当前版本信息
+
+- **版本**: V1.51.0
+- **更新日期**: 2025-11-19
 - **作者**: 技术觉醒团队
 - **主要更新**:
-  - 🔧 修复构造函数Backend实例化问题
-  - 🆕 继承Backend基类的宏定义系统
-  - 🆕 统一的NotImplementedError异常格式
-  - ✅ 100%向后兼容，现有代码无需修改
-  - ✅ 完善的CUDA错误处理和异常管理
-  - ✅ 支持V1.43.0新增接口的异常处理机制
+  - 🆕 基于cuBLAS/cuDNN的新add/mul API实现
+  - ⚡ 高性能张量算术运算优化
+  - 🔧 const重载方法完善
+  - ✅ 与Backend基类完全对齐的接口设计
+  - 📈 临时缓冲区和算法缓存优化
+  - 🛡️ 完善的设备一致性验证和错误处理

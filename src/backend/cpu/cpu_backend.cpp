@@ -171,44 +171,6 @@ void CpuBackend::fill_int32(Tensor& dst, int32_t value) {
     fill(dst, value);
 }
 
-void CpuBackend::add(Tensor& result, const Tensor& a, const Tensor& b) {
-    validate_same_device(a.device());
-    validate_same_device(b.device());
-    validate_same_device(result.device());
-    validate_tensor_shape(a, b);
-    validate_tensor_shape(a, result);
-
-    // 新增：检查Storage是否已分配
-    if (result.is_empty()) {
-        throw TRException("[CpuBackend::add] Result tensor has no allocated Storage");
-    }
-    if (a.is_empty()) {
-        throw TRException("[CpuBackend::add] Input tensor 'a' has no allocated Storage");
-    }
-    if (b.is_empty()) {
-        throw TRException("[CpuBackend::add] Input tensor 'b' has no allocated Storage");
-    }
-
-    if (a.dtype() != DType::FP32) {
-        throw TRException("[CpuBackend::add] add only supports FP32 in first phase");
-    }
-
-    const float* a_data = static_cast<const float*>(a.data_ptr());
-    const float* b_data = static_cast<const float*>(b.data_ptr());
-    float* result_data = static_cast<float*>(result.data_ptr());
-    size_t count = a.numel();
-
-#ifdef TR_USE_EIGEN
-    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
-    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
-    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
-    result_vec = a_vec + b_vec;
-#else
-    for (size_t i = 0; i < count; ++i) {
-        result_data[i] = a_data[i] + b_data[i];
-    }
-#endif
-}
 
 void CpuBackend::add_into(const Tensor& a, const Tensor& b, Tensor& result) const {
     validate_same_device(a.device());
@@ -245,6 +207,84 @@ void CpuBackend::add_into(const Tensor& a, const Tensor& b, Tensor& result) cons
 #else
     for (size_t i = 0; i < count; ++i) {
         result_data[i] = a_data[i] + b_data[i];
+    }
+#endif
+}
+
+void CpuBackend::mul_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+    validate_same_device(result.device());
+    validate_tensor_shape(a, b);
+    validate_tensor_shape(a, result);
+
+    // 检查Storage是否已分配
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::mul_into] Result tensor has no allocated Storage");
+    }
+    if (a.is_empty()) {
+        throw TRException("[CpuBackend::mul_into] Input tensor 'a' has no allocated Storage");
+    }
+    if (b.is_empty()) {
+        throw TRException("[CpuBackend::mul_into] Input tensor 'b' has no allocated Storage");
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::mul_into] mul_into only supports FP32");
+    }
+
+    const float* a_data = static_cast<const float*>(a.data_ptr());
+    const float* b_data = static_cast<const float*>(b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = a.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
+    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
+    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
+    result_vec = a_vec.cwiseProduct(b_vec);
+#else
+    for (size_t i = 0; i < count; ++i) {
+        result_data[i] = a_data[i] * b_data[i];
+    }
+#endif
+}
+
+void CpuBackend::minus_into(const Tensor& a, const Tensor& b, Tensor& result) const {
+    validate_same_device(a.device());
+    validate_same_device(b.device());
+    validate_same_device(result.device());
+    validate_tensor_shape(a, b);
+    validate_tensor_shape(a, result);
+
+    // 检查Storage是否已分配
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::minus_into] Result tensor has no allocated Storage");
+    }
+    if (a.is_empty()) {
+        throw TRException("[CpuBackend::minus_into] Input tensor 'a' has no allocated Storage");
+    }
+    if (b.is_empty()) {
+        throw TRException("[CpuBackend::minus_into] Input tensor 'b' has no allocated Storage");
+    }
+
+    if (a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::minus_into] minus_into only supports FP32");
+    }
+
+    const float* a_data = static_cast<const float*>(a.data_ptr());
+    const float* b_data = static_cast<const float*>(b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = a.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
+    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
+    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
+    result_vec = a_vec - b_vec;
+#else
+    for (size_t i = 0; i < count; ++i) {
+        result_data[i] = a_data[i] - b_data[i];
     }
 #endif
 }
@@ -290,44 +330,6 @@ void CpuBackend::sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, b
     }
 }
 
-void CpuBackend::mul(Tensor& result, const Tensor& a, const Tensor& b) {
-    validate_same_device(a.device());
-    validate_same_device(b.device());
-    validate_same_device(result.device());
-    validate_tensor_shape(a, b);
-    validate_tensor_shape(a, result);
-
-    // 新增：检查Storage是否已分配
-    if (result.is_empty()) {
-        throw TRException("[CpuBackend::mul] Result tensor has no allocated Storage");
-    }
-    if (a.is_empty()) {
-        throw TRException("[CpuBackend::mul] Input tensor 'a' has no allocated Storage");
-    }
-    if (b.is_empty()) {
-        throw TRException("[CpuBackend::mul] Input tensor 'b' has no allocated Storage");
-    }
-
-    if (a.dtype() != DType::FP32) {
-        throw TRException("[CpuBackend::mul] mul only supports FP32 in first phase");
-    }
-
-    const float* a_data = static_cast<const float*>(a.data_ptr());
-    const float* b_data = static_cast<const float*>(b.data_ptr());
-    float* result_data = static_cast<float*>(result.data_ptr());
-    size_t count = a.numel();
-
-#ifdef TR_USE_EIGEN
-    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
-    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
-    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
-    result_vec = a_vec.cwiseProduct(b_vec);
-#else
-    for (size_t i = 0; i < count; ++i) {
-        result_data[i] = a_data[i] * b_data[i];
-    }
-#endif
-}
 
 void CpuBackend::validate_same_device(const Device& device) const {
     if (!device.is_cpu()) {

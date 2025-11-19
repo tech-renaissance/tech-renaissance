@@ -16,6 +16,7 @@
 #include "tech_renaissance/backend/backend.h"
 #include <vector>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
 namespace tr {
@@ -29,7 +30,7 @@ struct OptimizerState {
     Tensor momentum;
     bool has_momentum = false;
 
-    // Adam状态
+    // Adam状态（为未来扩展预留）
     Tensor adam_m;
     Tensor adam_v;
     bool has_adam_state = false;
@@ -105,7 +106,7 @@ public:
     void initialize_sgd_states(const std::vector<Tensor*>& params, float momentum = 0.0f);
 
     /**
-     * @brief 初始化Adam状态
+     * @brief 初始化Adam状态（为未来扩展预留）
      * @param params 参数指针列表
      * @param beta1 一阶矩衰减率
      * @param beta2 二阶矩衰减率

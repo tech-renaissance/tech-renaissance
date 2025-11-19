@@ -70,8 +70,13 @@ public:
     void fill_int32(Tensor& dst, int32_t value) override;
 
     // 基本运算
-    void add(Tensor& result, const Tensor& a, const Tensor& b) override;
-    void mul(Tensor& result, const Tensor& a, const Tensor& b) override;
+    // 张量加法和乘法
+    Tensor add(const Tensor& a, const Tensor& b) const override;
+    void add_into(const Tensor& a, const Tensor& b, Tensor& result) const override;
+    void minus_into(const Tensor& a, const Tensor& b, Tensor& result) const override;
+    void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false) const override;
+    Tensor mul(const Tensor& a, const Tensor& b) const override;
+    void mul_into(const Tensor& a, const Tensor& b, Tensor& result) const;
 
     // 矩阵乘法
     Tensor mm(const Tensor& a, const Tensor& b) override;
@@ -94,6 +99,7 @@ public:
 
     // 张量创建操作
     Tensor empty(const Shape& shape, DType dtype) override;
+    Tensor empty(const Shape& shape, DType dtype) const override;
     Tensor zeros(const Shape& shape, DType dtype) override;
     Tensor ones(const Shape& shape, DType dtype) override;
     Tensor randn(const Shape& shape, unsigned int seed = 0) override;

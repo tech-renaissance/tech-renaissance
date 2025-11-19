@@ -8,8 +8,9 @@
  * @note 依赖项: state_manager.h, backend_manager.h
  */
 
-#include "tech_renaissance/optimizer/state_manager.h"
+#include "tech_renaissance/trainer/state_manager.h"
 #include "tech_renaissance/backend/backend_manager.h"
+#include "tech_renaissance/utils/tr_exception.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -162,15 +163,15 @@ void StateManager::to(const Device& device) {
     // 转移所有状态张量到目标设备
     for (auto& state : states_) {
         if (state.has_momentum && state.momentum.storage_allocated()) {
-            state.momentum.to(device);
+            state.momentum = backend_->from_cpu(state.momentum);
         }
 
         if (state.has_adam_state) {
             if (state.adam_m.storage_allocated()) {
-                state.adam_m.to(device);
+                state.adam_m = backend_->from_cpu(state.adam_m);
             }
             if (state.adam_v.storage_allocated()) {
-                state.adam_v.to(device);
+                state.adam_v = backend_->from_cpu(state.adam_v);
             }
         }
     }

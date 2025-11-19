@@ -37,6 +37,14 @@ Tensor CpuBackend::empty(const Shape& shape, DType dtype) {
     return result;
 }
 
+Tensor CpuBackend::empty(const Shape& shape, DType dtype) const {
+    Tensor result(shape, dtype, CPU);
+    auto memory_holder = const_cast<CpuBackend*>(this)->allocate(result.numel() * result.dtype_size());
+    result.storage_ = std::make_shared<Storage>(result.numel() * result.dtype_size(), result.device());
+    result.storage_->set_data_ptr(const_cast<CpuBackend*>(this)->get_data_ptr(memory_holder), memory_holder);
+    return result;
+}
+
 Tensor CpuBackend::zeros(const Shape& shape, DType dtype) {
     Tensor result(shape, dtype, CPU);
     auto memory_holder = this->allocate(result.numel() * result.dtype_size());

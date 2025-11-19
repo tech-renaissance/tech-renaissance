@@ -10,6 +10,7 @@ set(BACKEND_SOURCES
     backend.cpp
     backend_manager.cpp
     cpu/cpu_backend.cpp
+    cpu/cpu_basic_ops.cpp
     cpu/cpu_mm_fp32.cpp
     cpu/cpu_unary.cpp
     cpu/cpu_scalar.cpp

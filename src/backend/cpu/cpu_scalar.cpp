@@ -37,7 +37,7 @@ Tensor CpuBackend::mul(const Tensor& input, float scalar) const {
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     mul_into(input, scalar, result);
     return result;
 }
@@ -116,7 +116,7 @@ Tensor CpuBackend::add(const Tensor& input, float scalar) const {
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     add_into(input, scalar, result);
     return result;
 }
@@ -195,7 +195,7 @@ Tensor CpuBackend::minus(const Tensor& input, float scalar) const {
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     minus_into(input, scalar, result);
     return result;
 }
@@ -274,7 +274,7 @@ Tensor CpuBackend::minus(float scalar, const Tensor& input) const {
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     minus_into(scalar, input, result);
     return result;
 }
@@ -354,7 +354,7 @@ Tensor CpuBackend::mac(const Tensor& input, float scalar_x, float scalar_y) cons
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     mac_into(input, scalar_x, scalar_y, result);
     return result;
 }
@@ -441,7 +441,7 @@ Tensor CpuBackend::clamp(const Tensor& input, float min_val, float max_val) cons
     }
 
     // 创建输出张量
-    Tensor result = Tensor::empty(input.shape(), input.dtype(), input.device());
+    Tensor result = this->empty(input.shape(), input.dtype());
     clamp_into(input, min_val, max_val, result);
     return result;
 }
