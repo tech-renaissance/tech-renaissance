@@ -126,9 +126,9 @@ int main() {
 
         std::cout << "Initial weights loaded successfully" << std::endl;
 
-        // 4. 创建SGD优化器
-        std::cout << "\n4. Creating SGD optimizer..." << std::endl;
-        auto optimizer = std::make_unique<SGD>(0.1f, 0.9f, 1e-4f, false, backend);
+        // 4. 创建SGD优化器（启用Nesterov动量）
+        std::cout << "\n4. Creating SGD optimizer with Nesterov momentum..." << std::endl;
+        auto optimizer = std::make_unique<SGD>(0.1f, 0.9f, 1e-4f, true, backend);
         optimizer->initialize(*model);
 
         // 5. 创建交叉熵损失函数

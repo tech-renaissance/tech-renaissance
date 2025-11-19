@@ -66,7 +66,7 @@ def main():
     print("Exported initial weights to TSR files")
 
     # 5. 设置优化器和损失函数
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4, nesterov=True)
     criterion = nn.CrossEntropyLoss()
 
     print("Set up SGD optimizer (lr=0.1, momentum=0.9, weight_decay=1e-4)")
