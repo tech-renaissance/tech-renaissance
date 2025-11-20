@@ -36,14 +36,19 @@ public:
         // 创建并注册权重参数
         if (!has_parameter("weight")) {
             // 权重：out_features × in_features (PyTorch标准格式)
-            Tensor weight = backend->zeros(Shape(out_features_, in_features_), DType::FP32);
+            // 使用标准正态分布初始化，然后进行缩放
+            Tensor weight = backend->randn(Shape(out_features_, in_features_), 42);
+            float std_scale = std::sqrt(2.0f / in_features_);  // He初始化的缩放因子
+            backend->mul_inplace(weight, std_scale);
             register_parameter("weight", weight);
         }
 
         // 只有需要时才创建偏置参数
         if (use_bias_ && !has_parameter("bias")) {
             // 偏置：(1, out_features) - 2D形状以便于广播
-            Tensor bias = backend->zeros(Shape(1, out_features_), DType::FP32);
+            // 偏置使用小的随机值初始化
+            Tensor bias = backend->randn(Shape(1, out_features_), 43);
+            backend->mul_inplace(bias, 0.01f);  // 缩放到很小的值
             register_parameter("bias", bias);
         }
 

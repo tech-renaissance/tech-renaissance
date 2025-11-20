@@ -54,7 +54,7 @@ class MLP(nn.Module):
 def train_one_epoch(model, criterion, optimizer, train_loader, device, epoch):
     with torch.no_grad():
         for data, target in train_loader:
-            data, target = data.to(torch.float32), target.to(torch.float32)
+            data, target = data.to(torch.float32), target.to(torch.int32)
             export_tsr(data, 'train_images.tsr')
             export_tsr(target, 'train_labels.tsr')
             break
@@ -63,7 +63,7 @@ def train_one_epoch(model, criterion, optimizer, train_loader, device, epoch):
 def test(model, criterion, test_loader, device):
     with torch.no_grad():
         for data, target in test_loader:
-            data, target = data.to(torch.float32), target.to(torch.float32)
+            data, target = data.to(torch.float32), target.to(torch.int32)
             export_tsr(data, 'test_images.tsr')
             export_tsr(target, 'test_labels.tsr')
             break

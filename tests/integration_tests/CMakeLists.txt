@@ -6,6 +6,7 @@ set(TEST_SOURCES
     test_training_sgd.cpp
     test_training_adam.cpp
     test_training_adamw.cpp
+    test_training_mnist_mlp.cpp
 )
 
 # 创建测试可执行文件
@@ -14,6 +15,7 @@ add_executable(test_training_sgd test_training_sgd.cpp)
 add_executable(test_training_adam test_training_adam.cpp)
 add_executable(test_training_adamw test_training_adamw.cpp)
 add_executable(test_training_simple test_training_simple.cpp)
+add_executable(test_training_mnist_mlp test_training_mnist_mlp.cpp)
 
 # 链接必要的库
 target_link_libraries(test_model_optimizer_integration
@@ -41,6 +43,11 @@ target_link_libraries(test_training_simple
     tech_renaissance  # 主框架库
 )
 
+target_link_libraries(test_training_mnist_mlp
+    PRIVATE
+    tech_renaissance  # 主框架库
+)
+
 # 包含头文件
 target_include_directories(test_model_optimizer_integration
     PRIVATE
@@ -62,6 +69,11 @@ target_include_directories(test_training_simple
     ${CMAKE_SOURCE_DIR}
 )
 
+target_include_directories(test_training_mnist_mlp
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+
 # 设置输出目录
 set_target_properties(test_model_optimizer_integration PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
@@ -76,6 +88,10 @@ set_target_properties(test_training_adam PROPERTIES
 )
 
 set_target_properties(test_training_simple PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+)
+
+set_target_properties(test_training_mnist_mlp PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
 )
 
