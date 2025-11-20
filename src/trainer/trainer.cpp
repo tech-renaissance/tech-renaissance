@@ -22,7 +22,7 @@ namespace tr {
 Trainer::Trainer(Model& model,
                  std::unique_ptr<Optimizer> optimizer,
                  std::unique_ptr<Loss> loss_fn,
-                 std::unique_ptr<LRScheduler> scheduler)
+                 std::unique_ptr<Scheduler> scheduler)
     : model_(model)
     , optimizer_(std::move(optimizer))
     , loss_fn_(std::move(loss_fn))
@@ -56,21 +56,21 @@ float Trainer::train_step(const Tensor& input, const Tensor& target) {
 
     validate_components();
 
-    // 1. 前向传播，获取logits缓存
-    model_.forward(input);
-
-    // 2. 计算损失，使用缓存的logits()结果
-    loss_fn_->train();
-    float loss = loss_fn_->criterion(model_.logits(), target);
-
-    // 3. 反向传播
-    model_.backward();
-
-    // 4. 参数更新
-    optimizer_->step(model_);
-
-    // 5. 梯度清零
+    // 1. 清零梯度（参考test_training_mnist_mlp.cpp的实现）
     optimizer_->zero_grad(model_);
+
+    // 2. 前向传播（参考成功的实现）
+    auto output = model_.forward(input);
+
+    // 3. 计算损失
+    loss_fn_->train();
+    float loss = loss_fn_->criterion(output, target);
+
+    // 4. 反向传播：损失函数会自动在output上创建梯度
+    model_.backward(output.grad());
+
+    // 5. 参数更新
+    optimizer_->step(model_);
 
     current_step_++;
     return loss;
@@ -86,7 +86,7 @@ float Trainer::eval_step(const Tensor& input, const Tensor& target) {
     // 1. 前向传播
     model_.forward(input);
 
-    // 2. 计算损失，不需要梯度
+    // 2. 计算损失，使用缓存的logits()结果
     loss_fn_->eval();
     float loss = loss_fn_->criterion(model_.logits(), target);
 
@@ -177,15 +177,29 @@ void Trainer::validate_components() const {
 
 void Trainer::update_learning_rate() {
     if (scheduler_) {
-        float new_lr = scheduler_->get_lr();
+        float new_lr = scheduler_->get_lr(current_epoch_);
         optimizer_->set_lr(new_lr);
-        scheduler_->step();
     }
 }
 
 void Trainer::print_progress(int epoch, int step, float loss, int total_steps) const {
     std::cout << "Epoch " << (epoch + 1) << ", Step " << step << "/" << total_steps
               << " - Loss: " << std::fixed << std::setprecision(4) << loss << std::endl;
+}
+
+// ===== 学习率调度方法 =====
+
+float Trainer::step_lr_scheduler(int epoch) {
+    if (scheduler_) {
+        float new_lr = scheduler_->get_lr(epoch);
+        optimizer_->set_lr(new_lr);
+        return new_lr;
+    }
+    return optimizer_->get_lr();
+}
+
+float Trainer::get_current_lr() const {
+    return optimizer_ ? optimizer_->get_lr() : 0.0f;
 }
 
 } // namespace tr

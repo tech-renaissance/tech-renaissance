@@ -31,7 +31,7 @@ private:
     Model& model_;                                         // 模型引用
     std::unique_ptr<Optimizer> optimizer_;                 // 优化器
     std::unique_ptr<Loss> loss_fn_;                        // 损失函数
-    std::unique_ptr<LRScheduler> scheduler_;               // 学习率调度器
+    std::unique_ptr<Scheduler> scheduler_;               // 学习率调度器
 
     // 缓存管理
     const std::vector<Tensor*>* cached_params_;             // 缓存参数
@@ -53,7 +53,7 @@ public:
     Trainer(Model& model,
             std::unique_ptr<Optimizer> optimizer,
             std::unique_ptr<Loss> loss_fn,
-            std::unique_ptr<LRScheduler> scheduler = nullptr);
+            std::unique_ptr<Scheduler> scheduler = nullptr);
 
     /**
      * @brief 析构函数
@@ -151,7 +151,7 @@ public:
      * @brief 获取学习率调度器
      * @return 学习率调度器指针
      */
-    LRScheduler* get_scheduler() const { return scheduler_.get(); }
+    Scheduler* get_scheduler() const { return scheduler_.get(); }
 
     /**
      * @brief 获取当前epoch
@@ -164,6 +164,21 @@ public:
      * @return 当前step数
      */
     int get_current_step() const { return current_step_; }
+
+    // === 学习率调度 ===
+
+    /**
+     * @brief 执行一步学习率调度
+     * @param epoch 当前epoch数
+     * @return 当前学习率
+     */
+    float step_lr_scheduler(int epoch);
+
+    /**
+     * @brief 获取当前学习率
+     * @return 学习率
+     */
+    float get_current_lr() const;
 
     // === 检查点 ===
 

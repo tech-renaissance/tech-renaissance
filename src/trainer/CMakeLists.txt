@@ -7,6 +7,7 @@
 
 # 收集所有源文件
 set(TRAINER_SOURCES
+    trainer.cpp
     loss.cpp
     cross_entropy_loss.cpp
     optimizer.cpp
