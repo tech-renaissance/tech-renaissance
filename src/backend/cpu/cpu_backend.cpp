@@ -417,9 +417,9 @@ void CpuBackend::export_tensor(const Tensor& tensor, const std::string& filename
         // 验证设备类型
         validate_same_device(tensor.device());
 
-        // 验证张量
-        if (tensor.dtype() != DType::FP32 && tensor.dtype() != DType::INT8) {
-            throw TRException("Tensor export only supports FP32 and INT8 data types. "
+        // 验证张量数据类型
+        if (tensor.dtype() != DType::FP32 && tensor.dtype() != DType::INT8 && tensor.dtype() != DType::INT32) {
+            throw TRException("Tensor export only supports FP32, INT8 and INT32 data types. "
                              "Current dtype: " + std::to_string(static_cast<int>(tensor.dtype())));
         }
 
@@ -548,10 +548,12 @@ Tensor CpuBackend::import_tensor(const std::string& filename) const {
 
         // 验证数据类型
         if (header.dtype != static_cast<int32_t>(DType::FP32) &&
-            header.dtype != static_cast<int32_t>(DType::INT8)) {
+            header.dtype != static_cast<int32_t>(DType::INT8) &&
+            header.dtype != static_cast<int32_t>(DType::INT32)) {
             throw TRException("Unsupported dtype value: " + std::to_string(header.dtype) +
                              ". Supported values: " + std::to_string(static_cast<int>(DType::FP32)) +
-                             " (FP32), " + std::to_string(static_cast<int>(DType::INT8)) + " (INT8)");
+                             " (FP32), " + std::to_string(static_cast<int>(DType::INT8)) + " (INT8), " +
+                             std::to_string(static_cast<int>(DType::INT32)) + " (INT32)");
         }
 
         // 验证维度数量
@@ -585,7 +587,14 @@ Tensor CpuBackend::import_tensor(const std::string& filename) const {
         std::streampos file_size = file.tellg();
         file.seekg(sizeof(TSRHeader), std::ios::beg);
 
-        size_t element_size = (header.dtype == static_cast<int32_t>(DType::FP32)) ? 4 : 1;
+        size_t element_size;
+        if (header.dtype == static_cast<int32_t>(DType::FP32)) {
+            element_size = 4;  // FP32 = 4字节
+        } else if (header.dtype == static_cast<int32_t>(DType::INT32)) {
+            element_size = 4;  // INT32 = 4字节
+        } else {  // INT8
+            element_size = 1;  // INT8 = 1字节
+        }
         size_t expected_data_size = header.total_elements * element_size;
         size_t expected_file_size = sizeof(TSRHeader) + expected_data_size;
 
@@ -1087,17 +1096,23 @@ bool CpuBackend::equal(const Tensor& tensor_a, const Tensor& tensor_b) const {
     validate_same_device(tensor_a.device());
     validate_same_device(tensor_b.device());
 
-    // 2. 检查数据类型必须是INT32
-    if (tensor_a.dtype() != DType::INT32 || tensor_b.dtype() != DType::INT32) {
-        throw TypeError("[CpuBackend::equal] All tensors must be INT32 type");
+    // 2. 检查数据类型必须是INT32或INT8
+    if ((tensor_a.dtype() != DType::INT32 && tensor_a.dtype() != DType::INT8) ||
+        (tensor_b.dtype() != DType::INT32 && tensor_b.dtype() != DType::INT8)) {
+        throw TypeError("[CpuBackend::equal] All tensors must be INT32 or INT8 type");
     }
 
-    // 3. 检查形状一致性
+    // 3. 检查数据类型一致性
+    if (tensor_a.dtype() != tensor_b.dtype()) {
+        throw TypeError("[CpuBackend::equal] Tensors must have the same data type");
+    }
+
+    // 4. 检查形状一致性
     if (tensor_a.shape() != tensor_b.shape()) {
         return false;
     }
 
-    // 4. 处理空张量情况
+    // 5. 处理空张量情况
     if (tensor_a.is_empty() && tensor_b.is_empty()) {
         return true;
     }
@@ -1105,21 +1120,38 @@ bool CpuBackend::equal(const Tensor& tensor_a, const Tensor& tensor_b) const {
         return false;
     }
 
-    // 5. 执行快速比较
-    const int32_t* data_a = static_cast<const int32_t*>(tensor_a.data_ptr());
-    const int32_t* data_b = static_cast<const int32_t*>(tensor_b.data_ptr());
-
+    // 6. 执行快速比较
     size_t num_elements = tensor_a.numel();
 
-    // 先使用memcmp进行快速比较（如果内存完全相同）
-    if (std::memcmp(data_a, data_b, num_elements * sizeof(int32_t)) == 0) {
-        return true;
-    }
+    if (tensor_a.dtype() == DType::INT32) {
+        const int32_t* data_a = static_cast<const int32_t*>(tensor_a.data_ptr());
+        const int32_t* data_b = static_cast<const int32_t*>(tensor_b.data_ptr());
 
-    // 如果memcmp失败，逐个元素比较
-    for (size_t i = 0; i < num_elements; ++i) {
-        if (data_a[i] != data_b[i]) {
-            return false;
+        // 先使用memcmp进行快速比较（如果内存完全相同）
+        if (std::memcmp(data_a, data_b, num_elements * sizeof(int32_t)) == 0) {
+            return true;
+        }
+
+        // 如果memcmp失败，逐个元素比较
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (data_a[i] != data_b[i]) {
+                return false;
+            }
+        }
+    } else if (tensor_a.dtype() == DType::INT8) {
+        const int8_t* data_a = static_cast<const int8_t*>(tensor_a.data_ptr());
+        const int8_t* data_b = static_cast<const int8_t*>(tensor_b.data_ptr());
+
+        // 先使用memcmp进行快速比较（如果内存完全相同）
+        if (std::memcmp(data_a, data_b, num_elements * sizeof(int8_t)) == 0) {
+            return true;
+        }
+
+        // 如果memcmp失败，逐个元素比较
+        for (size_t i = 0; i < num_elements; ++i) {
+            if (data_a[i] != data_b[i]) {
+                return false;
+            }
         }
     }
     return true;

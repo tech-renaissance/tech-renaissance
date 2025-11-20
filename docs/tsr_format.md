@@ -1,13 +1,32 @@
 # TSR文件格式规范文档
 
-**版本**: 1.0
-**日期**: 2025-10-28
+**格式版本**: 1.0
+**实现版本**: V1.56.0
+**日期**: 2025年11月20日
 **作者**: 技术觉醒团队
-**文档版本**: V1.17.01
+**文档版本**: V1.56.00
 
 ## 概述
 
-TSR(Technical Renaissance)文件格式是技术觉醒框架的专用张量二进制存储格式，旨在提供高效、自描述、跨平台的张量数据交换机制。
+TSR(Technical Renaissance)文件格式是技术觉醒框架的专用张量二进制存储格式，旨在提供高效、自描述、跨平台的张量数据交换机制。**V1.56.0版本已完整支持FP32、INT32、INT8三种数据类型，并提供C++和Python双重接口**。
+
+## 🎉 V1.56.0最新更新：INT32数据类型支持
+
+### ✨ 核心功能扩展
+
+- **🎯 INT32数据类型**: 新增32位有符号整数张量的完整TSR支持
+- **📊 存储效率**: INT32与FP32相同大小，INT8仅为1/4大小
+- **🔍 完全兼容**: 100%向后兼容现有FP32和INT8 TSR文件
+- **⚡ 双重接口**: C++ CpuBackend和Python tech_renaissance.py同时支持
+
+### 实现状态
+| 功能 | FP32 | INT32 | INT8 | 说明 |
+|------|------|-------|------|------|
+| C++ 导出 | ✅ | ✅ | ✅ | CpuBackend::export_tensor |
+| C++ 导入 | ✅ | ✅ | ✅ | CpuBackend::import_tensor |
+| Python 导出 | ✅ | ✅ | ✅ | export_tsr(tensor, filename) |
+| Python 导入 | ✅ | ✅ | ✅ | import_tsr(filename) |
+| 精确比较 | is_close | equal | equal | 数据类型适配的比较方法 |
 
 ### 设计目标
 
@@ -65,7 +84,7 @@ struct TSRHeader {
 
 | 偏移 | 大小 | 字段 | 描述 |
 |-------|------|------|------|
-| 16 | 4 | dtype | 数据类型：1=FP32, 2=INT8 |
+| 16 | 4 | dtype | 数据类型：1=FP32, 2=INT8, 3=INT32 |
 | 20 | 4 | ndim | 维度数量：0-4 |
 | 24 | 16 | dims[4] | 维度尺寸数组，按N,C,H,W顺序 |
 | 40 | 8 | total_elements | 元素总数 |
@@ -94,6 +113,11 @@ struct TSRHeader {
 **INT8数据类型**:
 - 格式: 有符号8位整数
 - 大小: 1字节/元素
+- 顺序: 按NCHW连续存储
+
+**INT32数据类型**:
+- 格式: 有符号32位整数
+- 大小: 4字节/元素
 - 顺序: 按NCHW连续存储
 
 ## 与Tensor类的属性映射
@@ -157,7 +181,8 @@ dims = {2, 3, 4, 5};  // N=2, C=3, H=4, W=5
 enum class DType : int32_t {
     UNKNOWN = 0,  // 无效类型
     FP32 = 1,     // 32位浮点数 (IEEE 754)
-    INT8 = 2      // 8位有符号整数
+    INT8 = 2,     // 8位有符号整数
+    INT32 = 3     // 32位有符号整数 (V1.56.0新增)
 };
 ```
 
@@ -167,6 +192,7 @@ enum class DType : int32_t {
 |------|-----|------|------|------|
 | FP32 | 1 | 4字节 | ±3.4E±38 | 深度学习训练和推理 |
 | INT8 | 2 | 1字节 | -128 到 +127 | 量化推理 |
+| INT32 | 3 | 4字节 | -2³¹ 到 2³¹-1 | 标签存储和整数运算 |
 
 ## 实现指南
 
@@ -281,7 +307,7 @@ try {
 
 TSR格式设计支持向前兼容：
 
-- **版本1**: 当前版本，支持FP32和INT8，0-4维张量
+- **版本1**: 当前版本，支持FP32、INT32、INT8，0-4维张量
 - **未来版本**: 可通过version字段识别，添加新数据类型或功能
 
 ### 保留字段
@@ -293,18 +319,19 @@ TSR格式设计支持向前兼容：
 
 ### 扩展数据类型
 
-未来可支持的数据类型：
+当前和未来可支持的数据类型：
 
 ```cpp
 enum class DType : int32_t {
-    UNKNOWN = 0,
-    FP32 = 1,     // 当前支持
-    INT8 = 2,     // 当前支持
-    FP16 = 3,     // 未来：16位浮点数
-    BF16 = 4,     // 未来：bfloat16
-    FP64 = 5,     // 未来：64位浮点数
-    INT32 = 6,     // 未来：32位整数
-    INT16 = 7      // 未来：16位整数
+    UNKNOWN = 0,  // 无效类型
+    FP32 = 1,     // ✅ 当前支持：32位浮点数
+    INT8 = 2,     // ✅ 当前支持：8位有符号整数
+    INT32 = 3,    // ✅ 当前支持：32位有符号整数 (V1.56.0新增)
+    FP16 = 4,     // 未来：16位浮点数
+    BF16 = 5,     // 未来：bfloat16
+    FP64 = 6,     // 未来：64位浮点数
+    INT16 = 7,    // 未来：16位整数
+    UINT8 = 8     // 未来：8位无符号整数
 };
 ```
 
@@ -336,10 +363,10 @@ tsr_info data.tsr
 # 输出:
 # File: data.tsr
 # Format: TSR v1
-# Type: FP32
+# Type: FP32/INT32/INT8
 # Shape: [2, 3, 4, 5] (N=2, C=3, H=4, W=5)
 # Elements: 120
-# Size: 480 bytes
+# Size: 480 bytes (FP32/INT32) / 120 bytes (INT8)
 ```
 
 ### 数据转换
@@ -368,11 +395,17 @@ TSR文件格式为技术觉醒框架提供了：
 ```cpp
 // 源文件: src/backend/cpu/cpu_backend.cpp
 // 函数: CpuBackend::export_tensor() 和 CpuBackend::import_tensor()
+// V1.56.0更新：新增INT32数据类型支持
 
 // 关键实现细节
 constexpr char MAGIC_NUMBER[4] = {'T', 'S', 'R', '!'};
 constexpr int32_t FORMAT_VERSION = 1;
 constexpr int32_t HEADER_SIZE = 64;
+
+// 数据类型验证 (V1.56.0更新)
+if (tensor.dtype() != DType::FP32 && tensor.dtype() != DType::INT8 && tensor.dtype() != DType::INT32) {
+    throw TRException("Tensor export only supports FP32, INT8 and INT32 data types");
+}
 
 // 验证魔数
 if (std::memcmp(header.magic, MAGIC_NUMBER, 4) != 0) {
@@ -393,9 +426,14 @@ else shape = Shape(header.dims[0], header.dims[1], header.dims[2], header.dims[3
 ```python
 # 源文件: python/module/tech_renaissance.py
 # 函数: export_tsr() 和 import_tsr()
+# V1.56.0更新：新增INT32数据类型支持
 
 # 关键实现细节
 def export_tsr(tensor: torch.Tensor, filename: str) -> None:
+    # 数据类型检查 (V1.56.0更新)
+    if tensor.dtype not in [torch.float32, torch.int8, torch.int32]:
+        raise TSRError(f"Unsupported data type {tensor.dtype}, only support float32, int8 and int32")
+
     # 头部打包（64字节）
     header = struct.pack(
         '<4s i i i i i i i i i q q q',  # 64字节格式
@@ -403,7 +441,7 @@ def export_tsr(tensor: torch.Tensor, filename: str) -> None:
         1,            # 版本
         64,           # 头部大小
         0,            # reserved
-        dtype_enum,   # 数据类型
+        dtype_enum,   # 数据类型 (1=FP32, 2=INT8, 3=INT32)
         ndim,         # 维度数量
         nchw[0], nchw[1], nchw[2], nchw[3],  # NCHW维度
         tensor.numel(),  # 元素总数
@@ -415,11 +453,47 @@ def import_tsr(filename: str) -> torch.Tensor:
     magic, version, header_size, reserved_1, dtype_enum, ndim, \
     dim0, dim1, dim2, dim3, total_elements, reserved_2, reserved_3 = \
         struct.unpack('<4s i i i i i i i i i q q q', header_data)
+
+    # 数据类型转换 (V1.56.0更新)
+    if dtype_enum == 1: dtype = torch.float32
+    elif dtype_enum == 2: dtype = torch.int8
+    elif dtype_enum == 3: dtype = torch.int32
+    else: raise TSRError(f"Unknown data type enum: {dtype_enum}")
 ```
 
 ### 测试验证
+
+#### C++测试 (V1.56.0更新)
 ```cpp
-// 源文件: tests/unit_tests/test_tensor_io.cpp
+// 源文件: tests/unit_tests/test_tsr_io_extended.cpp
+// V1.56.0新增：完整的INT32数据类型测试
+
+// 测试内容
+- FP32 2D/4D张量导入导出
+- INT32 2D/4D张量导入导出
+- INT8 2D/4D张量导入导出
+- 向后兼容性验证
+```
+
+#### Python测试 (V1.56.0新增)
+```python
+# 源文件: python/module/test_tsr_extended.py
+# 测试FP32、INT32、INT8三种数据类型的完整TSR支持
+
+# 运行测试
+python test_tsr_extended.py
+# 预期结果：所有测试通过
+```
+
+#### 兼容性测试 (V1.56.0新增)
+```python
+# 源文件: python/module/test_tsr_compatibility.py
+# 验证V1.56.0与旧版本的完全兼容性
+
+# 运行测试
+python test_tsr_compatibility.py
+# 预期结果：向后兼容性100%验证通过
+```
 // 测试用例覆盖所有维度和数据类型的组合
 
 std::vector<std::pair<Shape, DType>> test_cases = {

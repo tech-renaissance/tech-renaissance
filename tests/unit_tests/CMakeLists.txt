@@ -796,5 +796,11 @@ register_test(test_lr_schedulers "Learning Rate Schedulers Test")
 configure_simple_test(test_d4_optimizer test_d4_optimizer.cpp)
 register_test(test_d4_optimizer "D4 Optimizer Implementation Test")
 
+# =============================================================================
+# TSR扩展I/O测试（V1.56.0新增）
+# =============================================================================
+configure_simple_test(test_tsr_io_extended test_tsr_io_extended.cpp)
+register_test(test_tsr_io_extended "TSR Extended I/O Test")
+
 message(STATUS "All tests configured successfully (optimized version)")
 

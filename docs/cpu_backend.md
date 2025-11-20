@@ -1,7 +1,7 @@
 # CpuBackend技术文档
 
-**版本**: V1.53.0
-**日期**: 2025年11月19日
+**版本**: V1.56.0
+**日期**: 2025年11月20日
 **作者**: 技术觉醒团队
 **所属系列**: backend
 
@@ -21,7 +21,22 @@
 
 CpuBackend是Tech Renaissance框架的CPU计算后端实现，基于Eigen库提供高性能的张量运算。通过SIMD优化和多线程支持，充分利用现代CPU的计算能力。**V1.53.0版本通过了完整的PyTorch训练对齐测试，证明了其数值计算精度和稳定性达到工业级标准**。
 
-## 🎉 V1.53.0最新更新：PyTorch对齐验证
+## 🎉 V1.56.0最新更新：TSR格式INT32支持
+
+### ✨ TSR格式扩展功能
+
+- **🎯 INT32数据类型支持**: 新增INT32张量的TSR文件导入导出功能
+- **📊 完全向后兼容**: 现有FP32和INT8 TSR文件100%兼容
+- **🔍 Python集成**: PyTorch张量与TSR文件的双向转换
+- **⚡ 性能优化**: 支持所有三种数据类型的高效存储和访问
+
+### 核心功能
+- **TSR导出**: `export_tensor(tensor, filename)` 支持FP32/INT32/INT8
+- **TSR导入**: `import_tensor(filename)` 自动识别数据类型
+- **精确比较**: `equal(tensor_a, tensor_b)` 支持INT32和INT8精确比较
+- **文件大小**: INT32与FP32相同大小，INT8仅为1/4大小
+
+## 🎉 V1.53.0历史更新：PyTorch对齐验证
 
 ### ✨ 数值精度验证
 
@@ -63,11 +78,11 @@ CpuBackend是Tech Renaissance框架的CPU计算后端实现，基于Eigen库提�
 
 ### 📊 数据类型支持
 
-| 数据类型 | 支持状态 | 说明 |
-|---------|---------|------|
-| FP32 | ✅ 完全支持 | 主要计算类型 |
-| INT8 | ✅ 基础支持 | 量化和推理 |
-| INT32 | ✅ 完全支持 | 索引和标签 |
+| 数据类型 | 支持状态 | 说明 | TSR支持 |
+|---------|---------|------|---------|
+| FP32 | ✅ 完全支持 | 主要计算类型 | ✅ 完全支持 |
+| INT8 | ✅ 完全支持 | 量化和推理 | ✅ 完全支持 |
+| INT32 | ✅ 完全支持 | 索引和标签 | ✅ 完全支持(V1.56.0新增) |
 
 ---
 
@@ -200,6 +215,96 @@ Tensor CpuBackend::mac(const Tensor& input, float scalar_x, float scalar_y) cons
 ```
 
 **数学定义**: `result = input * scalar_x + scalar_y`
+
+### TSR文件IO (V1.56.0新增)
+
+#### export_tensor - 导出TSR文件
+
+```cpp
+void CpuBackend::export_tensor(const Tensor& tensor, const std::string& filename) const;
+```
+
+**功能**: 将张量导出为TSR格式文件
+**支持数据类型**: FP32, INT32, INT8
+**文件结构**: 64字节头部 + 数据部分
+
+**实现特点**:
+```cpp
+// 验证数据类型
+if (tensor.dtype() != DType::FP32 && tensor.dtype() != DType::INT8 && tensor.dtype() != DType::INT32) {
+    throw TRException("Tensor export only supports FP32, INT8 and INT32 data types");
+}
+
+// 写入文件头
+constexpr char MAGIC_NUMBER[4] = {'T', 'S', 'R', '!'};
+int32_t dtype_value = static_cast<int32_t>(tensor.dtype());
+
+// 写入数据
+const void* data_ptr = tensor.data_ptr();
+file.write(static_cast<const char*>(data_ptr), data_size);
+```
+
+#### import_tensor - 导入TSR文件
+
+```cpp
+Tensor CpuBackend::import_tensor(const std::string& filename) const;
+```
+
+**功能**: 从TSR文件导入张量
+**自动类型识别**: 根据文件头自动识别数据类型
+**完整性验证**: 文件大小和数据完整性检查
+
+**实现特点**:
+```cpp
+// 读取文件头
+struct TSRHeader {
+    char magic[4];        // 魔数 'TSR!'
+    int32_t version;     // 格式版本
+    int32_t dtype;       // 数据类型
+    int32_t ndim;        // 维度数量
+    int32_t dims[4];     // 各维度大小 (NCHW)
+    int64_t total_elements; // 元素总数
+};
+
+// 验证魔数和版本
+if (magic != std::string("TSR!") || version != 1) {
+    throw TRException("Invalid TSR file format");
+}
+```
+
+#### equal - 精确比较 (V1.56.0扩展)
+
+```cpp
+bool CpuBackend::equal(const Tensor& tensor_a, const Tensor& tensor_b) const;
+```
+
+**功能**: 精确比较两个张量是否相等
+**支持数据类型**: INT32, INT8 (FP32使用is_close)
+**性能优化**: 快速memcmp + 逐元素比较
+
+**实现特点**:
+```cpp
+// 数据类型检查
+if (tensor_a.dtype() != DType::INT32 && tensor_a.dtype() != DType::INT8) {
+    throw TypeError("Tensors must be INT32 or INT8 type");
+}
+
+// 高效比较
+if (tensor_a.dtype() == DType::INT32) {
+    const int32_t* data_a = static_cast<const int32_t*>(tensor_a.data_ptr());
+    const int32_t* data_b = static_cast<const int32_t*>(tensor_b.data_ptr());
+
+    // 快速memcmp
+    if (std::memcmp(data_a, data_b, num_elements * sizeof(int32_t)) == 0) {
+        return true;
+    }
+
+    // 逐元素比较
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (data_a[i] != data_b[i]) return false;
+    }
+}
+```
 
 ---
 
@@ -362,6 +467,9 @@ void batch_add(std::vector<Tensor>& inputs, const Tensor& bias) {
 
 # 运行张量后端联合测试
 ./build/cmake-build-release-alpha/bin/tests/test_tensor_backend.exe
+
+# 运行TSR扩展功能测试 (V1.56.0新增)
+./build/cmake-build-release-alpha/bin/tests/test_tsr_io_extended.exe
 ```
 
 ### 性能基准
@@ -405,7 +513,38 @@ valgrind --tool=memcheck ./test_cpu_backend
 
 ## 版本历史
 
-### V1.51.0 (2025-11-19)
+### V1.56.0 (2025-11-20)
+- ✅ TSR格式扩展：新增INT32数据类型支持
+- ✅ 文件IO功能：export_tensor/import_tensor完整实现
+- ✅ Python集成：PyTorch与TSR双向转换
+- ✅ 精确比较：equal方法扩展支持INT32和INT8
+- ✅ 向后兼容：100%兼容现有FP32和INT8文件
+
+### V1.55.0 (2025-11-19)
+- ✅ AdamW优化器完整实现
+- ✅ 随机数生成器：randint方法修复和扩展
+- ✅ 类型系统：INT32数据类型完整支持
+
+### V1.54.0 (2025-11-19)
+- ✅ Adam优化器与PyTorch对齐实现
+- ✅ 优化器系统：完整梯度管理
+- ✅ 数值稳定性：改进的更新算法
+
+### V1.53.1 (2025-11-19)
+- ✅ SGD优化器完全对齐实现
+- ✅ PyTorch兼容性：包括Nesterov动量
+- ✅ 训练流程：端到端验证通过
+
+### V1.53.0 (2025-11-19)
+- ✅ PyTorch训练对齐验证：100%测试通过
+- ✅ 数值精度：is_close方法验证
+- ✅ 张量可视化：tensor.print()方法
+
+### V1.52.0 (2025-11-18)
+- ✅ Optimizer系统集成支持
+- ✅ StateManager设备转移优化
+
+### V1.51.0 (2025-11-17)
 - ✅ API重构：统一add/mul运算接口
 - ✅ 新增cpu_basic_ops.cpp实现文件
 - ✅ 添加张量版本的mul_into方法

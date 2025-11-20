@@ -273,7 +273,7 @@ Tensor CpuBackend::randint(const Shape& shape, int low, int high, DType dtype, u
     }
 
     // 创建张量并分配内存
-    Tensor result = this->empty(shape, DType::FP32);
+    Tensor result = this->empty(shape, dtype);
 
     // 使用C++11随机数生成器
     std::mt19937 engine(seed);

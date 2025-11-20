@@ -33,15 +33,15 @@ def _validate_tensor_for_export(tensor: torch.Tensor) -> None:
     """
     # 检查维度限制
     if tensor.dim() > 4:
-        raise TSRError(f"张量维度{tensor.dim()}超过4维限制")
+        raise TSRError(f"Tensor dimension {tensor.dim()} exceeds 4D limit")
 
     # 检查数据类型
-    if tensor.dtype not in [torch.float32, torch.int8]:
-        raise TSRError(f"不支持的数据类型{tensor.dtype}，仅支持float32和int8")
+    if tensor.dtype not in [torch.float32, torch.int8, torch.int32]:
+        raise TSRError(f"Unsupported data type {tensor.dtype}, only support float32, int8 and int32")
 
     # 检查设备类型
     if tensor.device.type != 'cpu':
-        raise TSRError(f"张量必须在CPU设备上，当前在{tensor.device.type}")
+        raise TSRError(f"Tensor must be on CPU device, currently on {tensor.device.type}")
 
 
 def _tensor_to_tsr_dtype(tensor: torch.Tensor) -> int:
@@ -58,8 +58,10 @@ def _tensor_to_tsr_dtype(tensor: torch.Tensor) -> int:
         return 1  # FP32
     elif tensor.dtype == torch.int8:
         return 2  # INT8
+    elif tensor.dtype == torch.int32:
+        return 3  # INT32
     else:
-        raise TSRError(f"不支持的数据类型: {tensor.dtype}")
+        raise TSRError(f"Unsupported data type: {tensor.dtype}")
 
 
 def _tsr_dtype_to_tensor(dtype_enum: int) -> torch.dtype:
@@ -76,8 +78,10 @@ def _tsr_dtype_to_tensor(dtype_enum: int) -> torch.dtype:
         return torch.float32
     elif dtype_enum == 2:
         return torch.int8
+    elif dtype_enum == 3:
+        return torch.int32
     else:
-        raise TSRError(f"未知的TSR数据类型枚举值: {dtype_enum}")
+        raise TSRError(f"Unknown TSR data type enum value: {dtype_enum}")
 
 
 def _shape_to_nchw(tensor: torch.Tensor) -> Tuple[int, int, int, int]:
@@ -134,7 +138,7 @@ def _nchw_to_shape(nchw: Tuple[int, int, int, int], ndim: int) -> Tuple[int, ...
     elif ndim == 4:  # 4D张量 [N, C, H, W]
         result = nchw
     else:
-        raise TSRError(f"不支持的维度数: {ndim}")
+        raise TSRError(f"Unsupported number of dimensions: {ndim}")
 
     if DEBUG_MODE: print(f"[PYTHON_DEBUG] _nchw_to_shape: Output shape = {result}")
     return result
@@ -187,7 +191,7 @@ def export_tsr(tensor: torch.Tensor, filename: str) -> None:
             f.write(tensor_bytes)
 
     except Exception as e:
-        raise TSRError(f"写入TSR文件失败: {e}")
+        raise TSRError(f"Failed to write TSR file: {e}")
 
 
 def import_tsr(filename: str) -> torch.Tensor:
@@ -204,14 +208,14 @@ def import_tsr(filename: str) -> torch.Tensor:
         TSRError: 如果文件格式错误或读取失败
     """
     if not os.path.exists(filename):
-        raise TSRError(f"TSR文件不存在: {filename}")
+        raise TSRError(f"TSR file does not exist: {filename}")
 
     try:
         with open(filename, 'rb') as f:
             # 读取文件头
             header_data = f.read(64)
             if len(header_data) != 64:
-                raise TSRError("TSR文件头大小不正确")
+                raise TSRError("Invalid TSR header size")
 
             # 解析文件头 (64字节)
             # 格式: <4s i i i i i 4i q q q (与导出时一致)
@@ -222,13 +226,13 @@ def import_tsr(filename: str) -> torch.Tensor:
 
             # 验证魔数和版本
             if magic != b'TSR!':
-                raise TSRError(f"无效的TSR魔数: {magic}")
+                raise TSRError(f"Invalid TSR magic number: {magic}")
 
             if version != 1:
-                raise TSRError(f"不支持的TSR版本: {version}")
+                raise TSRError(f"Unsupported TSR version: {version}")
 
             if header_size != 64:
-                raise TSRError(f"不支持的头部大小: {header_size}，期望64字节")
+                raise TSRError(f"Unsupported header size: {header_size}, expected 64 bytes")
 
             # 转换数据类型
             dtype = _tsr_dtype_to_tensor(dtype_enum)
@@ -240,13 +244,18 @@ def import_tsr(filename: str) -> torch.Tensor:
             if DEBUG_MODE: print(f"[PYTHON_DEBUG] import_tsr: Final reconstructed shape = {shape}")
 
             # 计算期望的数据大小
-            element_size = 4 if dtype == torch.float32 else 1  # FP32=4字节, INT8=1字节
+            if dtype == torch.float32:
+                element_size = 4  # FP32 = 4 bytes
+            elif dtype == torch.int32:
+                element_size = 4  # INT32 = 4 bytes
+            else:  # torch.int8
+                element_size = 1  # INT8 = 1 byte
             expected_size = total_elements * element_size
 
             # 读取数据
             data = f.read(expected_size)
             if len(data) != expected_size:
-                raise TSRError(f"数据大小不匹配，期望{expected_size}字节，实际{len(data)}字节")
+                raise TSRError(f"Data size mismatch, expected {expected_size} bytes, got {len(data)} bytes")
 
             # 创建张量
             if ndim == 0:  # 标量
@@ -254,13 +263,21 @@ def import_tsr(filename: str) -> torch.Tensor:
                 if dtype == torch.float32:
                     value = struct.unpack('<f', data)[0]
                     tensor = torch.tensor(value, dtype=dtype)
+                elif dtype == torch.int32:
+                    value = struct.unpack('<i', data)[0]
+                    tensor = torch.tensor(value, dtype=dtype)
                 else:  # int8
                     value = struct.unpack('<b', data)[0]
                     tensor = torch.tensor(value, dtype=dtype)
             else:
                 # 对于多维张量，从字节数组创建
                 import numpy as np
-                np_dtype = np.float32 if dtype == torch.float32 else np.int8
+                if dtype == torch.float32:
+                    np_dtype = np.float32
+                elif dtype == torch.int32:
+                    np_dtype = np.int32
+                else:  # torch.int8
+                    np_dtype = np.int8
                 np_array = np.frombuffer(data, dtype=np_dtype).reshape(shape)
                 # 创建可写副本以避免PyTorch警告
                 np_array = np.copy(np_array)
@@ -269,11 +286,11 @@ def import_tsr(filename: str) -> torch.Tensor:
             return tensor
 
     except struct.error as e:
-        raise TSRError(f"解析TSR文件头失败: {e}")
+        raise TSRError(f"Failed to parse TSR header: {e}")
     except Exception as e:
         if isinstance(e, TSRError):
             raise
-        raise TSRError(f"读取TSR文件失败: {e}")
+        raise TSRError(f"Failed to read TSR file: {e}")
 
 
 def get_tsr_info(filename: str) -> dict:
