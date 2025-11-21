@@ -69,6 +69,10 @@ DEFINE_NOT_IMPLEMENTED_VOID_METHOD(square_into, (const Tensor& input, Tensor& ou
 // 交叉熵损失函数
 DEFINE_NOT_IMPLEMENTED_METHOD(crossentropy, float, (const Tensor& pred, const Tensor& label, std::string reduction), )
 
+// softmax操作
+DEFINE_NOT_IMPLEMENTED_METHOD(softmax, Tensor, (const Tensor& input, int dim), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(softmax_into, (const Tensor& input, Tensor& output, int dim), )
+
 // One-hot编码操作
 DEFINE_NOT_IMPLEMENTED_METHOD(one_hot, Tensor, (const Tensor& label, int32_t num_classes, float label_smoothing), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(one_hot_into, (const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing), )
@@ -122,5 +126,13 @@ DEFINE_NOT_IMPLEMENTED_VOID_METHOD(mul_broadcast_into, (const Tensor& tensor_a, 
 
 // 张量创建方法（const重载）
 DEFINE_NOT_IMPLEMENTED_METHOD(empty, Tensor, (const Shape& shape, DType dtype), const)
+
+// 张量复制操作
+DEFINE_NOT_IMPLEMENTED_METHOD(copy, Tensor, (const Tensor& tensor), const)
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(copy_into, (const Tensor& src, Tensor& dst), const)
+DEFINE_NOT_IMPLEMENTED_METHOD(zeros_like, Tensor, (const Tensor& input), const)
+
+// 支持转置的矩阵乘法
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(mm_into_transposed, (const Tensor& a, const Tensor& b, Tensor& result, bool transpose_a, bool transpose_b), )
 
 } // namespace tr

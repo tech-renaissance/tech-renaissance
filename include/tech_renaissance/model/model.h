@@ -64,6 +64,10 @@ private:
         std::vector<Tensor> backward_cache_;  // 反向传播缓存
         bool allocated_ = false;              // 分配状态标志
 
+        // ✅ 新增成员
+        Shape last_input_shape_;              // 上次输入形状
+        Backend* last_backend_ = nullptr;     // 上次后端指针
+
         /**
          * @brief 预分配所有层的缓存空间
          * @param modules 模块列表

@@ -33,44 +33,44 @@ CrossEntropyLoss::CrossEntropyLoss(std::shared_ptr<Backend> backend, bool traini
 float CrossEntropyLoss::criterion(Tensor& logits, const Tensor& target, const std::string& reduction) {
     auto backend = get_backend();
 
-    // 计算softmax概率（内部包含softmax计算）
-    auto cpu_backend = std::dynamic_pointer_cast<CpuBackend>(backend);
-    if (!cpu_backend) {
-        throw TRException("CrossEntropyLoss: Currently only supports CPU backend");
-    }
+    // 确保缓存已分配
+    ensure_cache_allocated(logits.shape());
 
-    // 如果target是INT32标签，需要先转换为one-hot编码
+    // ✅ 增强类型检查
     Tensor processed_target;
     if (target.dtype() == DType::INT32) {
-        // 创建one-hot编码
-        processed_target = cpu_backend->one_hot(target, logits.shape().dim(1), label_smoothing_);
-    } else {
-        // 假设已经是one-hot编码格式
+        // INT32标签 -> one-hot
+        processed_target = backend->one_hot(target, logits.shape().dim(1), label_smoothing_);
+    } else if (target.dtype() == DType::FP32) {
+        // ✅ 显式验证FP32
         processed_target = target;
+    } else {
+        // ✅ 抛出明确错误 - 使用具体异常类型
+        throw TypeError("[CrossEntropyLoss] Target must be INT32 (labels) or FP32 (one-hot), got unsupported dtype");
     }
 
-    // 计算softmax概率
-    Tensor softmax_probs = cpu_backend->softmax(logits, 1);
+    // 使用基类的softmax_into方法
+    backend->softmax_into(logits, softmax_cache_, 1);
 
-    // 使用backend的crossentropy方法计算损失（softmax后的概率 + one-hot标签）
-    float loss = cpu_backend->crossentropy(softmax_probs, processed_target, reduction);
+    // 使用基类的minus_broadcast_into方法（避免内存分配）
+    backend->minus_broadcast_into(softmax_cache_, processed_target, grad_cache_);
 
-    // 在训练模式下，计算梯度：softmax_probs - one_hot_target
+    // 使用基类的crossentropy方法计算损失
+    float loss = backend->crossentropy(softmax_cache_, processed_target, reduction);
+
+    // 训练模式下处理梯度
     if (is_training()) {
-        // 梯度计算: softmax_probs - processed_target
-        Tensor grad_logits = cpu_backend->minus_broadcast(softmax_probs, processed_target);
-
         // 如果是mean reduction，需要除以batch size
         if (reduction == "mean") {
             float batch_size = static_cast<float>(logits.shape().dim(0));
-            cpu_backend->mul_inplace(grad_logits, 1.0f / batch_size);
+            backend->mul_inplace(grad_cache_, 1.0f / batch_size);
         }
 
         // 将梯度存储到logits的grad中
         if (!logits.has_grad()) {
-            logits.set_grad(cpu_backend->zeros_like(logits));
+            logits.set_grad(backend->zeros_like(logits));
         }
-        cpu_backend->copy_into(grad_logits, logits.grad());
+        backend->copy_into(grad_cache_, logits.grad());
     }
 
     return loss;

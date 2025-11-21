@@ -41,6 +41,7 @@ private:
     bool training_;                                         // 训练模式
     int current_epoch_;                                     // 当前epoch
     int current_step_;                                      // 当前step
+    mutable bool grad_cleared_ = true;                       // ✅ 新增：梯度清零状态标记
 
 public:
     /**

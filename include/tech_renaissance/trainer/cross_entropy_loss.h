@@ -25,6 +25,25 @@ class CrossEntropyLoss : public Loss {
 private:
     float label_smoothing_;  // 标签平滑参数
 
+    // 预分配缓存 - 避免每次调用criterion时创建临时张量
+    mutable Tensor softmax_cache_;     // 预分配的softmax概率缓存
+    mutable Tensor grad_cache_;        // 预分配的梯度缓存
+    mutable bool cache_allocated_ = false;  // 缓存分配状态标志
+
+    // ✅ 使用精确匹配（保证兼容性）
+    /**
+     * @brief 确保缓存已分配
+     * @param shape 张量形状
+     */
+    void ensure_cache_allocated(const Shape& shape) const {
+        auto backend = get_backend();
+        if (!cache_allocated_ || softmax_cache_.shape() != shape) {
+            softmax_cache_ = backend->empty(shape, DType::FP32);
+            grad_cache_ = backend->empty(shape, DType::FP32);
+            cache_allocated_ = true;
+        }
+    }
+
 public:
     /**
      * @brief 构造函数

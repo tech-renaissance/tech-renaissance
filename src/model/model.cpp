@@ -22,16 +22,23 @@ namespace tr {
 void Model::InternalContext::allocate(const std::vector<std::shared_ptr<Module>>& modules,
                                      const Shape& input_shape,
                                      std::shared_ptr<Backend> backend) {
+
+    // ✅ 智能重用检测
     if (allocated_) {
-        return;
+        bool shape_same = (last_input_shape_ == input_shape);
+        bool backend_same = (last_backend_ == backend.get());
+
+        if (shape_same && backend_same) {
+            return; // 缓存仍然有效，直接复用
+        }
     }
 
     if (!backend) {
         throw TRException("[Model::InternalContext::allocate] Backend is null");
     }
 
-    forward_cache_.clear();
-    backward_cache_.clear();
+    // 需要重新分配
+    clear();
 
     // 预分配所有层的输出空间
     Shape current_shape = input_shape;
@@ -55,6 +62,8 @@ void Model::InternalContext::allocate(const std::vector<std::shared_ptr<Module>>
     // 预分配最终输出的反向传播缓存
     backward_cache_.emplace_back(backend->empty(current_shape, DType::FP32));
 
+    last_input_shape_ = input_shape;
+    last_backend_ = backend.get();
     allocated_ = true;
 }
 

@@ -18,40 +18,16 @@
 
 using namespace tr;
 
-// Classic training parameters
+// 经典训练参数
 const int BATCH_SIZE = 100;
 const int NUM_EPOCHS = 20;
-const float LEARNING_RATE = 0.01f;  // Classic SGD learning rate
-const float WEIGHT_DECAY = 5e-4f;   // Classic weight decay
-const float LABEL_SMOOTHING = 0.0f; // Classic: no label smoothing
+const float LEARNING_RATE = 0.01f;  // 经典SGD学习率
+const float WEIGHT_DECAY = 5e-4f;   // 经典权重衰减
+const float LABEL_SMOOTHING = 0.0f;
 const int PRINT_INTERVAL = 100;
 
 // MNIST数据路径
 const std::string MNIST_PATH = "R:/tech-renaissance/python/dataset/";
-
-// 辅助函数：打印张量信息
-void print_tensor_info(const std::string& name, const Tensor& tensor, bool show_values = false, int max_elements = 10) {
-    std::cout << name << " - Shape: " << tensor.shape().to_string()
-              << ", Dtype: " << static_cast<int>(tensor.dtype()) << std::endl;
-
-    if (show_values && tensor.storage_allocated()) {
-        std::cout << "  Values: [";
-        auto* cpu_backend = dynamic_cast<CpuBackend*>(BackendManager::instance().get_backend(CPU).get());
-        int64_t total_elements = tensor.numel();
-        int elements_to_show = std::min(total_elements, static_cast<int64_t>(max_elements));
-
-        for (int64_t i = 0; i < elements_to_show; ++i) {
-            float value = cpu_backend->get_item_fp32(tensor, i);
-            std::cout << std::fixed << std::setprecision(6) << value;
-            if (i < elements_to_show - 1) std::cout << ", ";
-        }
-
-        if (total_elements > max_elements) {
-            std::cout << ", ... (" << (total_elements - max_elements) << " more)";
-        }
-        std::cout << "]" << std::endl;
-    }
-}
 
 // 辅助函数：计算准确率（与原始测试保持一致）
 float calculate_accuracy(const Tensor& logits, const Tensor& labels) {
@@ -176,6 +152,10 @@ int main() {
         // 6. 使用Trainer进行训练
         std::cout << "\n=== Training with Trainer ===" << std::endl;
 
+        // 追踪最高测试准确率
+        float best_test_accuracy = 0.0f;
+        int best_epoch = -1;
+
         for (int epoch = 0; epoch < NUM_EPOCHS; ++epoch) {
             std::cout << "\n--- Epoch " << (epoch + 1) << "/" << NUM_EPOCHS << " ---" << std::endl;
 
@@ -194,9 +174,10 @@ int main() {
                 // 使用Trainer的训练步骤
                 float batch_loss = trainer.train_step(batch_images, batch_labels);
 
-                // 获取模型输出计算准确率（Trainer不直接提供，需要手动计算）
-                auto output = model->forward(batch_images);
-                float batch_acc = calculate_accuracy(output, batch_labels);
+                // 获取模型输出计算准确率 - 使用Model缓存的输出，避免重复forward
+                // train_step执行后，Model的内部输出cached_output_已经被更新
+                // 通过model->logits()方法可以直接零拷贝地访问它
+                float batch_acc = calculate_accuracy(model->logits(), batch_labels);
 
                 epoch_loss += batch_loss;
                 epoch_accuracy += batch_acc;
@@ -239,9 +220,8 @@ int main() {
                 // 使用Trainer的评估步骤
                 float batch_loss = trainer.eval_step(batch_images, batch_labels);
 
-                // 获取模型输出计算准确率
-                auto output = model->forward(batch_images);
-                float batch_acc = calculate_accuracy(output, batch_labels);
+                // 获取模型输出计算准确率 - 使用Model缓存的输出，避免重复forward
+                float batch_acc = calculate_accuracy(model->logits(), batch_labels);
 
                 test_loss += batch_loss;
                 test_accuracy += batch_acc;
@@ -251,17 +231,30 @@ int main() {
             float avg_test_loss = test_loss / test_num_batches;
             float avg_test_accuracy = test_accuracy / test_num_batches;
 
+            // 更新最高测试准确率
+            if (avg_test_accuracy > best_test_accuracy) {
+                best_test_accuracy = avg_test_accuracy;
+                best_epoch = epoch + 1;
+            }
+
             std::cout << "Test Results:" << std::endl;
             std::cout << "  Test Loss: " << std::fixed << std::setprecision(4) << avg_test_loss << std::endl;
             std::cout << "  Test Accuracy: " << std::setprecision(2) << avg_test_accuracy << "%" << std::endl;
+
+            // 显示当前最佳成绩
+            std::cout << "  Best Test Accuracy So Far: " << std::setprecision(2)
+                      << best_test_accuracy << "% (Epoch " << best_epoch << ")" << std::endl;
             std::cout << "======================================" << std::endl;
         }
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
 
-        std::cout << "\nTraining completed successfully!" << std::endl;
+        std::cout << "\n=== TRAINING COMPLETED ===" << std::endl;
+        std::cout << "=== BEST PERFORMANCE ===" << std::endl;
+        std::cout << "Best Test Accuracy: " << std::setprecision(2) << best_test_accuracy << "% (Epoch " << best_epoch << ")" << std::endl;
         std::cout << "Total training time: " << duration.count() << " seconds" << std::endl;
+        std::cout << "=========================" << std::endl;
         std::cout << "\n=== Trainer API Benefits ===" << std::endl;
         std::cout << "[OK] Encapsulated training logic" << std::endl;
         std::cout << "[OK] Automatic component management" << std::endl;

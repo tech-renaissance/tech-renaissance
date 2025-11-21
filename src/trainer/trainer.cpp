@@ -56,8 +56,20 @@ float Trainer::train_step(const Tensor& input, const Tensor& target) {
 
     validate_components();
 
-    // 1. 清零梯度（参考test_training_mnist_mlp.cpp的实现）
-    optimizer_->zero_grad(model_);
+    // ✅ 智能清零：只在必要时执行
+    if (!grad_cleared_) {
+        optimizer_->zero_grad(model_);
+        grad_cleared_ = true;
+    }
+
+    // ✅ 确保参数有梯度（修复初始化问题）
+    for (Tensor* param : model_.trainable_parameters()) {
+        if (!param->has_grad()) {
+            auto backend = BackendManager::instance().get_backend(model_.device());
+            Tensor zero_grad = backend->zeros(param->shape(), DType::FP32);
+            param->set_grad(zero_grad);
+        }
+    }
 
     // 2. 前向传播（参考成功的实现）
     auto output = model_.forward(input);
@@ -72,6 +84,7 @@ float Trainer::train_step(const Tensor& input, const Tensor& target) {
     // 5. 参数更新
     optimizer_->step(model_);
 
+    grad_cleared_ = false;  // ✅ 标记需要清零
     current_step_++;
     return loss;
 }

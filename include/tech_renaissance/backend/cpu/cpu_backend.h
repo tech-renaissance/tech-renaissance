@@ -58,6 +58,8 @@ public:
     Tensor mul(const Tensor& a, const Tensor& b) const;
     Tensor mm(const Tensor& a, const Tensor& b) override;
     void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override;
+    void mm_into_transposed(const Tensor& a, const Tensor& b, Tensor& result,
+                           bool transpose_a = false, bool transpose_b = false) override;
 
     // 设备转换方法
     Tensor to(const Tensor& tensor, const Device& device) const override;

@@ -223,6 +223,17 @@ public:
     virtual void mm_into(const Tensor& a, const Tensor& b, Tensor& result) = 0;
 
     /**
+     * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N) (支持转置标志，指定输出张量)
+     * @param a 输入张量A
+     * @param b 输入张量B
+     * @param result 结果张量
+     * @param transpose_a 是否转置张量A
+     * @param transpose_b 是否转置张量B
+     */
+    virtual void mm_into_transposed(const Tensor& a, const Tensor& b, Tensor& result,
+                                   bool transpose_a = false, bool transpose_b = false);
+
+    /**
      * @brief 张量转置（2D矩阵）
      * @param input 输入张量
      * @return 转置后的张量
@@ -403,9 +414,16 @@ public:
     // 交叉熵损失函数
     virtual float crossentropy(const Tensor& pred, const Tensor& label, std::string reduction);
 
+    // softmax操作
+    virtual Tensor softmax(const Tensor& input, int dim);
+    virtual void softmax_into(const Tensor& input, Tensor& output, int dim);
+
     // One-hot编码操作
     virtual Tensor one_hot(const Tensor& label, int32_t num_classes, float label_smoothing);
     virtual void one_hot_into(const Tensor& label, Tensor& result, int32_t num_classes, float label_smoothing);
+
+    // 张量复制操作（添加zeros_like等）
+    virtual Tensor zeros_like(const Tensor& input) const;
 
     // 标量运算（tensor - scalar）
     virtual Tensor minus(const Tensor& input, float scalar) const;

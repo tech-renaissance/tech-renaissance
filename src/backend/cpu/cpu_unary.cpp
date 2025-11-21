@@ -1334,23 +1334,30 @@ Tensor CpuBackend::copy(const Tensor& tensor) const {
 }
 
 void CpuBackend::copy_into(const Tensor& src, Tensor& dst) const {
-    // 检查两个张量是否都属于CPU后端
     validate_same_device(src.device());
     validate_same_device(dst.device());
 
-    // 检查数据类型是否一致
-    if (src.dtype() != dst.dtype()) {
-        throw TRException("[CpuBackend::copy_into] Data type mismatch: source dtype " +
-                         std::to_string(static_cast<int>(src.dtype())) +
-                         " != destination dtype " + std::to_string(static_cast<int>(dst.dtype())));
+    // ✅ 自我拷贝检测
+    if (src.storage() == dst.storage() &&
+        src.data_ptr() == dst.data_ptr()) {
+        return; // 自我拷贝直接返回
     }
 
-    // 检查形状是否完全匹配
-    validate_tensor_shape(src, dst);
+    // ✅ 形状和类型验证 - 使用具体异常类型
+    if (src.shape() != dst.shape()) {
+        throw ShapeError("[CpuBackend::copy_into] Shape mismatch: " +
+            src.shape().to_string() + " vs " + dst.shape().to_string());
+    }
 
-    // 执行深拷贝
-    copy_data(dst.data_ptr(), src.data_ptr(), src.numel() * dtype_size(src.dtype()),
-              tr::CPU, tr::CPU);
+    if (src.dtype() != dst.dtype()) {
+        throw TypeError("[CpuBackend::copy_into] DType mismatch");
+    }
+
+    // 执行拷贝
+    size_t size = src.memory_size();
+    const void* src_ptr = src.data_ptr();
+    void* dst_ptr = dst.data_ptr();
+    std::memcpy(dst_ptr, src_ptr, size);
 }
 
 // ===== reshape方法实现 =====

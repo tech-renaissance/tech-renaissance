@@ -25,6 +25,7 @@ private:
     // 权重转置缓存
     mutable Tensor weight_transposed_;      // 缓存的转置权重
     mutable bool weight_transposed_valid_ = false;
+    mutable bool weight_dirty_ = false;     // ✅ 新增：权重脏标记
 
 public:
     Linear(int in_features, int out_features, const std::string& name = "Linear", bool use_bias = false)
@@ -41,6 +42,10 @@ public:
             float std_scale = std::sqrt(2.0f / in_features_);  // He初始化的缩放因子
             backend->mul_inplace(weight, std_scale);
             register_parameter("weight", weight);
+
+            // ✅ 启用梯度：为权重参数创建梯度张量
+            Tensor weight_grad = backend->zeros(weight.shape(), DType::FP32);
+            weight.set_grad(weight_grad);
         }
 
         // 只有需要时才创建偏置参数
@@ -50,10 +55,15 @@ public:
             Tensor bias = backend->randn(Shape(1, out_features_), 43);
             backend->mul_inplace(bias, 0.01f);  // 缩放到很小的值
             register_parameter("bias", bias);
+
+            // ✅ 启用梯度：为偏置参数创建梯度张量
+            Tensor bias_grad = backend->zeros(bias.shape(), DType::FP32);
+            bias.set_grad(bias_grad);
         }
 
         // 初始化转置缓存（在权重创建之后）
         invalidate_weight_cache();
+        weight_dirty_ = false;  // ✅ 确保初始状态正确
     }
 
     // === 核心计算（into型） ===
@@ -64,6 +74,12 @@ public:
 
         // 获取权重
         const Tensor& weight = get_parameter("weight");
+
+        // ✅ 只在权重被修改后才重新转置
+        if (weight_dirty_) {
+            invalidate_weight_cache();
+            weight_dirty_ = false;
+        }
 
         // 确保转置权重缓存有效
         if (!weight_transposed_valid_) {
@@ -89,7 +105,6 @@ public:
 
     void backward_into(const Tensor& grad_output, Tensor& grad_input) override {
         auto backend = get_backend();
-        auto* cpu_backend = dynamic_cast<CpuBackend*>(backend.get());
 
         // 获取权重
         Tensor& weight = get_parameter("weight");
@@ -100,17 +115,17 @@ public:
 
         // 计算权重梯度：grad_weight = grad_output^T @ input
         if (weight.has_grad()) {
-            // grad_output^T(out_features, batch) @ input(batch, in_features) = grad_weight(out_features, in_features)
-            Tensor grad_output_t = backend->transpose(grad_output);
-            Shape grad_weight_shape(grad_output_t.shape().dim(0), cached_input_.shape().dim(1));
+            // ⭐ 使用mm_into_transposed，避免临时转置张量
+            // grad_output^T @ input = grad_weight (transpose_a=true)
+            Shape grad_weight_shape(weight.shape());
             Tensor grad_weight = backend->zeros(grad_weight_shape, DType::FP32);
-            backend->mm_into(grad_output_t, cached_input_, grad_weight);
+            backend->mm_into_transposed(grad_output, cached_input_, grad_weight, true, false);
 
             // 累积权重梯度
             if (!weight.grad().storage_allocated()) {
                 weight.set_grad(grad_weight);
             } else {
-                // 实现梯度累积：新梯度 += 旧梯度
+                // 实现梯度累积：new_grad += old_grad
                 Tensor& existing_grad = weight.grad();
                 backend->add_into(grad_weight, existing_grad, existing_grad);
             }
@@ -130,7 +145,7 @@ public:
                 if (!bias.grad().storage_allocated()) {
                     bias.set_grad(grad_bias);
                 } else {
-                    // 实现梯度累积：新梯度 += 旧梯度
+                    // 实现梯度累积：new_grad += old_grad
                     Tensor& existing_grad = bias.grad();
                     backend->add_into(grad_bias, existing_grad, existing_grad);
                 }
@@ -139,8 +154,8 @@ public:
 
         clear_cache();
 
-        // 权重更新后，转置缓存失效
-        invalidate_weight_cache();
+    weight_dirty_ = true;  // ✅ 标记权重将被更新，而非立即失效缓存
+    // 移除 invalidate_weight_cache();
     }
 
 protected:
@@ -171,6 +186,7 @@ public:
             weight_transposed_ = backend->zeros(Shape(in_features_, out_features_), weight.dtype());
         }
         weight_transposed_valid_ = false;
+        weight_dirty_ = false;  // ✅ 重置脏标记
     }
 
     // === 访问器方法 ===
@@ -182,7 +198,7 @@ public:
         std::cout << "Linear Layer (" << instance_name() << "):" << std::endl;
         std::cout << "  Input features: " << in_features_ << std::endl;
         std::cout << "  Output features: " << out_features_ << std::endl;
-        std::cout << "  Weight transposed cache: " << (weight_transposed_valid_ ? "VALID ✅" : "INVALID ❌") << std::endl;
+        std::cout << "  Weight transposed cache: " << (weight_transposed_valid_ ? "VALID [OK]" : "INVALID [FAIL]") << std::endl;
 
         if (has_parameter("weight")) {
             const Tensor& weight = get_parameter("weight");
