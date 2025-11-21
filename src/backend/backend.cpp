@@ -84,6 +84,7 @@ DEFINE_NOT_IMPLEMENTED_METHOD(mul, Tensor, (const Tensor& a, const Tensor& b), c
 // 张量运算（into版本）
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(add_into, (const Tensor& a, const Tensor& b, Tensor& result), const)
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(minus_into, (const Tensor& a, const Tensor& b, Tensor& result), const)
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(div_into, (const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result), const)
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sum_into, (const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim), const)
 
 // 标量运算（tensor + scalar）

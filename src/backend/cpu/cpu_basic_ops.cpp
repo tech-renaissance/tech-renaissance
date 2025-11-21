@@ -92,4 +92,40 @@ Tensor CpuBackend::mul(const Tensor& a, const Tensor& b) const {
     return result;
 }
 
+// ===== 张量间除法运算 =====
+
+Tensor CpuBackend::div(const Tensor& tensor_a, const Tensor& tensor_b) const {
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::div] First input tensor has no allocated Storage");
+    }
+    if (tensor_b.is_empty()) {
+        throw TRException("[CpuBackend::div] Second input tensor has no allocated Storage");
+    }
+
+    if (tensor_a.shape() != tensor_b.shape()) {
+        throw TRException("[CpuBackend::div] Shape mismatch: tensor_a shape " +
+                        tensor_a.shape().to_string() + " vs tensor_b shape " +
+                        tensor_b.shape().to_string());
+    }
+
+    if (tensor_a.dtype() != tensor_b.dtype()) {
+        throw TRException("[CpuBackend::div] Data type mismatch: tensor_a dtype " +
+                        dtype_to_string(tensor_a.dtype()) + " vs tensor_b dtype " +
+                        dtype_to_string(tensor_b.dtype()));
+    }
+
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::div] Only FP32 tensors are supported for tensor division. "
+                        "TODO: Consider implementing INT8 tensor operations in future versions.");
+    }
+
+    // 创建输出张量
+    Tensor result = this->empty(tensor_a.shape(), tensor_a.dtype());
+    div_into(tensor_a, tensor_b, result);
+    return result;
+}
+
 } // namespace tr

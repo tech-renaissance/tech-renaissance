@@ -207,6 +207,14 @@ public:
     virtual void mul_into(const Tensor& input, float scalar, Tensor& output) const;
 
     /**
+     * @brief 张量间除法（指定输出张量） result = tensor_a / tensor_b
+     * @param tensor_a 输入张量A
+     * @param tensor_b 输入张量B
+     * @param result 输出张量
+     */
+    virtual void div_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;
+
+    /**
      * @brief 矩阵乘法 C(M,N) = A(M,K) * B(K,N)
      * @param a 输入张量A
      * @param b 输入张量B

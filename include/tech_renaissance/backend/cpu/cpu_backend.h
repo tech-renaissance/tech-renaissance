@@ -56,6 +56,8 @@ public:
     void minus_into(const Tensor& a, const Tensor& b, Tensor& result) const override;
     void sum_into(const Tensor& tensor_a, Tensor& result, int32_t dim, bool keep_dim = false) const override;
     Tensor mul(const Tensor& a, const Tensor& b) const;
+    Tensor div(const Tensor& tensor_a, const Tensor& tensor_b) const;
+    void div_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const override;
     Tensor mm(const Tensor& a, const Tensor& b) override;
     void mm_into(const Tensor& a, const Tensor& b, Tensor& result) override;
     void mm_into_transposed(const Tensor& a, const Tensor& b, Tensor& result,

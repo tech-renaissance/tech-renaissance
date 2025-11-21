@@ -1,9 +1,9 @@
 /**
- * @file test_trainer.cpp
+ * @file test_trainer_adamw.cpp
  * @brief Trainer类MNIST MLP训练测试 - 使用AdamW优化器
- * @details 使用MnistLoader封装数据加载，使用AdamW+余弦退火调度器
- * @version 1.59.0
- * @date 2025-11-21
+ * @details 使用MnistLoader封装数据加载，使用AdamW+ConstantLR调度器
+ * @version 1.60.1
+ * @date 2025年11月22日
  * @author 技术觉醒团队
  */
 
@@ -18,14 +18,14 @@
 
 using namespace tr;
 
-// AdamW训练参数
-const int BATCH_SIZE = 100;
-const int NUM_EPOCHS = 20;
-const float LEARNING_RATE = 0.001f; // AdamW学习率
-const float WEIGHT_DECAY = 1e-4f;   // AdamW权重衰减
-const float BETA1 = 0.9f;           // AdamW beta1
-const float BETA2 = 0.999f;         // AdamW beta2
-const float EPS = 1e-8f;            // AdamW epsilon
+// AdamW训练参数（匹配Python MLP配置）
+const int BATCH_SIZE = 128;          // 匹配Python BATCH_SIZE = 128
+const int NUM_EPOCHS = 20;           // 匹配Python NUM_EPOCHS = 20
+const float LEARNING_RATE = 0.001f;  // 匹配Python LEARNING_RATE = 0.001
+const float WEIGHT_DECAY = 0.01f;    // AdamW经典权重衰减配置 (weight_decay=0.01)
+const float BETA1 = 0.9f;            // AdamW beta1 (匹配PyTorch默认值)
+const float BETA2 = 0.999f;          // AdamW beta2 (匹配PyTorch默认值)
+const float EPS = 1e-8f;             // AdamW epsilon (匹配PyTorch默认值)
 const float LABEL_SMOOTHING = 0.0f;
 const int PRINT_INTERVAL = 100;
 
@@ -75,19 +75,19 @@ std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
     std::cout << "Creating MLP model..." << std::endl;
 
     auto model = Model::create("MNIST_MLP",
-        std::make_shared<Flatten>(),              // flatten: (N,1,28,28) -> (N,784)
-        std::make_shared<Linear>(784, 512),      // fc1: 784 -> 512
-        std::make_shared<Tanh>(),                // tanh1
-        std::make_shared<Linear>(512, 256),      // fc2: 512 -> 256
-        std::make_shared<Tanh>(),                // tanh2
-        std::make_shared<Linear>(256, 10)        // fc3: 256 -> 10
+        std::make_shared<Flatten>(),                    // flatten: (N,1,28,28) -> (N,784)
+        std::make_shared<Linear>(784, 512, "fc1", false), // fc1: 784 -> 512 (bias=False)
+        std::make_shared<Tanh>(),                       // tanh1
+        std::make_shared<Linear>(512, 256, "fc2", false), // fc2: 512 -> 256 (bias=False)
+        std::make_shared<Tanh>(),                       // tanh2
+        std::make_shared<Linear>(256, 10, "fc3", false)   // fc3: 256 -> 10 (bias=False)
     );
 
     model->set_backend(std::move(backend));
     model->train();
 
-    std::cout << "Model: MNIST_MLP (3-layer MLP with Tanh + Flatten)" << std::endl;
-    std::cout << "Architecture: (N,1,28,28) -> Flatten -> (N,784) -> 512 -> 256 -> 10" << std::endl;
+    std::cout << "Model: MNIST_MLP (3-layer MLP with Tanh + Flatten, no bias)" << std::endl;
+    std::cout << "Architecture: (N,1,28,28) -> Flatten -> (N,784) -> 512 -> 256 -> 10 (all Linear layers bias=False)" << std::endl;
 
     return model;
 }
@@ -95,10 +95,10 @@ std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
 
 int main() {
     std::cout << "=== MNIST MLP Training Test (AdamW Optimizer) ===" << std::endl;
-    std::cout << "Using Trainer with AdamW + CosineAnnealing scheduler" << std::endl;
+    std::cout << "Using Trainer with AdamW + ConstantLR scheduler (matching Python MLP)" << std::endl;
     std::cout << "Training 3-layer MLP on MNIST dataset for " << NUM_EPOCHS << " epochs" << std::endl;
-    std::cout << "Architecture: 784 -> 512 -> 256 -> 10 (with Tanh)" << std::endl;
-    std::cout << "Learning Rate: " << LEARNING_RATE << ", Weight Decay: " << WEIGHT_DECAY << std::endl;
+    std::cout << "Architecture: 784 -> 512 -> 256 -> 10 (with Tanh, no bias)" << std::endl;
+    std::cout << "Learning Rate: " << LEARNING_RATE << " (matching Python), Batch Size: " << BATCH_SIZE << std::endl;
     std::cout << "================================================================" << std::endl;
 
     // 设置安静模式
@@ -121,23 +121,23 @@ int main() {
         // 4. 创建Trainer组件（使用AdamW配置）
         std::cout << "\n=== Trainer Component Setup (AdamW Configuration) ===" << std::endl;
 
-        // 创建AdamW优化器（现代优化配置）
+        // 创建AdamW优化器（匹配Python MLP配置：beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0.01）
         auto optimizer = std::make_unique<AdamW>(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY, backend);
 
         // 创建损失函数（无标签平滑）
         auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, LABEL_SMOOTHING);
 
-        // 创建余弦退火调度器（无热重启）
-        auto scheduler = std::make_unique<CosineAnnealingLR>(LEARNING_RATE, NUM_EPOCHS);
+        // 创建ConstantLR调度器（固定学习率，对齐PyTorch）
+        auto scheduler = std::make_unique<ConstantLR>(LEARNING_RATE);
 
         // 创建Trainer
         Trainer trainer(*model, std::move(optimizer), std::move(loss_fn), std::move(scheduler));
 
         std::cout << "[OK] Trainer created successfully" << std::endl;
         std::cout << "[OK] Optimizer: AdamW (lr=" << LEARNING_RATE << ", beta1=" << BETA1
-                  << ", beta2=" << BETA2 << ", eps=" << EPS << ", weight_decay=" << WEIGHT_DECAY << ")" << std::endl;
+                  << ", beta2=" << BETA2 << ", eps=" << EPS << ", weight_decay=" << WEIGHT_DECAY << ") - Python matching" << std::endl;
         std::cout << "[OK] Loss Function: CrossEntropyLoss (label_smoothing=" << LABEL_SMOOTHING << ")" << std::endl;
-        std::cout << "[OK] Scheduler: CosineAnnealingLR (T_max=" << NUM_EPOCHS << ")" << std::endl;
+        std::cout << "[OK] Scheduler: ConstantLR (fixed lr=" << LEARNING_RATE << ") - Python matching" << std::endl;
         std::cout << "[OK] Data Normalization: MNIST (mean=0.1307, std=0.3081)" << std::endl;
 
         // 初始化优化器
@@ -265,8 +265,10 @@ int main() {
         // std::cout << "[OK] Automatic component management" << std::endl;
         // std::cout << "[OK] Unified training interface" << std::endl;
         // std::cout << "[OK] Learning rate scheduling support" << std::endl;
-        // std::cout << "[OK] Modern AdamW optimizer integration" << std::endl;
-        // std::cout << "[OK] V1.59.0 TIPS3.md optimizations applied" << std::endl;
+        // std::cout << "[OK] SGD optimizer matching Python MLP configuration" << std::endl;
+        // std::cout << "[OK] V1.60.0 CrossEntropyLoss one-hot cache optimization" << std::endl;
+        // std::cout << "[OK] V1.60.1 Linear layer Kaiming Uniform initialization (PyTorch-aligned)" << std::endl;
+        // std::cout << "[OK] Configuration: lr=0.1, batch_size=128, no momentum, no weight decay, no bias, constant_lr" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

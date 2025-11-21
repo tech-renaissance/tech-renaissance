@@ -1,7 +1,7 @@
 /**
- * @file test_trainer_adam.cpp
- * @brief Trainer类MNIST MLP训练测试 - 使用Adam优化器
- * @details 使用MnistLoader封装数据加载，使用Adam+ConstantLR调度器
+ * @file test_trainer_adamw.cpp
+ * @brief Trainer类MNIST MLP训练测试 - 使用AdamW优化器
+ * @details 使用MnistLoader封装数据加载，使用AdamW+ConstantLR调度器
  * @version 1.60.1
  * @date 2025年11月22日
  * @author 技术觉醒团队
@@ -18,14 +18,14 @@
 
 using namespace tr;
 
-// Adam训练参数（匹配Python MLP配置）
+// AdamW训练参数（匹配Python MLP配置）
 const int BATCH_SIZE = 128;          // 匹配Python BATCH_SIZE = 128
 const int NUM_EPOCHS = 20;           // 匹配Python NUM_EPOCHS = 20
 const float LEARNING_RATE = 0.001f;  // 匹配Python LEARNING_RATE = 0.001
-const float WEIGHT_DECAY = 0.0f;     // Python版本未使用权重衰减
-const float BETA1 = 0.9f;            // Adam beta1 (匹配PyTorch默认值)
-const float BETA2 = 0.999f;          // Adam beta2 (匹配PyTorch默认值)
-const float EPS = 1e-8f;             // Adam epsilon (匹配PyTorch默认值)
+const float WEIGHT_DECAY = 0.01f;    // AdamW经典权重衰减配置 (weight_decay=0.01)
+const float BETA1 = 0.9f;            // AdamW beta1 (匹配PyTorch默认值)
+const float BETA2 = 0.999f;          // AdamW beta2 (匹配PyTorch默认值)
+const float EPS = 1e-8f;             // AdamW epsilon (匹配PyTorch默认值)
 const float LABEL_SMOOTHING = 0.0f;
 const int PRINT_INTERVAL = 100;
 
@@ -94,8 +94,8 @@ std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
 
 
 int main() {
-    std::cout << "=== MNIST MLP Training Test (Adam Optimizer) ===" << std::endl;
-    std::cout << "Using Trainer with Adam + ConstantLR scheduler (matching Python MLP)" << std::endl;
+    std::cout << "=== MNIST MLP Training Test (AdamW Optimizer) ===" << std::endl;
+    std::cout << "Using Trainer with AdamW + ConstantLR scheduler (matching Python MLP)" << std::endl;
     std::cout << "Training 3-layer MLP on MNIST dataset for " << NUM_EPOCHS << " epochs" << std::endl;
     std::cout << "Architecture: 784 -> 512 -> 256 -> 10 (with Tanh, no bias)" << std::endl;
     std::cout << "Learning Rate: " << LEARNING_RATE << " (matching Python), Batch Size: " << BATCH_SIZE << std::endl;
@@ -118,11 +118,11 @@ int main() {
         // 3. 创建模型
         auto model = create_mlp_model(backend);
 
-        // 4. 创建Trainer组件（使用Adam配置）
-        std::cout << "\n=== Trainer Component Setup (Adam Configuration) ===" << std::endl;
+        // 4. 创建Trainer组件（使用AdamW配置）
+        std::cout << "\n=== Trainer Component Setup (AdamW Configuration) ===" << std::endl;
 
-        // 创建Adam优化器（匹配Python MLP配置：beta1=0.9, beta2=0.999, eps=1e-8）
-        auto optimizer = std::make_unique<Adam>(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY, backend);
+        // 创建AdamW优化器（匹配Python MLP配置：beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0.01）
+        auto optimizer = std::make_unique<AdamW>(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY, backend);
 
         // 创建损失函数（无标签平滑）
         auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, LABEL_SMOOTHING);
@@ -134,7 +134,7 @@ int main() {
         Trainer trainer(*model, std::move(optimizer), std::move(loss_fn), std::move(scheduler));
 
         std::cout << "[OK] Trainer created successfully" << std::endl;
-        std::cout << "[OK] Optimizer: Adam (lr=" << LEARNING_RATE << ", beta1=" << BETA1
+        std::cout << "[OK] Optimizer: AdamW (lr=" << LEARNING_RATE << ", beta1=" << BETA1
                   << ", beta2=" << BETA2 << ", eps=" << EPS << ", weight_decay=" << WEIGHT_DECAY << ") - Python matching" << std::endl;
         std::cout << "[OK] Loss Function: CrossEntropyLoss (label_smoothing=" << LABEL_SMOOTHING << ")" << std::endl;
         std::cout << "[OK] Scheduler: ConstantLR (fixed lr=" << LEARNING_RATE << ") - Python matching" << std::endl;

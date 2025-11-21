@@ -37,13 +37,15 @@ private:
     float eps_;                // 数值稳定性常数，通常1e-8
     float weight_decay_;       // 权重衰减系数，默认0.0
 
-    // P1优化：预分配临时缓冲区，避免每次step时的内存分配
-    std::vector<Tensor> temp_m_hat_buffers_;  // m_hat缓冲区
-    std::vector<Tensor> temp_v_hat_buffers_;  // v_hat缓冲区
-    std::vector<Tensor> temp_update_buffers_; // 更新量缓冲区
+    // 【P0级优化】优化临时缓冲区分配，减少内存使用
+    std::vector<Tensor> temp_m_hat_buffers_;  // m_hat缓冲区（也用作临时计算缓冲区）
+    std::vector<Tensor> temp_update_buffers_; // 更新量缓冲区（也用作v_hat缓冲区）
+    // 移除temp_v_hat_buffers_和temp_scratch_buffers_，通过重用减少内存开销
 
-    // 【新增】专用临时缓冲区，用于中间计算（修复缓冲区别名问题）
-    std::vector<Tensor> temp_scratch_buffers_;  // 通用临时缓冲区
+    // 【P0级优化】预计算的bias_correction缓存，避免重复pow运算
+    std::vector<float> cached_bias_correction1_;  // 预计算的bias_correction1缓存
+    std::vector<float> cached_bias_correction2_;  // 预计算的bias_correction2缓存
+    int last_time_step_;                          // 上次计算的时间步
 
 public:
     /**

@@ -250,6 +250,54 @@ void CpuBackend::mul_into(const Tensor& a, const Tensor& b, Tensor& result) cons
 #endif
 }
 
+void CpuBackend::div_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const {
+    validate_same_device(tensor_a.device());
+    validate_same_device(tensor_b.device());
+    validate_same_device(result.device());
+    validate_tensor_shape(tensor_a, tensor_b);
+    validate_tensor_shape(tensor_a, result);
+
+    // 检查Storage是否已分配
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::div_into] Result tensor has no allocated Storage");
+    }
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::div_into] Input tensor 'tensor_a' has no allocated Storage");
+    }
+    if (tensor_b.is_empty()) {
+        throw TRException("[CpuBackend::div_into] Input tensor 'tensor_b' has no allocated Storage");
+    }
+
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::div_into] div_into only supports FP32");
+    }
+
+    const float* a_data = static_cast<const float*>(tensor_a.data_ptr());
+    const float* b_data = static_cast<const float*>(tensor_b.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+    size_t count = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    Eigen::Map<const Eigen::VectorXf> a_vec(a_data, count);
+    Eigen::Map<const Eigen::VectorXf> b_vec(b_data, count);
+    Eigen::Map<Eigen::VectorXf> result_vec(result_data, count);
+
+    // Eigen优化实现：逐元素除法
+    result_vec = a_vec.cwiseQuotient(b_vec);
+#else
+    // 普通C++实现
+    for (size_t i = 0; i < count; ++i) {
+        // 检查除零错误
+        if (std::abs(b_data[i]) < 1e-10f) {
+            // 处理除零情况：使用epsilon避免除零错误
+            result_data[i] = a_data[i] * 1e10f;  // 等价于除以一个非常小的数
+        } else {
+            result_data[i] = a_data[i] / b_data[i];
+        }
+    }
+#endif
+}
+
 void CpuBackend::minus_into(const Tensor& a, const Tensor& b, Tensor& result) const {
     validate_same_device(a.device());
     validate_same_device(b.device());
