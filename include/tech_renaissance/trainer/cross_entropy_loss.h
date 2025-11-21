@@ -28,18 +28,27 @@ private:
     // 预分配缓存 - 避免每次调用criterion时创建临时张量
     mutable Tensor softmax_cache_;     // 预分配的softmax概率缓存
     mutable Tensor grad_cache_;        // 预分配的梯度缓存
+    mutable Tensor one_hot_cache_;     // 【新增】one-hot编码缓存
+    mutable Shape last_target_shape_; // 【新增】目标形状缓存
     mutable bool cache_allocated_ = false;  // 缓存分配状态标志
 
     // ✅ 使用精确匹配（保证兼容性）
     /**
      * @brief 确保缓存已分配
-     * @param shape 张量形状
+     * @param logits_shape logits张量形状
+     * @param target_shape 目标张量形状
      */
-    void ensure_cache_allocated(const Shape& shape) const {
+    void ensure_cache_allocated(const Shape& logits_shape, const Shape& target_shape) const {
         auto backend = get_backend();
-        if (!cache_allocated_ || softmax_cache_.shape() != shape) {
-            softmax_cache_ = backend->empty(shape, DType::FP32);
-            grad_cache_ = backend->empty(shape, DType::FP32);
+        bool need_realloc = !cache_allocated_ ||
+                           softmax_cache_.shape() != logits_shape ||
+                           target_shape != last_target_shape_;
+
+        if (need_realloc) {
+            softmax_cache_ = backend->empty(logits_shape, DType::FP32);
+            grad_cache_ = backend->empty(logits_shape, DType::FP32);
+            one_hot_cache_ = backend->empty(logits_shape, DType::FP32);  // 新增one-hot缓存
+            last_target_shape_ = target_shape;  // 缓存目标形状
             cache_allocated_ = true;
         }
     }

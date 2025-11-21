@@ -33,17 +33,19 @@ CrossEntropyLoss::CrossEntropyLoss(std::shared_ptr<Backend> backend, bool traini
 float CrossEntropyLoss::criterion(Tensor& logits, const Tensor& target, const std::string& reduction) {
     auto backend = get_backend();
 
-    // 确保缓存已分配
-    ensure_cache_allocated(logits.shape());
+    // 【修改】确保所有缓存分配，同时检查目标形状
+    ensure_cache_allocated(logits.shape(), target.shape());
 
-    // ✅ 增强类型检查
-    Tensor processed_target;
+    const Tensor* processed_target_ptr = &target;
+
     if (target.dtype() == DType::INT32) {
-        // INT32标签 -> one-hot
-        processed_target = backend->one_hot(target, logits.shape().dim(1), label_smoothing_);
+        // 【优化】使用into版本写入缓存，避免内存分配
+        backend->one_hot_into(target, one_hot_cache_,
+                             logits.shape().dim(1), label_smoothing_);
+        processed_target_ptr = &one_hot_cache_;
     } else if (target.dtype() == DType::FP32) {
         // ✅ 显式验证FP32
-        processed_target = target;
+        // processed_target_ptr 已经指向 target
     } else {
         // ✅ 抛出明确错误 - 使用具体异常类型
         throw TypeError("[CrossEntropyLoss] Target must be INT32 (labels) or FP32 (one-hot), got unsupported dtype");
@@ -53,10 +55,10 @@ float CrossEntropyLoss::criterion(Tensor& logits, const Tensor& target, const st
     backend->softmax_into(logits, softmax_cache_, 1);
 
     // 使用基类的minus_broadcast_into方法（避免内存分配）
-    backend->minus_broadcast_into(softmax_cache_, processed_target, grad_cache_);
+    backend->minus_broadcast_into(softmax_cache_, *processed_target_ptr, grad_cache_);
 
     // 使用基类的crossentropy方法计算损失
-    float loss = backend->crossentropy(softmax_cache_, processed_target, reduction);
+    float loss = backend->crossentropy(softmax_cache_, *processed_target_ptr, reduction);
 
     // 训练模式下处理梯度
     if (is_training()) {

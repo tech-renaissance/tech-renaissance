@@ -68,12 +68,14 @@ void AdamW::initialize(const Model& model) {
     temp_m_hat_buffers_.resize(num_params);
     temp_v_hat_buffers_.resize(num_params);
     temp_update_buffers_.resize(num_params);
+    temp_scratch_buffers_.resize(num_params);  // 【修复】调整scratch缓冲区向量大小
 
     for (size_t i = 0; i < num_params; ++i) {
         // 在参数设备上创建临时缓冲区
         temp_m_hat_buffers_[i] = backend_->empty(params[i]->shape(), params[i]->dtype());
         temp_v_hat_buffers_[i] = backend_->empty(params[i]->shape(), params[i]->dtype());
         temp_update_buffers_[i] = backend_->empty(params[i]->shape(), params[i]->dtype());
+        temp_scratch_buffers_[i] = backend_->empty(params[i]->shape(), params[i]->dtype());  // 新增
     }
 }
 
@@ -121,8 +123,8 @@ void AdamW::update_moments(Tensor& m, Tensor& v, const Tensor& grad, size_t para
     // 计算beta1 * m，存入临时缓冲区
     backend_->mul_into(m, beta1_, temp_update_buffers_[param_index]);
 
-    // 计算(1 - beta1) * grad，存入另一个临时缓冲区
-    Tensor& temp_grad_buffer = temp_m_hat_buffers_[param_index];  // 使用m_hat缓冲区作为临时存储
+    // 计算(1 - beta1) * grad，存入专用临时缓冲区（修复缓冲区别名问题）
+    Tensor& temp_grad_buffer = temp_scratch_buffers_[param_index];  // 使用专用缓冲区
     backend_->mul_into(grad, 1.0f - beta1_, temp_grad_buffer);
 
     // m = beta1 * m + (1 - beta1) * grad

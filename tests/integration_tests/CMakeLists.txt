@@ -7,6 +7,8 @@ set(TEST_SOURCES
     test_training_adam.cpp
     test_training_adamw.cpp
     test_trainer.cpp
+    test_trainer_adam.cpp
+    test_trainer_sgd.cpp
 )
 
 # 创建测试可执行文件
@@ -16,6 +18,8 @@ add_executable(test_training_adam test_training_adam.cpp)
 add_executable(test_training_adamw test_training_adamw.cpp)
 add_executable(test_training_simple test_training_simple.cpp)
 add_executable(test_trainer test_trainer.cpp)
+add_executable(test_trainer_adam test_trainer_adam.cpp)
+add_executable(test_trainer_sgd test_trainer_sgd.cpp)
 
 # 链接必要的库
 target_link_libraries(test_model_optimizer_integration
@@ -45,6 +49,16 @@ target_link_libraries(test_training_simple
 
 
 target_link_libraries(test_trainer
+    PRIVATE
+    tech_renaissance  # 主框架库
+)
+
+target_link_libraries(test_trainer_adam
+    PRIVATE
+    tech_renaissance  # 主框架库
+)
+
+target_link_libraries(test_trainer_sgd
     PRIVATE
     tech_renaissance  # 主框架库
 )

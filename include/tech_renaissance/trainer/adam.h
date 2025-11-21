@@ -42,6 +42,9 @@ private:
     std::vector<Tensor> temp_v_hat_buffers_;  // v_hat缓冲区
     std::vector<Tensor> temp_update_buffers_; // 更新量缓冲区
 
+    // 【新增】专用临时缓冲区，用于中间计算（修复缓冲区别名问题）
+    std::vector<Tensor> temp_scratch_buffers_;  // 通用临时缓冲区
+
 public:
     /**
      * @brief Adam优化器构造函数
