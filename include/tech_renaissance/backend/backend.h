@@ -320,6 +320,16 @@ public:
      */
     virtual Tensor randn(const Shape& shape, unsigned int seed = 0) = 0;
 
+    /**
+     * @brief 创建均匀分布随机张量
+     * @param shape 张量形状
+     * @param min_val 最小值
+     * @param max_val 最大值
+     * @param seed 随机种子
+     * @return 均匀分布随机张量
+     */
+    virtual Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
+
     // ===== 张量复制操作 =====
 
     /**

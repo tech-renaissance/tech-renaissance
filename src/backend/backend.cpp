@@ -127,6 +127,9 @@ DEFINE_NOT_IMPLEMENTED_VOID_METHOD(mul_broadcast_into, (const Tensor& tensor_a, 
 // 张量创建方法（const重载）
 DEFINE_NOT_IMPLEMENTED_METHOD(empty, Tensor, (const Shape& shape, DType dtype), const)
 
+// 均匀分布随机张量创建方法
+DEFINE_NOT_IMPLEMENTED_METHOD(uniform, Tensor, (const Shape& shape, float min_val, float max_val, unsigned int seed), )
+
 // 张量复制操作
 DEFINE_NOT_IMPLEMENTED_METHOD(copy, Tensor, (const Tensor& tensor), const)
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(copy_into, (const Tensor& src, Tensor& dst), const)

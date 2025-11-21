@@ -259,14 +259,14 @@ int main() {
         std::cout << "=== BEST PERFORMANCE ===" << std::endl;
         std::cout << "Best Test Accuracy: " << std::setprecision(2) << best_test_accuracy << "% (Epoch " << best_epoch << ")" << std::endl;
         std::cout << "Total training time: " << duration.count() << " seconds" << std::endl;
-        std::cout << "=========================" << std::endl;
-        std::cout << "\n=== Trainer API Benefits ===" << std::endl;
-        std::cout << "[OK] Encapsulated training logic" << std::endl;
-        std::cout << "[OK] Automatic component management" << std::endl;
-        std::cout << "[OK] Unified training interface" << std::endl;
-        std::cout << "[OK] Learning rate scheduling support" << std::endl;
-        std::cout << "[OK] Modern AdamW optimizer integration" << std::endl;
-        std::cout << "[OK] V1.59.0 TIPS3.md optimizations applied" << std::endl;
+        // std::cout << "=========================" << std::endl;
+        // std::cout << "\n=== Trainer API Benefits ===" << std::endl;
+        // std::cout << "[OK] Encapsulated training logic" << std::endl;
+        // std::cout << "[OK] Automatic component management" << std::endl;
+        // std::cout << "[OK] Unified training interface" << std::endl;
+        // std::cout << "[OK] Learning rate scheduling support" << std::endl;
+        // std::cout << "[OK] Modern AdamW optimizer integration" << std::endl;
+        // std::cout << "[OK] V1.59.0 TIPS3.md optimizations applied" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

@@ -96,7 +96,7 @@ public:
     static void full_inplace(Tensor& tensor_a, float value);
     Tensor randn(const Shape& shape, unsigned int seed = 0) override;
     static void randn_inplace(Tensor& tensor_a, unsigned int seed = 0);
-    Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
+    Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0) override;
     static void uniform_inplace(Tensor& tensor_a, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
     Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0);
     static void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0);

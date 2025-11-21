@@ -37,10 +37,10 @@ public:
         // 创建并注册权重参数
         if (!has_parameter("weight")) {
             // 权重：out_features × in_features (PyTorch标准格式)
-            // 使用标准正态分布初始化，然后进行缩放
-            Tensor weight = backend->randn(Shape(out_features_, in_features_), 42);
-            float std_scale = std::sqrt(2.0f / in_features_);  // He初始化的缩放因子
-            backend->mul_inplace(weight, std_scale);
+            // 🔧 对齐PyTorch Linear层默认初始化：Kaiming Uniform初始化
+            // PyTorch Linear层默认使用: uniform(-k, k) where k = sqrt(1/fan_in)
+            float k = std::sqrt(1.0f / in_features_);  // Kaiming Uniform的边界值
+            Tensor weight = backend->uniform(Shape(out_features_, in_features_), -k, k);
             register_parameter("weight", weight);
 
             // ✅ 启用梯度：为权重参数创建梯度张量
@@ -51,9 +51,9 @@ public:
         // 只有需要时才创建偏置参数
         if (use_bias_ && !has_parameter("bias")) {
             // 偏置：(1, out_features) - 2D形状以便于广播
-            // 偏置使用小的随机值初始化
-            Tensor bias = backend->randn(Shape(1, out_features_), 43);
-            backend->mul_inplace(bias, 0.01f);  // 缩放到很小的值
+            // 🔧 对齐PyTorch偏置初始化：同样使用uniform(-k, k) where k = sqrt(1/fan_in)
+            float k = std::sqrt(1.0f / in_features_);  // 与权重相同的边界值
+            Tensor bias = backend->uniform(Shape(1, out_features_), -k, k);
             register_parameter("bias", bias);
 
             // ✅ 启用梯度：为偏置参数创建梯度张量
