@@ -1,0 +1,400 @@
+R:\tech-renaissance\build\cmake-build-release\bin\tests\test_trainer.exe
+=== MNIST MLP Training Test (Simplified with MnistLoader) ===
+Using Trainer with classic SGD + CosineAnnealing scheduler
+Training 3-layer MLP on MNIST dataset for 20 epochs
+Architecture: 784 -> 512 -> 256 -> 10 (with Tanh)
+================================================================
+
+=== Data Loading with MnistLoader ===
+Loading MNIST dataset...
+Loading MNIST train data...
+Original image shape: (60000,1,28,28)
+Original label shape: (60000)
+train processed images - Shape: (60000,1,28,28), Dtype: 1
+train processed labels - Shape: (60000,10), Dtype: 1
+Loading MNIST test data...
+Original image shape: (10000,1,28,28)
+Original label shape: (10000)
+test processed images - Shape: (10000,1,28,28), Dtype: 1
+test processed labels - Shape: (10000,10), Dtype: 1
+[OK] MNIST dataset loaded successfully!
+
+=== MNIST Dataset Information ===
+Training samples: 60000
+Test samples: 10000
+Image size: 1x28x28
+Number of classes: 10
+Normalization: mean=0.1307, std=0.3081
+================================
+Creating MLP model...
+Model: MNIST_MLP (3-layer MLP with Tanh + Flatten)
+Architecture: (N,1,28,28) -> Flatten -> (N,784) -> 512 -> 256 -> 10
+
+=== Trainer Component Setup (Classic Configuration) ===
+[OK] Trainer created successfully
+[OK] Optimizer: SGD (lr=0.01, momentum=0.9, weight_decay=0.0005)
+[OK] Loss Function: CrossEntropyLoss (label_smoothing=0)
+[OK] Scheduler: CosineAnnealingLR (T_max=20)
+[OK] Data Normalization: MNIST (mean=0.1307, std=0.3081)
+[OK] Optimizer initialized
+
+=== Data Setup ===
+Batch size: 100
+Training batches per epoch: 600
+Test batches per epoch: 100
+======================================
+
+=== Training with Trainer ===
+
+--- Epoch 1/20 ---
+Batch 0/600 - Loss: 2.7502, Acc: 19.00%
+Batch 100/600 - Loss: 0.2766, Acc: 93.00%
+Batch 200/600 - Loss: 0.4239, Acc: 88.00%
+Batch 300/600 - Loss: 0.2279, Acc: 97.00%
+Batch 400/600 - Loss: 0.1083, Acc: 98.00%
+Batch 500/600 - Loss: 0.2649, Acc: 91.00%
+Epoch 1 Summary:
+  Average Loss: 0.2644
+  Average Accuracy: 92.67%
+  Learning Rate: 0.010000
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.1484
+  Test Accuracy: 95.81%
+======================================
+
+--- Epoch 2/20 ---
+Batch 0/600 - Loss: 0.0815, Acc: 99.00%
+Batch 100/600 - Loss: 0.1357, Acc: 96.00%
+Batch 200/600 - Loss: 0.1350, Acc: 96.00%
+Batch 300/600 - Loss: 0.1066, Acc: 96.00%
+Batch 400/600 - Loss: 0.0726, Acc: 98.00%
+Batch 500/600 - Loss: 0.0520, Acc: 100.00%
+Epoch 2 Summary:
+  Average Loss: 0.1162
+  Average Accuracy: 96.96%
+  Learning Rate: 0.009938
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.1130
+  Test Accuracy: 96.83%
+======================================
+
+--- Epoch 3/20 ---
+Batch 0/600 - Loss: 0.0783, Acc: 99.00%
+Batch 100/600 - Loss: 0.1474, Acc: 96.00%
+Batch 200/600 - Loss: 0.0642, Acc: 99.00%
+Batch 300/600 - Loss: 0.0842, Acc: 97.00%
+Batch 400/600 - Loss: 0.0615, Acc: 98.00%
+Batch 500/600 - Loss: 0.1720, Acc: 95.00%
+Epoch 3 Summary:
+  Average Loss: 0.0766
+  Average Accuracy: 98.12%
+  Learning Rate: 0.009755
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0919
+  Test Accuracy: 97.21%
+======================================
+
+--- Epoch 4/20 ---
+Batch 0/600 - Loss: 0.0561, Acc: 99.00%
+Batch 100/600 - Loss: 0.0783, Acc: 99.00%
+Batch 200/600 - Loss: 0.0509, Acc: 99.00%
+Batch 300/600 - Loss: 0.0691, Acc: 98.00%
+Batch 400/600 - Loss: 0.0253, Acc: 100.00%
+Batch 500/600 - Loss: 0.1079, Acc: 99.00%
+Epoch 4 Summary:
+  Average Loss: 0.0543
+  Average Accuracy: 98.75%
+  Learning Rate: 0.009455
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0804
+  Test Accuracy: 97.57%
+======================================
+
+--- Epoch 5/20 ---
+Batch 0/600 - Loss: 0.0232, Acc: 100.00%
+Batch 100/600 - Loss: 0.0124, Acc: 100.00%
+Batch 200/600 - Loss: 0.0269, Acc: 100.00%
+Batch 300/600 - Loss: 0.0327, Acc: 99.00%
+Batch 400/600 - Loss: 0.0130, Acc: 100.00%
+Batch 500/600 - Loss: 0.0137, Acc: 100.00%
+Epoch 5 Summary:
+  Average Loss: 0.0388
+  Average Accuracy: 99.21%
+  Learning Rate: 0.009045
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0723
+  Test Accuracy: 97.78%
+======================================
+
+--- Epoch 6/20 ---
+Batch 0/600 - Loss: 0.0133, Acc: 100.00%
+Batch 100/600 - Loss: 0.0202, Acc: 100.00%
+Batch 200/600 - Loss: 0.0231, Acc: 100.00%
+Batch 300/600 - Loss: 0.0184, Acc: 100.00%
+Batch 400/600 - Loss: 0.0253, Acc: 99.00%
+Batch 500/600 - Loss: 0.0257, Acc: 100.00%
+Epoch 6 Summary:
+  Average Loss: 0.0281
+  Average Accuracy: 99.54%
+  Learning Rate: 0.008536
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0708
+  Test Accuracy: 97.79%
+======================================
+
+--- Epoch 7/20 ---
+Batch 0/600 - Loss: 0.0153, Acc: 100.00%
+Batch 100/600 - Loss: 0.0186, Acc: 100.00%
+Batch 200/600 - Loss: 0.0093, Acc: 100.00%
+Batch 300/600 - Loss: 0.0255, Acc: 99.00%
+Batch 400/600 - Loss: 0.0365, Acc: 99.00%
+Batch 500/600 - Loss: 0.0272, Acc: 99.00%
+Epoch 7 Summary:
+  Average Loss: 0.0211
+  Average Accuracy: 99.74%
+  Learning Rate: 0.007939
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0705
+  Test Accuracy: 97.89%
+======================================
+
+--- Epoch 8/20 ---
+Batch 0/600 - Loss: 0.0118, Acc: 100.00%
+Batch 100/600 - Loss: 0.0075, Acc: 100.00%
+Batch 200/600 - Loss: 0.0092, Acc: 100.00%
+Batch 300/600 - Loss: 0.0085, Acc: 100.00%
+Batch 400/600 - Loss: 0.0332, Acc: 100.00%
+Batch 500/600 - Loss: 0.0142, Acc: 100.00%
+Epoch 8 Summary:
+  Average Loss: 0.0163
+  Average Accuracy: 99.82%
+  Learning Rate: 0.007270
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0653
+  Test Accuracy: 97.98%
+======================================
+
+--- Epoch 9/20 ---
+Batch 0/600 - Loss: 0.0170, Acc: 100.00%
+Batch 100/600 - Loss: 0.0061, Acc: 100.00%
+Batch 200/600 - Loss: 0.0151, Acc: 100.00%
+Batch 300/600 - Loss: 0.0094, Acc: 100.00%
+Batch 400/600 - Loss: 0.0102, Acc: 100.00%
+Batch 500/600 - Loss: 0.0069, Acc: 100.00%
+Epoch 9 Summary:
+  Average Loss: 0.0127
+  Average Accuracy: 99.90%
+  Learning Rate: 0.006545
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0656
+  Test Accuracy: 97.89%
+======================================
+
+--- Epoch 10/20 ---
+Batch 0/600 - Loss: 0.0106, Acc: 100.00%
+Batch 100/600 - Loss: 0.0092, Acc: 100.00%
+Batch 200/600 - Loss: 0.0058, Acc: 100.00%
+Batch 300/600 - Loss: 0.0088, Acc: 100.00%
+Batch 400/600 - Loss: 0.0106, Acc: 100.00%
+Batch 500/600 - Loss: 0.0062, Acc: 100.00%
+Epoch 10 Summary:
+  Average Loss: 0.0103
+  Average Accuracy: 99.96%
+  Learning Rate: 0.005782
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0651
+  Test Accuracy: 98.03%
+======================================
+
+--- Epoch 11/20 ---
+Batch 0/600 - Loss: 0.0091, Acc: 100.00%
+Batch 100/600 - Loss: 0.0079, Acc: 100.00%
+Batch 200/600 - Loss: 0.0041, Acc: 100.00%
+Batch 300/600 - Loss: 0.0078, Acc: 100.00%
+Batch 400/600 - Loss: 0.0172, Acc: 99.00%
+Batch 500/600 - Loss: 0.0156, Acc: 100.00%
+Epoch 11 Summary:
+  Average Loss: 0.0088
+  Average Accuracy: 99.97%
+  Learning Rate: 0.005000
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0645
+  Test Accuracy: 97.97%
+======================================
+
+--- Epoch 12/20 ---
+Batch 0/600 - Loss: 0.0034, Acc: 100.00%
+Batch 100/600 - Loss: 0.0091, Acc: 100.00%
+Batch 200/600 - Loss: 0.0042, Acc: 100.00%
+Batch 300/600 - Loss: 0.0062, Acc: 100.00%
+Batch 400/600 - Loss: 0.0086, Acc: 100.00%
+Batch 500/600 - Loss: 0.0020, Acc: 100.00%
+Epoch 12 Summary:
+  Average Loss: 0.0076
+  Average Accuracy: 99.97%
+  Learning Rate: 0.004218
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0654
+  Test Accuracy: 98.04%
+======================================
+
+--- Epoch 13/20 ---
+Batch 0/600 - Loss: 0.0183, Acc: 99.00%
+Batch 100/600 - Loss: 0.0056, Acc: 100.00%
+Batch 200/600 - Loss: 0.0068, Acc: 100.00%
+Batch 300/600 - Loss: 0.0058, Acc: 100.00%
+Batch 400/600 - Loss: 0.0110, Acc: 100.00%
+Batch 500/600 - Loss: 0.0072, Acc: 100.00%
+Epoch 13 Summary:
+  Average Loss: 0.0068
+  Average Accuracy: 99.98%
+  Learning Rate: 0.003455
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0641
+  Test Accuracy: 98.18%
+======================================
+
+--- Epoch 14/20 ---
+Batch 0/600 - Loss: 0.0079, Acc: 100.00%
+Batch 100/600 - Loss: 0.0047, Acc: 100.00%
+Batch 200/600 - Loss: 0.0017, Acc: 100.00%
+Batch 300/600 - Loss: 0.0074, Acc: 100.00%
+Batch 400/600 - Loss: 0.0104, Acc: 100.00%
+Batch 500/600 - Loss: 0.0046, Acc: 100.00%
+Epoch 14 Summary:
+  Average Loss: 0.0063
+  Average Accuracy: 99.99%
+  Learning Rate: 0.002730
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0643
+  Test Accuracy: 98.12%
+======================================
+
+--- Epoch 15/20 ---
+Batch 0/600 - Loss: 0.0047, Acc: 100.00%
+Batch 100/600 - Loss: 0.0075, Acc: 100.00%
+Batch 200/600 - Loss: 0.0048, Acc: 100.00%
+Batch 300/600 - Loss: 0.0090, Acc: 100.00%
+Batch 400/600 - Loss: 0.0045, Acc: 100.00%
+Batch 500/600 - Loss: 0.0108, Acc: 100.00%
+Epoch 15 Summary:
+  Average Loss: 0.0059
+  Average Accuracy: 99.99%
+  Learning Rate: 0.002061
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0648
+  Test Accuracy: 98.13%
+======================================
+
+--- Epoch 16/20 ---
+Batch 0/600 - Loss: 0.0045, Acc: 100.00%
+Batch 100/600 - Loss: 0.0047, Acc: 100.00%
+Batch 200/600 - Loss: 0.0065, Acc: 100.00%
+Batch 300/600 - Loss: 0.0038, Acc: 100.00%
+Batch 400/600 - Loss: 0.0087, Acc: 100.00%
+Batch 500/600 - Loss: 0.0036, Acc: 100.00%
+Epoch 16 Summary:
+  Average Loss: 0.0056
+  Average Accuracy: 99.99%
+  Learning Rate: 0.001464
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0643
+  Test Accuracy: 98.07%
+======================================
+
+--- Epoch 17/20 ---
+Batch 0/600 - Loss: 0.0051, Acc: 100.00%
+Batch 100/600 - Loss: 0.0014, Acc: 100.00%
+Batch 200/600 - Loss: 0.0044, Acc: 100.00%
+Batch 300/600 - Loss: 0.0024, Acc: 100.00%
+Batch 400/600 - Loss: 0.0053, Acc: 100.00%
+Batch 500/600 - Loss: 0.0064, Acc: 100.00%
+Epoch 17 Summary:
+  Average Loss: 0.0054
+  Average Accuracy: 99.99%
+  Learning Rate: 0.000955
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0641
+  Test Accuracy: 98.13%
+======================================
+
+--- Epoch 18/20 ---
+Batch 0/600 - Loss: 0.0069, Acc: 100.00%
+Batch 100/600 - Loss: 0.0034, Acc: 100.00%
+Batch 200/600 - Loss: 0.0044, Acc: 100.00%
+Batch 300/600 - Loss: 0.0076, Acc: 100.00%
+Batch 400/600 - Loss: 0.0061, Acc: 100.00%
+Batch 500/600 - Loss: 0.0051, Acc: 100.00%
+Epoch 18 Summary:
+  Average Loss: 0.0052
+  Average Accuracy: 99.99%
+  Learning Rate: 0.000545
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0643
+  Test Accuracy: 98.13%
+======================================
+
+--- Epoch 19/20 ---
+Batch 0/600 - Loss: 0.0049, Acc: 100.00%
+Batch 100/600 - Loss: 0.0018, Acc: 100.00%
+Batch 200/600 - Loss: 0.0038, Acc: 100.00%
+Batch 300/600 - Loss: 0.0064, Acc: 100.00%
+Batch 400/600 - Loss: 0.0077, Acc: 100.00%
+Batch 500/600 - Loss: 0.0085, Acc: 100.00%
+Epoch 19 Summary:
+  Average Loss: 0.0051
+  Average Accuracy: 99.99%
+  Learning Rate: 0.000245
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0643
+  Test Accuracy: 98.12%
+======================================
+
+--- Epoch 20/20 ---
+Batch 0/600 - Loss: 0.0017, Acc: 100.00%
+Batch 100/600 - Loss: 0.0026, Acc: 100.00%
+Batch 200/600 - Loss: 0.0022, Acc: 100.00%
+Batch 300/600 - Loss: 0.0058, Acc: 100.00%
+Batch 400/600 - Loss: 0.0026, Acc: 100.00%
+Batch 500/600 - Loss: 0.0087, Acc: 100.00%
+Epoch 20 Summary:
+  Average Loss: 0.0050
+  Average Accuracy: 100.00%
+  Learning Rate: 0.000062
+Evaluating on test set...
+Test Results:
+  Test Loss: 0.0644
+  Test Accuracy: 98.13%
+======================================
+
+Training completed successfully!
+Total training time: 95 seconds
+
+=== Trainer API Benefits ===
+[OK] Encapsulated training logic
+[OK] Automatic component management
+[OK] Unified training interface
+[OK] Learning rate scheduling support
+[OK] Easy switching between optimizers/schedulers
+
+
+进程已结束，退出代码为 0

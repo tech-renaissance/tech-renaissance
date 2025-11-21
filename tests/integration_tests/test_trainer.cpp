@@ -10,6 +10,7 @@
 #include "tech_renaissance.h"
 #include <iostream>
 #include <iomanip>
+#include <utility>
 #include <vector>
 #include <string>
 #include <chrono>
@@ -103,7 +104,7 @@ std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
         std::make_shared<Linear>(256, 10)        // fc3: 256 -> 10
     );
 
-    model->set_backend(backend);
+    model->set_backend(std::move(backend));
     model->train();
 
     std::cout << "Model: MNIST_MLP (3-layer MLP with Tanh + Flatten)" << std::endl;
@@ -127,7 +128,7 @@ int main() {
         auto start_time = std::chrono::high_resolution_clock::now();
 
         // 1. 获取CPU后端
-        auto backend = BackendManager::instance().get_cpu_backend();
+        auto backend = BackendManager::get_cpu_backend();
 
         // 2. 创建MnistLoader并加载数据
         std::cout << "\n=== Data Loading with MnistLoader ===" << std::endl;
