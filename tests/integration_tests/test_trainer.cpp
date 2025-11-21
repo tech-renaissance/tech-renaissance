@@ -1,8 +1,8 @@
 /**
  * @file test_trainer.cpp
- * @brief Trainer类MNIST MLP训练测试
- * @details 使用Trainer类对Optimizer、Loss、Scheduler三者进行封装，实现与test_training_mnist_mlp.cpp相同的功能
- * @version 1.57.0
+ * @brief Trainer类MNIST MLP训练测试 - 使用MnistLoader简化版
+ * @details 使用MnistLoader封装数据加载，使用经典SGD+余弦退火调度器
+ * @version 1.57.1
  * @date 2025-11-21
  * @author 技术觉醒团队
  */
@@ -17,10 +17,12 @@
 
 using namespace tr;
 
-// Training parameters (与原始测试保持一致)
+// Classic training parameters
 const int BATCH_SIZE = 100;
-const int NUM_EPOCHS = 5;
-const float LEARNING_RATE = 0.1f;
+const int NUM_EPOCHS = 20;
+const float LEARNING_RATE = 0.01f;  // Classic SGD learning rate
+const float WEIGHT_DECAY = 5e-4f;   // Classic weight decay
+const float LABEL_SMOOTHING = 0.0f; // Classic: no label smoothing
 const int PRINT_INTERVAL = 100;
 
 // MNIST数据路径
@@ -110,148 +112,13 @@ std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
     return model;
 }
 
-// 加载MNIST数据集（与原始测试保持一致）
-std::pair<Tensor, Tensor> load_mnist_data(const std::string& split, std::shared_ptr<Backend> backend) {
-    std::cout << "Loading MNIST " << split << " data..." << std::endl;
-
-    std::string images_path = MNIST_PATH + split + "_images.tsr";
-    std::string labels_path = MNIST_PATH + split + "_labels.tsr";
-
-    // 使用IMPORT_TENSOR宏加载TSR文件
-    Tensor images = IMPORT_TENSOR(images_path);
-    Tensor labels = IMPORT_TENSOR(labels_path);
-
-    auto cpu_backend = dynamic_cast<CpuBackend*>(backend.get());
-
-    // 处理图像数据：从4D INT32转为4D FP32，然后归一化
-    std::cout << "Processing image data..." << std::endl;
-    Shape original_shape = images.shape();
-    std::cout << "Original image shape: " << original_shape.to_string() << std::endl;
-
-    // 创建4D FP32张量：(N, 1, 28, 28)
-    Tensor fp32_images = backend->empty(original_shape, DType::FP32);
-
-    // 转换数据
-    int64_t total_elements = original_shape.numel();
-    for (int64_t i = 0; i < total_elements; ++i) {
-        float pixel_val;
-        if (images.dtype() == DType::INT32) {
-            int32_t int_val = cpu_backend->get_item_int32(images, i);
-            pixel_val = static_cast<float>(int_val) / 255.0f;
-        } else {
-            pixel_val = cpu_backend->get_item_fp32(images, i);
-        }
-        cpu_backend->set_item_fp32(fp32_images, i, pixel_val);
-    }
-
-    // 处理标签数据：转换为one-hot编码的2D FP32张量
-    std::cout << "Processing label data..." << std::endl;
-    Shape label_shape = labels.shape();
-    Shape onehot_shape({label_shape.dim(0), 10});
-    Tensor onehot_labels = backend->empty(onehot_shape, DType::FP32);
-
-    cpu_backend->fill(onehot_labels, 0.0f);
-
-    // 转换为one-hot编码
-    for (int64_t i = 0; i < label_shape.dim(0); ++i) {
-        int label_class;
-        if (labels.dtype() == DType::INT32) {
-            int32_t int_val = cpu_backend->get_item_int32(labels, i);
-            label_class = static_cast<int>(int_val);
-        } else {
-            float float_val = cpu_backend->get_item_fp32(labels, i);
-            label_class = static_cast<int>(float_val);
-        }
-
-        if (label_class >= 0 && label_class < 10) {
-            cpu_backend->set_item_fp32(onehot_labels, i * 10 + label_class, 1.0f);
-        }
-    }
-
-    print_tensor_info(split + " processed images", fp32_images);
-    print_tensor_info(split + " processed labels (one-hot)", onehot_labels);
-
-    return std::make_pair(fp32_images, onehot_labels);
-}
-
-// 数据批次生成器（与原始测试保持一致）
-class BatchGenerator {
-private:
-    Tensor images_;
-    Tensor labels_;
-    int batch_size_;
-    int num_samples_;
-    int current_idx_;
-    std::shared_ptr<Backend> backend_;
-
-public:
-    BatchGenerator(const Tensor& images, const Tensor& labels, int batch_size, std::shared_ptr<Backend> backend)
-        : images_(images), labels_(labels), batch_size_(batch_size), current_idx_(0), backend_(backend) {
-        num_samples_ = images.shape().dim(0);
-    }
-
-    bool has_next() const {
-        return current_idx_ < num_samples_;
-    }
-
-    std::pair<Tensor, Tensor> next_batch() {
-        if (!has_next()) {
-            throw TRException("[BatchGenerator] No more batches available");
-        }
-
-        int remaining = num_samples_ - current_idx_;
-        int current_batch_size = std::min(batch_size_, remaining);
-
-        // 创建批次张量
-        Shape image_batch_shape({batch_size_, images_.shape().dim(1), images_.shape().dim(2), images_.shape().dim(3)});
-        Shape label_batch_shape({batch_size_, labels_.shape().dim(1)});
-        Tensor batch_images = backend_->empty(image_batch_shape, DType::FP32);
-        Tensor batch_labels = backend_->empty(label_batch_shape, DType::FP32);
-
-        auto cpu_backend = dynamic_cast<CpuBackend*>(backend_.get());
-        cpu_backend->fill(batch_images, 0.0f);
-        cpu_backend->fill(batch_labels, 0.0f);
-
-        // 提取批次数据
-        for (int i = 0; i < current_batch_size; ++i) {
-            int src_idx = current_idx_ + i;
-
-            // 复制4D图像数据
-            int64_t image_size = images_.shape().dim(1) * images_.shape().dim(2) * images_.shape().dim(3);
-            for (int64_t j = 0; j < image_size; ++j) {
-                float val = cpu_backend->get_item_fp32(images_, src_idx * image_size + j);
-                cpu_backend->set_item_fp32(batch_images, i * image_size + j, val);
-            }
-
-            // 复制2D标签数据（one-hot向量）
-            for (int j = 0; j < labels_.shape().dim(1); ++j) {
-                float label_val = cpu_backend->get_item_fp32(labels_, src_idx * labels_.shape().dim(1) + j);
-                cpu_backend->set_item_fp32(batch_labels, i * labels_.shape().dim(1) + j, label_val);
-            }
-        }
-
-        current_idx_ += current_batch_size;
-
-        return std::make_pair(batch_images, batch_labels);
-    }
-
-    void reset() {
-        current_idx_ = 0;
-    }
-
-    int get_num_batches() const {
-        return (num_samples_ + batch_size_ - 1) / batch_size_;
-    }
-};
-
-// 使用现有的ConstantLR调度器
 
 int main() {
-    std::cout << "=== MNIST MLP Training Test with Trainer Class ===" << std::endl;
-    std::cout << "Using Trainer to encapsulate Optimizer, Loss, and Scheduler" << std::endl;
-    std::cout << "Training 3-layer MLP on MNIST dataset" << std::endl;
+    std::cout << "=== MNIST MLP Training Test (Simplified with MnistLoader) ===" << std::endl;
+    std::cout << "Using Trainer with classic SGD + CosineAnnealing scheduler" << std::endl;
+    std::cout << "Training 3-layer MLP on MNIST dataset for " << NUM_EPOCHS << " epochs" << std::endl;
     std::cout << "Architecture: 784 -> 512 -> 256 -> 10 (with Tanh)" << std::endl;
-    std::cout << "=========================================================" << std::endl;
+    std::cout << "================================================================" << std::endl;
 
     // 设置安静模式
     Logger::get_instance().set_quiet_mode(true);
@@ -262,46 +129,47 @@ int main() {
         // 1. 获取CPU后端
         auto backend = BackendManager::instance().get_cpu_backend();
 
-        // 2. 加载数据
-        auto [train_images, train_labels] = load_mnist_data("train", backend);
-        auto [test_images, test_labels] = load_mnist_data("test", backend);
+        // 2. 创建MnistLoader并加载数据
+        std::cout << "\n=== Data Loading with MnistLoader ===" << std::endl;
+        MnistLoader mnist_loader(backend, MNIST_PATH);
+        auto [train_data, test_data] = mnist_loader.load_data();
 
         // 3. 创建模型
         auto model = create_mlp_model(backend);
 
-        // 4. 创建Trainer组件
-        std::cout << "\n=== Trainer Component Setup ===" << std::endl;
+        // 4. 创建Trainer组件（使用经典配置）
+        std::cout << "\n=== Trainer Component Setup (Classic Configuration) ===" << std::endl;
 
-        // 创建优化器
-        auto optimizer = std::make_unique<SGD>(LEARNING_RATE, 0.0f, 0.0f, false);
+        // 创建SGD优化器（经典配置）
+        auto optimizer = std::make_unique<SGD>(LEARNING_RATE, 0.9f, WEIGHT_DECAY, false, backend);
 
-        // 创建损失函数
-        auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, 0.0f);
+        // 创建损失函数（经典：无标签平滑）
+        auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, LABEL_SMOOTHING);
 
-        // 创建学习率调度器（使用固定学习率）
-        auto scheduler = std::make_unique<ConstantLR>(LEARNING_RATE);
+        // 创建余弦退火调度器（无热重启）
+        auto scheduler = std::make_unique<CosineAnnealingLR>(LEARNING_RATE, NUM_EPOCHS);
 
         // 创建Trainer
         Trainer trainer(*model, std::move(optimizer), std::move(loss_fn), std::move(scheduler));
 
-        std::cout << "✓ Trainer created successfully" << std::endl;
-        std::cout << "✓ Optimizer: SGD (lr=" << LEARNING_RATE << ")" << std::endl;
-        std::cout << "✓ Loss Function: CrossEntropyLoss" << std::endl;
-        std::cout << "✓ Scheduler: ConstantLR" << std::endl;
+        std::cout << "[OK] Trainer created successfully" << std::endl;
+        std::cout << "[OK] Optimizer: SGD (lr=" << LEARNING_RATE << ", momentum=0.9, weight_decay=" << WEIGHT_DECAY << ")" << std::endl;
+        std::cout << "[OK] Loss Function: CrossEntropyLoss (label_smoothing=" << LABEL_SMOOTHING << ")" << std::endl;
+        std::cout << "[OK] Scheduler: CosineAnnealingLR (T_max=" << NUM_EPOCHS << ")" << std::endl;
+        std::cout << "[OK] Data Normalization: MNIST (mean=0.1307, std=0.3081)" << std::endl;
 
         // 初始化优化器
         trainer.get_optimizer()->initialize(*model);
-        std::cout << "✓ Optimizer initialized" << std::endl;
+        std::cout << "[OK] Optimizer initialized" << std::endl;
 
         // 5. 创建数据生成器
         std::cout << "\n=== Data Setup ===" << std::endl;
-        BatchGenerator train_loader(train_images, train_labels, BATCH_SIZE, backend);
-        BatchGenerator test_loader(test_images, test_labels, BATCH_SIZE, backend);
+        auto train_loader = mnist_loader.get_train_loader(BATCH_SIZE);
+        auto test_loader = mnist_loader.get_test_loader(BATCH_SIZE);
 
-        std::cout << "Training samples: " << train_images.shape().dim(0) << std::endl;
-        std::cout << "Test samples: " << test_images.shape().dim(0) << std::endl;
         std::cout << "Batch size: " << BATCH_SIZE << std::endl;
-        std::cout << "Training batches per epoch: " << train_loader.get_num_batches() << std::endl;
+        std::cout << "Training batches per epoch: " << train_loader->get_num_batches() << std::endl;
+        std::cout << "Test batches per epoch: " << test_loader->get_num_batches() << std::endl;
         std::cout << "======================================" << std::endl;
 
         // 6. 使用Trainer进行训练
@@ -312,15 +180,15 @@ int main() {
 
             // 设置为训练模式
             trainer.train();
-            train_loader.reset();
+            train_loader->reset();
 
             float epoch_loss = 0.0f;
             float epoch_accuracy = 0.0f;
             int num_batches = 0;
 
             int batch_idx = 0;
-            while (train_loader.has_next()) {
-                auto [batch_images, batch_labels] = train_loader.next_batch();
+            while (train_loader->has_next()) {
+                auto [batch_images, batch_labels] = train_loader->next_batch();
 
                 // 使用Trainer的训练步骤
                 float batch_loss = trainer.train_step(batch_images, batch_labels);
@@ -335,7 +203,7 @@ int main() {
 
                 // 打印进度
                 if (batch_idx % PRINT_INTERVAL == 0) {
-                    std::cout << "Batch " << batch_idx << "/" << train_loader.get_num_batches()
+                    std::cout << "Batch " << batch_idx << "/" << train_loader->get_num_batches()
                               << " - Loss: " << std::fixed << std::setprecision(4) << batch_loss
                               << ", Acc: " << std::setprecision(2) << batch_acc << "%" << std::endl;
                 }
@@ -358,14 +226,14 @@ int main() {
             // 评估
             std::cout << "Evaluating on test set..." << std::endl;
             trainer.eval();
-            test_loader.reset();
+            test_loader->reset();
 
             float test_loss = 0.0f;
             float test_accuracy = 0.0f;
             int test_num_batches = 0;
 
-            while (test_loader.has_next()) {
-                auto [batch_images, batch_labels] = test_loader.next_batch();
+            while (test_loader->has_next()) {
+                auto [batch_images, batch_labels] = test_loader->next_batch();
 
                 // 使用Trainer的评估步骤
                 float batch_loss = trainer.eval_step(batch_images, batch_labels);
@@ -394,11 +262,11 @@ int main() {
         std::cout << "\nTraining completed successfully!" << std::endl;
         std::cout << "Total training time: " << duration.count() << " seconds" << std::endl;
         std::cout << "\n=== Trainer API Benefits ===" << std::endl;
-        std::cout << "✓ Encapsulated training logic" << std::endl;
-        std::cout << "✓ Automatic component management" << std::endl;
-        std::cout << "✓ Unified training interface" << std::endl;
-        std::cout << "✓ Learning rate scheduling support" << std::endl;
-        std::cout << "✓ Easy switching between optimizers/schedulers" << std::endl;
+        std::cout << "[OK] Encapsulated training logic" << std::endl;
+        std::cout << "[OK] Automatic component management" << std::endl;
+        std::cout << "[OK] Unified training interface" << std::endl;
+        std::cout << "[OK] Learning rate scheduling support" << std::endl;
+        std::cout << "[OK] Easy switching between optimizers/schedulers" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

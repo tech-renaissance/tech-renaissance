@@ -8,6 +8,7 @@ set(UTILS_SOURCES
     tr_exception.cpp
     logger.cpp
     profiler.cpp
+    mnist_loader.cpp
 )
 
 # 添加PythonSession源文件（如果启用）
@@ -28,6 +29,12 @@ target_include_directories(tech_renaissance_utils
 )
 
 # 链接依赖库
+target_link_libraries(tech_renaissance_utils
+    PRIVATE
+        data
+        backend
+)
+
 if(TR_USE_PROTOBUF)
     target_link_libraries(tech_renaissance_utils PRIVATE protobuf::libprotobuf)
 endif()
