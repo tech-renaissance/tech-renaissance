@@ -34,6 +34,7 @@ target_include_directories(trainer PRIVATE
 )
 
 target_link_libraries(trainer
+    tech_renaissance_base
     tech_renaissance_utils
     data
     backend

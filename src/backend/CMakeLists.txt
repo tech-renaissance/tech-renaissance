@@ -54,8 +54,8 @@ else()
     message(STATUS "Eigen optimizations: DISABLED for backend (global config)")
 endif()
 
-# 链接数据模块
-target_link_libraries(backend PUBLIC data)
+# 链接基础库和数据模块（backend模块需要Tensor类）
+target_link_libraries(backend PUBLIC tech_renaissance_base data)
 
 # 查找OpenMP支持
 find_package(OpenMP)

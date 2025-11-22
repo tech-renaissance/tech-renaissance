@@ -18,6 +18,8 @@
 #include "tech_renaissance/trainer/scheduler.h"
 #include <memory>
 #include <functional>
+#include <iomanip>
+#include <iostream>
 
 namespace tr {
 

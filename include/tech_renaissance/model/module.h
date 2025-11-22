@@ -14,6 +14,8 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <cstring>
+#include <fstream>
 #include "tech_renaissance/data/tensor.h"
 #include "tech_renaissance/data/shape.h"
 #include "tech_renaissance/backend/backend.h"

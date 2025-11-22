@@ -13,6 +13,7 @@
 #include "tech_renaissance/data/tensor.h"
 #include "tech_renaissance/utils/tr_exception.h"
 #include "tech_renaissance/utils/logger.h"
+#include <cmath>
 
 #include <algorithm>
 #include <stdexcept>

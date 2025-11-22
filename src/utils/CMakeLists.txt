@@ -3,10 +3,14 @@
 # Python会话支持选项
 option(TR_BUILD_PYTHON_SESSION "Enable Python session integration" ON)
 
-# 收集源文件
-set(UTILS_SOURCES
+# 核心工具源文件（无依赖）
+set(CORE_UTILS_SOURCES
     tr_exception.cpp
     logger.cpp
+)
+
+# 收集源文件（依赖核心工具）
+set(UTILS_SOURCES
     profiler.cpp
     mnist_loader.cpp
 )
@@ -16,10 +20,22 @@ if(TR_BUILD_PYTHON_SESSION)
     list(APPEND UTILS_SOURCES python_session.cpp)
 endif()
 
-# 创建库目标
+# 创建基础库目标（无依赖）
+add_library(tech_renaissance_base STATIC ${CORE_UTILS_SOURCES})
+
+# 创建工具库目标（依赖基础）
 add_library(tech_renaissance_utils STATIC ${UTILS_SOURCES})
 
-# 设置目标属性
+# 设置基础库目标属性
+target_include_directories(tech_renaissance_base
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_BINARY_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# 设置工具库目标属性
 target_include_directories(tech_renaissance_utils
     PUBLIC
         ${CMAKE_SOURCE_DIR}/include
@@ -28,8 +44,12 @@ target_include_directories(tech_renaissance_utils
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# 基础库无依赖
+
 # 链接依赖库
 target_link_libraries(tech_renaissance_utils
+    PUBLIC
+        tech_renaissance_base
     PRIVATE
         data
         backend
@@ -40,6 +60,11 @@ if(TR_USE_PROTOBUF)
 endif()
 
 # 设置编译定义
+target_compile_definitions(tech_renaissance_base
+    PUBLIC
+        $<$<BOOL:${TR_BUILD_PYTHON_SESSION}>:TR_BUILD_PYTHON_SESSION>
+)
+
 target_compile_definitions(tech_renaissance_utils
     PUBLIC
         $<$<BOOL:${TR_USE_PROTOBUF}>:TR_USE_PROTOBUF>
@@ -48,12 +73,16 @@ target_compile_definitions(tech_renaissance_utils
 )
 
 # 设置C++标准
+set_property(TARGET tech_renaissance_base PROPERTY CXX_STANDARD 17)
+set_property(TARGET tech_renaissance_base PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET tech_renaissance_base PROPERTY CXX_EXTENSIONS OFF)
+
 set_property(TARGET tech_renaissance_utils PROPERTY CXX_STANDARD 17)
 set_property(TARGET tech_renaissance_utils PROPERTY CXX_STANDARD_REQUIRED ON)
 set_property(TARGET tech_renaissance_utils PROPERTY CXX_EXTENSIONS OFF)
 
 # 安装规则
-install(TARGETS tech_renaissance_utils
+install(TARGETS tech_renaissance_base tech_renaissance_utils
     EXPORT TechRenaissanceTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

@@ -25,6 +25,7 @@ add_library(tech_renaissance INTERFACE)
 
 # 链接各个模块
 target_link_libraries(tech_renaissance INTERFACE
+    tech_renaissance_base
     tech_renaissance_utils
     data
     backend

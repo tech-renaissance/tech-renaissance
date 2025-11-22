@@ -29,6 +29,7 @@ set_target_properties(model PROPERTIES
 
 # 链接依赖
 target_link_libraries(model PUBLIC
+    tech_renaissance_base
     data
     backend
 )

@@ -28,6 +28,9 @@ target_include_directories(data
         $<INSTALL_INTERFACE:include>
 )
 
+# 链接基础工具库和后端
+target_link_libraries(data PUBLIC tech_renaissance_base backend)
+
 # 设置编译选项
 target_compile_definitions(data PRIVATE
     TR_DATA_VERSION_MAJOR=1
