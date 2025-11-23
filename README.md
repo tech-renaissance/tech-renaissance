@@ -25,7 +25,7 @@
 |  Adam  | 112.00 s |     67.90 s      |  1.65×   |
 | AdamW  | 114.30 s |     67.95 s      |  1.68×   |
 
-测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/)** Vs **[TR](tests/integration_tests/)**
 
 #### （2）Intel Xeon + Ubuntu
 
@@ -35,7 +35,7 @@
 |  Adam  | 180.60 s |     97.15 s      |  1.86×   |
 | AdamW  | 181.50 s |     97.10 s      |  1.87×   |
 
-测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/)** Vs **[TR](tests/integration_tests/)**
 
 **测试准确率对比**：
 
@@ -47,7 +47,7 @@
 |  Adam  | 98.07%  |      98.09%      | 0.02%  |
 | AdamW  | 98.07%  |      98.04%      | -0.03% |
 
-测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/)** Vs **[TR](tests/integration_tests/)**
 
 #### （2）Intel Xeon + Ubuntu
 
@@ -57,7 +57,7 @@
 |  Adam  | 98.06%  |      98.07%      | 0.01% |
 | AdamW  | 98.05%  |      98.07%      | 0.02% |
 
-测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/)** Vs **[TR](tests/integration_tests/)**
 
 
 
