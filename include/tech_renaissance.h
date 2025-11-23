@@ -27,7 +27,7 @@
 #include "tech_renaissance/backend/backend.h"
 #include "tech_renaissance/backend/backend_manager.h"
 #include "tech_renaissance/backend/cpu/cpu_backend.h"
-#include "tech_renaissance/backend/cuda/cuda_backend.h"
+// CUDA backend removed for modular architecture - CPU Core Module only
 #include "tech_renaissance/model/module.h"
 #include "tech_renaissance/model/linear.h"
 #include "tech_renaissance/model/flatten.h"

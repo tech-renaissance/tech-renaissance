@@ -124,67 +124,8 @@ set_target_properties(backend PROPERTIES
 )
 
 # =============================================================================
-# CUDA后端配置（可选）
+# CUDA后端配置已移除 - 模块化架构支持
 # =============================================================================
-if(TR_ENABLE_CUDA AND CUDAToolkit_FOUND AND TARGET cudnn_static)
-    message(STATUS "Configuring CUDA backend...")
-
-    # 暂时注释掉CUDA语言启用，使用外部编译方法
-    # enable_language(CUDA)
-
-    # CUDA后端源文件（暂时改为.cpp以避免CUDA语言问题）
-    set(CUDA_BACKEND_SOURCES
-        cuda/cuda_backend.cpp
-        cuda/cuda_mm_fp32.cpp
-        cuda/cuda_conv.cpp
-    )
-
-    # 创建CUDA后端库
-    add_library(cuda_backend STATIC ${CUDA_BACKEND_SOURCES})
-
-    # CUDA库包含目录
-    target_include_directories(cuda_backend
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../include
-        PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
-            $<INSTALL_INTERFACE:include>
-    )
-
-    # 链接CUDA库
-    target_link_libraries(cuda_backend PUBLIC
-        CUDA::cudart
-        CUDA::cublas
-        cudnn_static
-        data
-    )
-
-    # 设置CUDA编译选项
-    target_compile_options(cuda_backend PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>
-    )
-
-    # 设置属性
-    set_target_properties(cuda_backend PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON
-        FOLDER "src"
-        POSITION_INDEPENDENT_CODE ON
-    )
-
-    # 将CUDA后端链接到主后端库
-    target_link_libraries(backend PUBLIC cuda_backend)
-
-    ### 确保三个层级（cuda_backend、backend、tech_renaissance）都定义该宏
-    target_compile_definitions(cuda_backend PUBLIC TR_USE_CUDA)
-    target_compile_definitions(backend PUBLIC TR_USE_CUDA)
-
-    message(STATUS "CUDA backend configured successfully")
-else()
-    if(TR_ENABLE_CUDA)
-        message(WARNING "CUDA backend disabled - missing CUDAToolkit or cuDNN")
-    else()
-        message(STATUS "CUDA backend disabled by user")
-    endif()
-endif()
+message(STATUS "CUDA backend removed for modular architecture - CPU Core Module only")
 
 message(STATUS "Backend module configured successfully")

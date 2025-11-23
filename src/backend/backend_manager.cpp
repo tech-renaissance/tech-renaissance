@@ -106,11 +106,13 @@ std::string BackendManager::device_key(const Device& device) const {
 }
 
 // API优化：静态便利方法实现
+#ifdef TR_USE_CUDA
 std::shared_ptr<CudaBackend> BackendManager::get_cuda_backend(int device_id) {
     return std::dynamic_pointer_cast<CudaBackend>(
         instance().get_backend(tr::CUDA[device_id])
     );
 }
+#endif
 
 std::shared_ptr<CpuBackend> BackendManager::get_cpu_backend() {
     return std::dynamic_pointer_cast<CpuBackend>(

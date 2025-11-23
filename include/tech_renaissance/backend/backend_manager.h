@@ -63,6 +63,7 @@ public:
     bool is_registered(const Device& device) const;
 
     // API优化：静态便利方法
+#ifdef TR_USE_CUDA
     /**
      * @brief 获取CUDA后端（便利方法）
      * @param device_id CUDA设备ID，默认为0
@@ -70,6 +71,7 @@ public:
      * @throws std::runtime_error 如果CUDA后端未注册
      */
     static std::shared_ptr<class CudaBackend> get_cuda_backend(int device_id = 0);
+#endif
 
     /**
      * @brief 获取CPU后端（便利方法）

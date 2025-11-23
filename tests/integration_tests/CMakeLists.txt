@@ -1,125 +1,64 @@
-# 集成测试的CMakeLists.txt
+# =============================================================================
+# 技术觉醒框架 - 集成测试构建配置（CPU Core Module）
+# 版本: 2.0.0
+# 日期: 2025-11-23
+# 作者: 技术觉醒团队
+# 说明: 集成测试，基于实际存在的Trainer测试文件
+# =============================================================================
 
-# 设置测试源文件
-set(TEST_SOURCES
-    test_model_optimizer_integration.cpp
-    test_training_sgd.cpp
-    test_training_adam.cpp
-    test_training_adamw.cpp
-    test_trainer_adamw.cpp
-    test_trainer_adam.cpp
-    test_trainer_sgd.cpp
-)
+# 启用测试
+enable_testing()
 
-# 创建测试可执行文件
-add_executable(test_model_optimizer_integration test_model_optimizer_integration.cpp)
-add_executable(test_training_sgd test_training_sgd.cpp)
-add_executable(test_training_adam test_training_adam.cpp)
-add_executable(test_training_adamw test_training_adamw.cpp)
-add_executable(test_training_simple test_training_simple.cpp)
-add_executable(test_trainer_adamw test_trainer_adamw.cpp)
-add_executable(test_trainer_adam test_trainer_adam.cpp)
-add_executable(test_trainer_sgd test_trainer_sgd.cpp)
+# =============================================================================
+# 集成测试配置函数
+# =============================================================================
+function(configure_integration_test test_name source_file)
+    add_executable(${test_name} ${source_file})
 
-# 链接必要的库
-target_link_libraries(test_model_optimizer_integration
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+    # 链接主库
+    if(WIN32)
+        target_link_libraries(${test_name} PRIVATE tech_renaissance)
+    else()
+        target_link_libraries(${test_name} PRIVATE tech_renaissance pthread)
+    endif()
 
-target_link_libraries(test_training_sgd
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+    # 设置标准属性
+    set_target_properties(${test_name} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        FOLDER "tests/integration"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+    )
 
-target_link_libraries(test_training_adam
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+    message(STATUS "[SUCCESS] Integration test ${test_name} configured")
+endfunction()
 
-target_link_libraries(test_training_adamw
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+# =============================================================================
+# 集成测试 - 基于实际存在的文件
+# =============================================================================
 
-target_link_libraries(test_training_simple
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+configure_integration_test(test_trainer_sgd test_trainer_sgd.cpp)
+configure_integration_test(test_trainer_adam test_trainer_adam.cpp)
+configure_integration_test(test_trainer_adamw test_trainer_adamw.cpp)
 
+# =============================================================================
+# 注册测试到CTest
+# =============================================================================
+function(register_integration_test test_name test_description)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+    set_tests_properties(${test_name} PROPERTIES
+        TIMEOUT 300
+        PASS_REGULAR_EXPRESSION "PASSED|SUCCESS|completed successfully"
+        LABELS "integration"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
+    )
+endfunction()
 
-target_link_libraries(test_trainer_adamw
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
+# 注册所有集成测试
+register_integration_test(test_trainer_sgd "Trainer SGD Integration Test")
+register_integration_test(test_trainer_adam "Trainer Adam Integration Test")
+register_integration_test(test_trainer_adamw "Trainer AdamW Integration Test")
 
-target_link_libraries(test_trainer_adam
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
-
-target_link_libraries(test_trainer_sgd
-    PRIVATE
-    tech_renaissance  # 主框架库
-)
-
-# 包含头文件
-target_include_directories(test_model_optimizer_integration
-    PRIVATE
-    ${CMAKE_SOURCE_DIR}
-)
-
-target_include_directories(test_training_sgd
-    PRIVATE
-    ${CMAKE_SOURCE_DIR}
-)
-
-target_include_directories(test_training_adam
-    PRIVATE
-    ${CMAKE_SOURCE_DIR}
-)
-
-target_include_directories(test_training_simple
-    PRIVATE
-    ${CMAKE_SOURCE_DIR}
-)
-
-# 设置输出目录
-set_target_properties(test_model_optimizer_integration PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-set_target_properties(test_training_sgd PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-set_target_properties(test_training_adam PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-set_target_properties(test_training_simple PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-# 添加到CTest
-add_test(NAME ModelOptimizerIntegrationTest
-         COMMAND test_model_optimizer_integration)
-
-add_test(NAME TrainingAlignmentTestSGD
-         COMMAND test_training_sgd)
-
-add_test(NAME TrainingAlignmentTestAdam
-         COMMAND test_training_adam)
-
-# 设置测试工作目录
-set_tests_properties(ModelOptimizerIntegrationTest PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-set_tests_properties(TrainingAlignmentTestSGD PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
-
-set_tests_properties(TrainingAlignmentTestAdam PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin/tests
-)
+message(STATUS "Integration tests configured successfully - CPU Core Module only")
+message(STATUS "Total integration tests: 3")

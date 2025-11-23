@@ -46,8 +46,4 @@ target_compile_definitions(tech_renaissance INTERFACE
     TR_VERSION="1.01.01"
 )
 
-message(STATUS "Source modules configured successfully (including backend module)")
-# 如果CUDA可用，添加CUDA宏定义
-if(TR_ENABLE_CUDA AND TARGET cudnn_static)
-    target_compile_definitions(tech_renaissance INTERFACE TR_USE_CUDA)
-endif()
+message(STATUS "Source modules configured successfully (CPU Core Module only)")
