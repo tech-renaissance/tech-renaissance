@@ -29,7 +29,7 @@ const float LABEL_SMOOTHING = 0.0f;
 const int PRINT_INTERVAL = 100;
 
 // MNIST数据路径
-const std::string MNIST_PATH = "R:/tech-renaissance/python/dataset/";
+const std::string MNIST_PATH = std::string(WORKSPACE_PATH) + "/../../MNIST/tsr/";
 
 // 辅助函数：计算准确率（与原始测试保持一致）
 float calculate_accuracy(const Tensor& logits, const Tensor& labels) {

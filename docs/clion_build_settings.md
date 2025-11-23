@@ -16,7 +16,7 @@ CMake选项：
 --preset "windows-msvc-release"
 
 构建目录：
-R:\tech-renaissance\build\windows-msvc-release
+build\clion-msvc-release
 
 构建选项：
 （空）
@@ -39,10 +39,10 @@ Release
 生成器：Ninja
 
 CMake选项：
--G Ninja -DCMAKE_TOOLCHAIN_FILE=R:/tech-renaissance/config/user_paths.cmake -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=FALSE -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=native -fopenmp" -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-fopenmp"
+-G Ninja -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=FALSE -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=native -fopenmp" -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-fopenmp"
 
 构建目录：
-R:\tech-renaissance\build\windows-msys2-release
+build\clion-mingw-release
 
 构建选项：
 -j 30
