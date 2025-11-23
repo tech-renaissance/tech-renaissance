@@ -17,32 +17,47 @@
 ### 性能优势
 **训练性能对比**：
 
-| 优化器 | PyTorch用时 | Tech Renaissance用时 | 性能提升 |
-|:------:|:-----------:|:-------------------:|:--------:|
-| **SGD** | 118.5秒 | 69.2秒 | **+71.24%** |
-| **Adam** | 126.0秒 | 77.0秒 | **+63.64%** |
-| **AdamW** | 123.0秒 | 78.0秒 | **+57.69%** |
+#### （1）Intel Core i9 + Windows
 
-测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+| 优化器 | PyTorch  | Tech Renaissance | Speed Up |
+| :----: | :------: | :--------------: | :------: |
+|  SGD   | 108.40 s |     60.85 s      |  1.78×   |
+|  Adam  | 112.00 s |     67.90 s      |  1.65×   |
+| AdamW  | 114.30 s |     67.95 s      |  1.68×   |
 
-**训练准确率完全对齐**：
+测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
 
-| 优化器 | PyTorch准确率 | Tech Renaissance准确率 | 差异 |
-|:------:|:-------------:|:---------------------:|:----:|
-| **SGD** | 98.30% | 98.35% | +0.05% |
-| **Adam** | 98.04% | 98.06% | +0.02% |
-| **AdamW** | 97.96% | 97.90% | -0.06% |
+#### （2）Intel Xeon + Ubuntu
 
-测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+| 优化器 | PyTorch  | Tech Renaissance | Speed Up |
+| :----: | :------: | :--------------: | :------: |
+|  SGD   | 177.30 s |     79.85 s      |  2.22×   |
+|  Adam  | 180.60 s |     97.15 s      |  1.86×   |
+| AdamW  | 181.50 s |     97.10 s      |  1.87×   |
 
-**跨平台性能验证**：
+测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
 
-| CPU | 操作系统 | PyTorch用时 | Tech Renaissance用时 | 性能提升 |
-|:----:|:-----------:|:-------------------:|:--------:|:--------:|
-| Core i9-14900HX | Windows 11专业版 | 118.5秒 | 69.2秒 | **+71.24%** |
-| Xeon Platinum 8369B | Ubuntu 24.04 LTS | 179.9秒 | 81.0秒 | **+122.04%** |
+**测试准确率对比**：
 
-测试条件：三层MLP（784-512-256-10）训练，数据集为MNIST，优化器为SGD。PyTorch版本为2.9.0。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+#### （1）Intel Core i9 + Windows
+
+| 优化器 | PyTorch | Tech Renaissance |  Diff  |
+| :----: | :-----: | :--------------: | :----: |
+|  SGD   | 98.29%  |      98.34%      | 0.06%  |
+|  Adam  | 98.07%  |      98.09%      | 0.02%  |
+| AdamW  | 98.07%  |      98.04%      | -0.03% |
+
+测试条件：Intel Core i9-14900HX，内存32.0 GB，Windows 11专业版，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
+
+#### （2）Intel Xeon + Ubuntu
+
+| 优化器 | PyTorch | Tech Renaissance | Diff  |
+| :----: | :-----: | :--------------: | :---: |
+|  SGD   | 98.26%  |      98.36%      | 0.09% |
+|  Adam  | 98.06%  |      98.07%      | 0.01% |
+| AdamW  | 98.05%  |      98.07%      | 0.02% |
+
+测试条件：Xeon Platinum 8369B，内存60.0 GB，Ubuntu 24.04 LTS，三层MLP（784-512-256-10）训练，数据集为MNIST。PyTorch版本为2.9.0。所有数据都是20次独立测试的结果取平均值。测试样例详见：**[PyTorch](python/tests/pytorch_sgd.py)** Vs **[TR](tests/integration_tests/test_trainer_sgd)**
 
 
 
