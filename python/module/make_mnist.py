@@ -83,11 +83,11 @@ def main():
         transforms.ToTensor(),
     ])
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='R:\\', train=True, download=True, transform=train_transform),
+        datasets.MNIST(root='../../..', train=True, download=True, transform=train_transform),
         batch_size=60000, shuffle=False, num_workers=0)
 
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='R:\\', train=False, transform=test_transform),
+        datasets.MNIST(root='../../..', train=False, transform=test_transform),
         batch_size=10000, shuffle=False, num_workers=0)
 
     model = MLP().to(device)
