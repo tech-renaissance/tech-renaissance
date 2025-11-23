@@ -72,13 +72,12 @@ python configure.py
 ### 一键编译
 ```bash
 # Windows MSVC (推荐)
-powershell.exe -Command "& { .\build_msvc.bat }"
+.\build_msvc.bat
 
 # Windows GCC
-powershell.exe -Command "& { .\build_msys2.bat }"
+.\build_msys2.bat
 
 # Linux GCC
-python configure.py
 chmod +x build.sh && ./build.sh
 ```
 
@@ -171,7 +170,7 @@ for (auto [batch_x, batch_y] : train_loader) {
 - **[设计文档](tech_renaissance_prompt.md)**：完整的项目设计和架构说明
 - **[张量-后端系统](docs/tensor_backend_system.md)**：核心架构设计详解
 - **[Model-Trainer系统](docs/model_trainer_system.md)**：完整训练系统设计详解
-- **[跨平台构建](docs/toward_2.0.0.md)**：V2.0.0架构重构和迁移方案
+- **[跨平台构建](docs/toward_2.0.0.md)**：V2.0架构重构和迁移方案
 
 ### 构建配置
 - **[编译指南](docs/gamma_build.md)**：一键编译配置和使用方法
@@ -205,11 +204,11 @@ for (auto [batch_x, batch_y] : train_loader) {
 
 ---
 
-**当前版本**: V2.1.1 (2025-11-23)
+**当前版本**: V2.1.7 (2025-11-24)
 
 **主要特性**:
 - ✅ 跨平台支持（Windows/Linux）
 - ✅ 自动配置（智能依赖检测）
-- ✅ 一键编译（Gamma编译脚本）
+- ✅ 一键编译（自动编译脚本）
 - ✅ 性能优越（训练速度超越PyTorch）
 - ✅ 完整生态（训练、推理、多后端）
