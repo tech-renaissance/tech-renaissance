@@ -19,32 +19,48 @@ namespace tr {
 
 // ===== Trainer 构造函数 =====
 
-Trainer::Trainer(Model& model,
-                 std::unique_ptr<Optimizer> optimizer,
-                 std::unique_ptr<Loss> loss_fn,
-                 std::unique_ptr<Scheduler> scheduler)
+// 主要构造函数 - 推荐使用shared_ptr
+Trainer::Trainer(std::shared_ptr<Model> model,
+                 std::shared_ptr<Loss> loss_fn,
+                 std::shared_ptr<Optimizer> optimizer,
+                 std::shared_ptr<Scheduler> scheduler)
     : model_(model)
-    , optimizer_(std::move(optimizer))
-    , loss_fn_(std::move(loss_fn))
-    , scheduler_(std::move(scheduler))
+    , loss_fn_(loss_fn)
+    , optimizer_(optimizer)
+    , scheduler_(scheduler)
     , cached_params_(nullptr)
     , training_(true)
     , current_epoch_(0)
     , current_step_(0) {
 
     // 验证必要组件
-    if (!optimizer_) {
-        throw TRException("[Trainer::Trainer] Optimizer cannot be null");
+    if (!model_) {
+        throw TRException("[Trainer::Trainer] Model cannot be null");
     }
     if (!loss_fn_) {
         throw TRException("[Trainer::Trainer] Loss function cannot be null");
+    }
+    if (!optimizer_) {
+        throw TRException("[Trainer::Trainer] Optimizer cannot be null");
     }
 
     // 初始化缓存管理
     initialize_cache_management();
 
     // 设置模型训练模式
-    model_.train();
+    model_->train();
+}
+
+// 向后兼容构造函数 - 支持栈对象引用
+Trainer::Trainer(Model& model,
+                 Loss& loss_fn,
+                 Optimizer& optimizer,
+                 Scheduler& scheduler)
+    : Trainer(
+        std::shared_ptr<Model>(&model, [](Model*){}),
+        std::shared_ptr<Loss>(&loss_fn, [](Loss*){}),
+        std::shared_ptr<Optimizer>(&optimizer, [](Optimizer*){}),
+        std::shared_ptr<Scheduler>(&scheduler, [](Scheduler*){})) {
 }
 
 // ===== Trainer 核心步骤 =====
@@ -58,31 +74,31 @@ float Trainer::train_step(const Tensor& input, const Tensor& target) {
 
     // ✅ 智能清零：只在必要时执行
     if (!grad_cleared_) {
-        optimizer_->zero_grad(model_);
+        optimizer_->zero_grad(*model_);
         grad_cleared_ = true;
     }
 
     // ✅ 确保参数有梯度（修复初始化问题）
-    for (Tensor* param : model_.trainable_parameters()) {
+    for (Tensor* param : model_->trainable_parameters()) {
         if (!param->has_grad()) {
-            auto backend = BackendManager::instance().get_backend(model_.device());
+            auto backend = BackendManager::instance().get_backend(model_->device());
             Tensor zero_grad = backend->zeros(param->shape(), DType::FP32);
             param->set_grad(zero_grad);
         }
     }
 
     // 2. 前向传播（参考成功的实现）
-    auto output = model_.forward(input);
+    auto output = model_->forward(input);
 
     // 3. 计算损失
     loss_fn_->train();
     float loss = loss_fn_->criterion(output, target);
 
     // 4. 反向传播：损失函数会自动在output上创建梯度
-    model_.backward(output.grad());
+    model_->backward(output.grad());
 
     // 5. 参数更新
-    optimizer_->step(model_);
+    optimizer_->step(*model_);
 
     grad_cleared_ = false;  // ✅ 标记需要清零
     current_step_++;
@@ -97,11 +113,11 @@ float Trainer::eval_step(const Tensor& input, const Tensor& target) {
     validate_components();
 
     // 1. 前向传播
-    model_.forward(input);
+    model_->forward(input);
 
     // 2. 计算损失，使用缓存的logits()结果
     loss_fn_->eval();
-    float loss = loss_fn_->criterion(model_.logits(), target);
+    float loss = loss_fn_->criterion(model_->logits(), target);
 
     return loss;
 }
@@ -110,7 +126,7 @@ float Trainer::eval_step(const Tensor& input, const Tensor& target) {
 
 void Trainer::train() {
     training_ = true;
-    model_.train();
+    model_->train();
     if (loss_fn_) {
         loss_fn_->train();
     }
@@ -118,7 +134,7 @@ void Trainer::train() {
 
 void Trainer::eval() {
     training_ = false;
-    model_.eval();
+    model_->eval();
     if (loss_fn_) {
         loss_fn_->eval();
     }
@@ -140,7 +156,7 @@ void Trainer::load_checkpoint(const std::string& filepath) {
 
 void Trainer::to(const Device& device) {
     // 转移模型
-    model_.to(device);
+    model_->to(device);
 
     // 转移优化器
     if (optimizer_) {
@@ -153,7 +169,7 @@ void Trainer::to(const Device& device) {
 }
 
 Device Trainer::device() const {
-    return model_.device();
+    return model_->device();
 }
 
 // ===== Trainer 私有辅助方法 =====

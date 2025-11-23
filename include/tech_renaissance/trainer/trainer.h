@@ -30,10 +30,10 @@ namespace tr {
  */
 class Trainer {
 private:
-    Model& model_;                                         // 模型引用
-    std::unique_ptr<Optimizer> optimizer_;                 // 优化器
-    std::unique_ptr<Loss> loss_fn_;                        // 损失函数
-    std::unique_ptr<Scheduler> scheduler_;               // 学习率调度器
+    std::shared_ptr<Model> model_;                          // 模型智能指针
+    std::shared_ptr<Optimizer> optimizer_;                  // 优化器智能指针
+    std::shared_ptr<Loss> loss_fn_;                         // 损失函数智能指针
+    std::shared_ptr<Scheduler> scheduler_;                // 学习率调度器智能指针
 
     // 缓存管理
     const std::vector<Tensor*>* cached_params_;             // 缓存参数
@@ -47,16 +47,28 @@ private:
 
 public:
     /**
-     * @brief 构造函数
+     * @brief 主要构造函数 - 推荐使用
+     * @param model 模型智能指针
+     * @param loss_fn 损失函数智能指针
+     * @param optimizer 优化器智能指针
+     * @param scheduler 学习率调度器智能指针（可选）
+     */
+    Trainer(std::shared_ptr<Model> model,
+            std::shared_ptr<Loss> loss_fn,
+            std::shared_ptr<Optimizer> optimizer,
+            std::shared_ptr<Scheduler> scheduler = nullptr);
+
+    /**
+     * @brief 向后兼容构造函数 - 现有代码无需修改
      * @param model 模型引用
-     * @param optimizer 优化器
-     * @param loss_fn 损失函数
-     * @param scheduler 学习率调度器（可选）
+     * @param loss_fn 损失函数引用
+     * @param optimizer 优化器引用
+     * @param scheduler 学习率调度器引用
      */
     Trainer(Model& model,
-            std::unique_ptr<Optimizer> optimizer,
-            std::unique_ptr<Loss> loss_fn,
-            std::unique_ptr<Scheduler> scheduler = nullptr);
+            Loss& loss_fn,
+            Optimizer& optimizer,
+            Scheduler& scheduler);
 
     /**
      * @brief 析构函数
@@ -131,12 +143,6 @@ public:
     bool is_training() const { return training_; }
 
     // === 访问器 ===
-
-    /**
-     * @brief 获取模型
-     * @return 模型引用
-     */
-    Model& get_model() { return model_; }
 
     /**
      * @brief 获取优化器
@@ -288,7 +294,7 @@ void Trainer::fit(int num_epochs,
     // 初始化优化器状态（如果需要）
     if (!optimizer_->get_state_manager() ||
         !optimizer_->get_state_manager()->is_initialized()) {
-        optimizer_->initialize(model_);
+        optimizer_->initialize(*model_);
     }
 
     std::cout << "Starting training for " << num_epochs << " epochs..." << std::endl;

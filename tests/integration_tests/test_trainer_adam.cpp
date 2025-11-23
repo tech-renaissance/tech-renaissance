@@ -118,20 +118,12 @@ int main() {
         // 3. 创建模型
         auto model = create_mlp_model(backend);
 
-        // 4. 创建Trainer组件（使用Adam配置）
+        // 4. 创建Trainer组件（使用新的统一API）
         std::cout << "\n=== Trainer Component Setup (Adam Configuration) ===" << std::endl;
-
-        // 创建Adam优化器（匹配Python MLP配置：beta1=0.9, beta2=0.999, eps=1e-8）
-        auto optimizer = std::make_unique<Adam>(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY, backend);
-
-        // 创建损失函数（无标签平滑）
-        auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, LABEL_SMOOTHING);
-
-        // 创建ConstantLR调度器（固定学习率，对齐PyTorch）
-        auto scheduler = std::make_unique<ConstantLR>(LEARNING_RATE);
-
-        // 创建Trainer
-        Trainer trainer(*model, std::move(optimizer), std::move(loss_fn), std::move(scheduler));
+        auto optimizer = Adam(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY, backend);
+        auto loss_fn = CrossEntropyLoss(backend, LABEL_SMOOTHING);
+        auto scheduler = ConstantLR(LEARNING_RATE);
+        Trainer trainer(*model, loss_fn, optimizer, scheduler);
 
         std::cout << "[OK] Trainer created successfully" << std::endl;
         std::cout << "[OK] Optimizer: Adam (lr=" << LEARNING_RATE << ", beta1=" << BETA1
