@@ -49,6 +49,11 @@ Trainer::Trainer(std::shared_ptr<Model> model,
 
     // 设置模型训练模式
     model_->train();
+
+    // 自动初始化优化器状态（用户无需手动调用）
+    if (optimizer_ && (!optimizer_->get_state_manager() || !optimizer_->get_state_manager()->is_initialized())) {
+        optimizer_->initialize(*model_);
+    }
 }
 
 // 向后兼容构造函数 - 支持栈对象引用

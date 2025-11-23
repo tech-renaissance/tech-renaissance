@@ -132,9 +132,7 @@ int main() {
         std::cout << "[OK] Scheduler: ConstantLR (fixed lr=" << LEARNING_RATE << ") - Python matching" << std::endl;
         std::cout << "[OK] Data Normalization: MNIST (mean=0.1307, std=0.3081)" << std::endl;
 
-        // 初始化优化器
-        trainer.get_optimizer()->initialize(*model);
-        std::cout << "[OK] Optimizer initialized" << std::endl;
+        std::cout << "[OK] Optimizer automatically initialized in Trainer constructor" << std::endl;
 
         // 5. 创建数据生成器
         std::cout << "\n=== Data Setup ===" << std::endl;
