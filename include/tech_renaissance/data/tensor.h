@@ -19,13 +19,13 @@
 #include "tech_renaissance/data/dtype.h"
 #include "tech_renaissance/data/device.h"
 #include "tech_renaissance/data/strides.h"
+#include "tech_renaissance/backend/backend.h"
 #include "tech_renaissance/utils/tr_exception.h"
 
 namespace tr {
 
 // 前向声明
 class Storage;
-class Backend;
 
 /**
  * @class Tensor

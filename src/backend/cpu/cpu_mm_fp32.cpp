@@ -15,7 +15,7 @@
 #include "tech_renaissance/utils/logger.h"
 
 #ifdef TR_USE_EIGEN
-#include "Core"
+#include <Eigen/Core>
 #include <omp.h>
 #endif
 

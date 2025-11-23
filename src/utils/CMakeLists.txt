@@ -12,19 +12,18 @@ set(CORE_UTILS_SOURCES
 # 收集源文件（依赖核心工具）
 set(UTILS_SOURCES
     profiler.cpp
-    mnist_loader.cpp
 )
 
-# 添加PythonSession源文件（如果启用）
-if(TR_BUILD_PYTHON_SESSION)
-    list(APPEND UTILS_SOURCES python_session.cpp)
-endif()
+# mn_loader.cpp和python_session.cpp现在在backend模块中构建
+# 因为它们需要backend和data模块的依赖
 
 # 创建基础库目标（无依赖）
 add_library(tech_renaissance_base STATIC ${CORE_UTILS_SOURCES})
 
 # 创建工具库目标（依赖基础）
 add_library(tech_renaissance_utils STATIC ${UTILS_SOURCES})
+
+# utils_backend现在在backend模块中构建
 
 # 设置基础库目标属性
 target_include_directories(tech_renaissance_base
@@ -44,16 +43,17 @@ target_include_directories(tech_renaissance_utils
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# utils_backend现在在backend模块中构建
+
 # 基础库无依赖
 
 # 链接依赖库
 target_link_libraries(tech_renaissance_utils
     PUBLIC
         tech_renaissance_base
-    PRIVATE
-        data
-        backend
 )
+
+# utils_backend现在在backend模块中构建
 
 if(TR_USE_PROTOBUF)
     target_link_libraries(tech_renaissance_utils PRIVATE protobuf::libprotobuf)

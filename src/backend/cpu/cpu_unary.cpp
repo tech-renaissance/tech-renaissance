@@ -17,7 +17,7 @@
 #include <cstring>
 
 #ifdef TR_USE_EIGEN
-#include "Core"
+#include <Eigen/Core>
 #endif
 
 // NaN检查宏配置

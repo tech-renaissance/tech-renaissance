@@ -17,6 +17,7 @@
 #include <chrono>
 #include <vector>
 #include <atomic>
+#include <filesystem>
 
 // 简单测试框架宏
 #define TEST_ASSERT(condition, message) \
@@ -55,6 +56,13 @@ std::string read_file_content(const std::string& filename) {
 
 void cleanup_test_file(const std::string& filename) {
     std::remove(filename.c_str());
+}
+
+// 获取workspace目录中的测试文件路径，避免在根目录创建文件
+std::string get_test_file_path(const std::string& basename) {
+    // 确保workspace目录存在（与test_tsr_io_extended.cpp保持一致）
+    std::filesystem::create_directories("workspace");
+    return "workspace/" + basename;
 }
 
 bool file_contains(const std::string& filename, const std::string& content) {
@@ -161,7 +169,7 @@ bool test_logger_formatted_output() {
     try {
         std::cout << "  Testing formatted output..." << std::endl;
 
-        std::string test_file = "test_formatted_output.txt";
+        std::string test_file = get_test_file_path("test_formatted_output.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();
@@ -236,7 +244,7 @@ bool test_logger_global_init_function() {
     try {
         std::cout << "  Testing global InitLogger function..." << std::endl;
 
-        std::string test_file = "test_global_init.txt";
+        std::string test_file = get_test_file_path("test_global_init.txt");
         cleanup_test_file(test_file);
 
         // 使用全局初始化函数
@@ -280,7 +288,7 @@ bool test_logger_performance_optimization() {
     try {
         std::cout << "  Testing performance optimization..." << std::endl;
 
-        std::string test_file = "test_performance.txt";
+        std::string test_file = get_test_file_path("test_performance.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();
@@ -321,7 +329,7 @@ bool test_logger_thread_safety() {
     try {
         std::cout << "  Testing thread safety..." << std::endl;
 
-        std::string test_file = "test_thread_safety.txt";
+        std::string test_file = get_test_file_path("test_thread_safety.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();
@@ -380,7 +388,7 @@ bool test_logger_convenience_macros() {
     try {
         std::cout << "  Testing convenience macros..." << std::endl;
 
-        std::string test_file = "test_macros.txt";
+        std::string test_file = get_test_file_path("test_macros.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();
@@ -424,7 +432,7 @@ bool test_logger_level_filtering() {
     try {
         std::cout << "  Testing log level filtering..." << std::endl;
 
-        std::string test_file = "test_level_filtering.txt";
+        std::string test_file = get_test_file_path("test_level_filtering.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();
@@ -493,7 +501,7 @@ bool test_logger_quiet_mode() {
     try {
         std::cout << "  Testing quiet mode..." << std::endl;
 
-        std::string test_file = "test_quiet_mode.txt";
+        std::string test_file = get_test_file_path("test_quiet_mode.txt");
         cleanup_test_file(test_file);
 
         auto& logger = tr::Logger::get_instance();

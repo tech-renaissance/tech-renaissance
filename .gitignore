@@ -30,6 +30,9 @@ AI_EXP.md
 # Build
 build*/
 cmake*/
+config*/
+*.bat
+*.sh
 
 # Third-Party
 third_party/

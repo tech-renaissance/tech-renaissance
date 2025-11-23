@@ -9,15 +9,14 @@
 # 启用测试
 enable_testing()
 
-# 检查Eigen库
-set(EIGEN_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/Eigen")
-if(EXISTS "${EIGEN_ROOT_DIR}/Dense")
+# 检查Eigen库 - 使用自动配置的路径
+if(DEFINED EIGEN3_INCLUDE_DIR)
     set(EIGEN_FOUND TRUE)
-    set(EIGEN_INCLUDE_DIR "${EIGEN_ROOT_DIR}")
-    message(STATUS "Found Eigen library: ${EIGEN_INCLUDE_DIR}")
+    set(EIGEN_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}")
+    message(STATUS "Using configured Eigen3: ${EIGEN_INCLUDE_DIR}")
 else()
     set(EIGEN_FOUND FALSE)
-    message(WARNING "Eigen library not found at ${EIGEN_ROOT_DIR}")
+    message(STATUS "Eigen3 not configured, using naive computation")
 endif()
 
 # 查找OpenMP支持

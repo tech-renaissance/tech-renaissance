@@ -124,6 +124,56 @@ set_target_properties(backend PROPERTIES
 )
 
 # =============================================================================
+# 构建需要backend依赖的utils组件
+# =============================================================================
+
+# 检查是否需要构建utils_backend
+set(UTILS_BACKEND_SOURCES)
+if(EXISTS "${CMAKE_SOURCE_DIR}/src/utils/mnist_loader.cpp")
+    set(UTILS_BACKEND_SOURCES
+        ${CMAKE_SOURCE_DIR}/src/utils/mnist_loader.cpp
+    )
+endif()
+
+if(TR_BUILD_PYTHON_SESSION AND EXISTS "${CMAKE_SOURCE_DIR}/src/utils/python_session.cpp")
+    list(APPEND UTILS_BACKEND_SOURCES
+        ${CMAKE_SOURCE_DIR}/src/utils/python_session.cpp
+    )
+endif()
+
+# 如果有需要backend依赖的utils文件，创建utils_backend库
+if(UTILS_BACKEND_SOURCES)
+    add_library(tech_renaissance_utils_backend STATIC ${UTILS_BACKEND_SOURCES})
+
+    target_include_directories(tech_renaissance_utils_backend
+        PUBLIC
+            ${CMAKE_SOURCE_DIR}/include
+            ${CMAKE_BINARY_DIR}/include
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/src/utils
+    )
+
+    target_link_libraries(tech_renaissance_utils_backend
+        PUBLIC
+            tech_renaissance_base
+            backend
+            data
+        PRIVATE
+            OpenMP::OpenMP_CXX
+    )
+
+    set_target_properties(tech_renaissance_utils_backend PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        FOLDER "src"
+        POSITION_INDEPENDENT_CODE ON
+    )
+
+    message(STATUS "Backend-dependent utils module configured successfully")
+endif()
+
+# =============================================================================
 # CUDA后端配置已移除 - 模块化架构支持
 # =============================================================================
 message(STATUS "CUDA backend removed for modular architecture - CPU Core Module only")

@@ -14,6 +14,10 @@
 #include "tech_renaissance/trainer/scheduler.h"
 #include <cmath>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 namespace tr {
 
 /**
@@ -52,8 +56,6 @@ public:
     std::string type_name() const override;
 
 private:
-    static constexpr double M_PI = 3.14159265358979323846;  ///< π常量
-
     int T_max_;      ///< 半周期长度（epoch数）
     float eta_min_;   ///< 最小学习率
 };

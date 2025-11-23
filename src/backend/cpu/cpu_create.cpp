@@ -20,7 +20,7 @@
 #include <stdexcept>
 
 #ifdef TR_USE_EIGEN
-#include "Core"
+#include <Eigen/Core>
 #endif
 
 namespace tr {

@@ -5,7 +5,7 @@
 # 作者: 技术觉醒团队
 # =============================================================================
 
-# 添加工具模块子目录
+# 添加工具模块子目录（先构建基础utils）
 add_subdirectory(utils)
 
 # 添加数据模块子目录
@@ -13,6 +13,9 @@ add_subdirectory(data)
 
 # 添加后端模块子目录
 add_subdirectory(backend)
+
+# 在backend之后添加需要backend依赖的utils
+# 这里我们需要在backend模块中构建utils_backend
 
 # 添加Model模块子目录
 add_subdirectory(model)
@@ -29,6 +32,7 @@ target_link_libraries(tech_renaissance INTERFACE
     tech_renaissance_utils
     data
     backend
+    tech_renaissance_utils_backend  # 需要backend依赖的utils组件
     model
     trainer
 )

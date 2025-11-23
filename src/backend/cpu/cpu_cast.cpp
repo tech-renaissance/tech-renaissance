@@ -13,7 +13,7 @@
 #include <algorithm>
 
 #ifdef TR_USE_EIGEN
-#include "Core"
+#include <Eigen/Core>
 #endif
 
 #include "tech_renaissance/backend/cpu/cpu_backend.h"
