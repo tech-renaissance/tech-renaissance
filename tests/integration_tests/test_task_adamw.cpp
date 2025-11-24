@@ -33,7 +33,7 @@ int main() {
         auto mnist = std::make_shared<MnistDataset>(backend, MNIST_PATH);
         auto [train_data, test_data] = mnist->load_data();
 
-        auto model = Model::create("MNIST_MLP_Task",
+        auto model = Model::create_ptr("MNIST_MLP_Task",
             std::make_shared<Flatten>(),
             std::make_shared<Linear>(784, 512),
             std::make_shared<Tanh>(),
@@ -44,7 +44,7 @@ int main() {
         model->set_backend(backend);
         model->train();
 
-        auto loss_fn = std::make_shared<CrossEntropyLoss>(backend, LABEL_SMOOTHING);
+        auto loss_fn = std::make_shared<CrossEntropyLoss>(LABEL_SMOOTHING);
         auto optimizer = std::make_shared<Adam>(LEARNING_RATE, BETA1, BETA2, EPS, WEIGHT_DECAY);
         auto scheduler = std::make_shared<CosineAnnealingLR>(LEARNING_RATE, NUM_EPOCHS);
         auto trainer = std::make_shared<Trainer>(model, loss_fn, optimizer, scheduler);

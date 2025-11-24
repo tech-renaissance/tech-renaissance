@@ -176,7 +176,7 @@ std::vector<Tensor*> Model::trainable_parameters() {
 ##### 🌟 三种构造方式+自动命名（D4方案的完整实现）
 ```cpp
 // 工厂方法（推荐）
-auto model = Model::create("MLP",
+auto model = Model::create_ptr("MLP",
     std::make_shared<Linear>(784, 512),
     std::make_shared<Tanh>(),
     std::make_shared<Linear>(512, 10)
@@ -324,7 +324,7 @@ std::vector<Tensor*> Model::trainable_parameters() {
 
 ```cpp
 // 创建复杂模型（MLP示例）
-auto model = Model::create("MNIST_MLP",
+auto model = Model::create_ptr("MNIST_MLP",
     std::make_shared<Flatten>(),              // flatten: (N,1,28,28) -> (N,784)
     std::make_shared<Linear>(784, 512),      // fc1: 784 -> 512
     std::make_shared<Tanh>(),                // tanh1
@@ -1469,7 +1469,7 @@ float Trainer::train_step(const Tensor& input, const Tensor& target) {
 **简洁的训练接口**：
 ```cpp
 // 创建训练组件
-auto model = Model::create("MNIST_MLP", /* layers... */);
+auto model = Model::create_ptr("MNIST_MLP", /* layers... */);
 auto optimizer = std::make_unique<AdamW>(0.001f, 0.9f, 0.999f, 1e-8f, 1e-4f, backend);
 auto loss_fn = std::make_unique<CrossEntropyLoss>(backend, 0.1f);
 auto scheduler = std::make_unique<CosineAnnealingLR>(0.001f, 20);

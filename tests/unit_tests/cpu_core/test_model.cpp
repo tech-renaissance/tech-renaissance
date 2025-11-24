@@ -49,7 +49,7 @@ void test_model_constructors() {
 
     // Test constructor 3: factory method
     {
-        auto model = Model::create("TestModel3",
+        auto model = Model::create_ptr("TestModel3",
                                   std::make_shared<Linear>(10, 5),
                                   std::make_shared<Linear>(5, 1));
         model->set_backend(backend);
@@ -69,7 +69,7 @@ void test_auto_naming() {
     auto backend = BackendManager::get_cpu_backend();
 
     // Create model with multiple modules of same type
-    auto model = Model::create("NamingTest",
+    auto model = Model::create_ptr("NamingTest",
                               std::make_shared<Linear>(10, 5),
                               std::make_shared<Linear>(5, 1),
                               std::make_shared<Tanh>(),
@@ -119,7 +119,7 @@ void test_forward_propagation() {
     auto backend = BackendManager::get_cpu_backend();
 
     // Create simple 3-layer model: Linear(4->3) -> Tanh -> Linear(3->2)
-    auto model = Model::create("ForwardTest",
+    auto model = Model::create_ptr("ForwardTest",
                               std::make_shared<Linear>(4, 3),
                               std::make_shared<Tanh>(),
                               std::make_shared<Linear>(3, 2));
@@ -161,7 +161,7 @@ void test_preallocation_mechanism() {
     auto backend = BackendManager::get_cpu_backend();
 
     // Create 2-layer model
-    auto model = Model::create("PreallocTest",
+    auto model = Model::create_ptr("PreallocTest",
                               std::make_shared<Linear>(3, 2),
                               std::make_shared<Linear>(2, 1));
 
@@ -211,7 +211,7 @@ void test_parameter_management() {
     auto backend = BackendManager::get_cpu_backend();
 
     // Create model with parameters
-    auto model = Model::create("ParamTest",
+    auto model = Model::create_ptr("ParamTest",
                               std::make_shared<Linear>(4, 3),
                               std::make_shared<Linear>(3, 2));
 
@@ -270,7 +270,7 @@ void test_device_and_mode() {
     auto backend = BackendManager::get_cpu_backend();
 
     // Create model
-    auto model = Model::create("DeviceModeTest",
+    auto model = Model::create_ptr("DeviceModeTest",
                               std::make_shared<Linear>(3, 2),
                               std::make_shared<Tanh>());
 
@@ -338,7 +338,7 @@ void test_edge_cases() {
 
     // Test single module model
     {
-        auto single_model = Model::create("SingleModule",
+        auto single_model = Model::create_ptr("SingleModule",
                                          std::make_shared<Linear>(3, 2));
         single_model->set_backend(backend);
 

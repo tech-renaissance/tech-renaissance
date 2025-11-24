@@ -144,7 +144,7 @@ int main() {
 ### 训练示例
 ```cpp
 // 创建模型
-auto model = Model::create("MLP",
+auto model = Model::create_ptr("MLP",
     std::make_shared<Linear>(784, 512),
     std::make_shared<Tanh>(),
     std::make_shared<Linear>(512, 10)

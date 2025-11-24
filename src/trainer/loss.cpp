@@ -10,11 +10,16 @@
  */
 
 #include "tech_renaissance/trainer/loss.h"
+#include "tech_renaissance/backend/cpu/cpu_backend.h"
+#include "tech_renaissance/backend/backend_manager.h"
 
 namespace tr {
 
 Loss::Loss(bool training_mode)
-    : training_mode_(training_mode), backend_(nullptr) {
+    : backend_(nullptr), training_mode_(training_mode) {
+    if (!backend_) {
+        Loss::set_backend(BackendManager::get_cpu_backend());
+    }
 }
 
 } // namespace tr

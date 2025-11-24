@@ -482,7 +482,7 @@ int main() {
         auto [test_images, test_labels] = load_mnist_data("test", backend);
 
         // 3. 创建MLP模型
-        auto model = Model::create("MNIST_MLP",
+        auto model = Model::create_ptr("MNIST_MLP",
             std::make_shared<Flatten>(),              // flatten: (N,1,28,28) -> (N,784)
             std::make_shared<Linear>(784, 512),      // fc1: 784 -> 512
             std::make_shared<Tanh>(),                // tanh1

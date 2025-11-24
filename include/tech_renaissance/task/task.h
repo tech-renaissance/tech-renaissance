@@ -5,6 +5,7 @@
 #include <string>
 #include <chrono>
 #include "tech_renaissance/data/device.h"
+#include "tech_renaissance/backend/backend.h"
 #include "tech_renaissance/model/model.h"
 #include "tech_renaissance/trainer/trainer.h"
 #include "tech_renaissance/task/dataset.h"
@@ -51,11 +52,13 @@ class Task {
 public:
     Task(std::shared_ptr<Model> model,
          std::shared_ptr<Dataset> dataset,
-         std::shared_ptr<Trainer> trainer);
+         std::shared_ptr<Trainer> trainer,
+         const std::shared_ptr<Backend> &backend = nullptr);
 
     Task(Model& model,
          Dataset& dataset,
-         Trainer& trainer);
+         Trainer& trainer,
+         const std::shared_ptr<Backend> &backend = nullptr);
 
     ~Task();
 
@@ -83,7 +86,9 @@ public:
         float current_lr = 0.0;
     };
     const TrainingStats& get_training_stats() const;
+    void set_backend(std::shared_ptr<Backend> backend) {backend_ = backend;};
 protected:
+    std::shared_ptr<Backend> backend_;
     std::shared_ptr<Model> model_;
     std::shared_ptr<Dataset> dataset_;
     std::shared_ptr<Trainer> trainer_;

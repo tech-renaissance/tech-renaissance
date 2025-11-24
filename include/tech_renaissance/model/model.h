@@ -114,7 +114,7 @@ private:
     bool frozen_ = false;                                       // 结构冻结标志
     Tensor cached_output_;                                      // 缓存的最后输出（用于logits访问）
 
-    // ⭐ 新增：参数缓存失效机制
+    // 新增：参数缓存失效机制
     mutable std::vector<Tensor*> cached_param_ptrs_;             // 缓存的参数指针
     mutable std::vector<Tensor*> cached_all_ptrs_;               // 缓存的所有参数指针
     mutable bool param_cache_valid_ = false;                    // 参数缓存有效性
@@ -311,7 +311,10 @@ public:
      * @return 模型智能指针
      */
     template<typename... Args>
-    static std::shared_ptr<Model> create(const std::string& name, Args&&... args);
+    static std::shared_ptr<Model> create_ptr(const std::string& name, Args&&... args);
+
+    template<class ... Args>
+    static Model create(const std::string &name, Args &&... args);
 
     // === 内存分析 ===
 
@@ -392,11 +395,21 @@ private:
 // ===== 模板实现 =====
 
 template<typename... Args>
-std::shared_ptr<Model> Model::create(const std::string& name, Args&&... args) {
+std::shared_ptr<Model> Model::create_ptr(const std::string& name, Args&&... args) {
     auto model = std::make_shared<Model>(name);
     (model->add_module(std::forward<Args>(args)), ...);
     // validate_model() will be called after backend is set
+    model->set_backend(BackendManager::get_cpu_backend());
     return model;
+}
+
+template<typename... Args>
+    Model Model::create(const std::string& name, Args&&... args) {
+    auto model = std::make_shared<Model>(name);
+    (model->add_module(std::forward<Args>(args)), ...);
+    // validate_model() will be called after backend is set
+    model->set_backend(BackendManager::get_cpu_backend());
+    return *model;
 }
 
 } // namespace tr

@@ -19,7 +19,7 @@
 
 ✅ **V1.46.3完成 - 代码规范优化和类型安全强化**:
 - Backend构造函数系统统一化 - 整个Backend体系的构造函数设计统一
-- 张量-后端系统类型安全增强 - Model::create智能指针使用确认
+- 张量-后端系统类型安全增强 - Model::create_ptr智能指针使用确认
 - Alpha编译验证通过 - 整个系统编译测试通过
 - 代码规范统一 - Backend、CpuBackend、CudaBackend接口一致化
 

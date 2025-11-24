@@ -1,33 +1,21 @@
 #include "tech_renaissance/trainer/cross_entropy_loss.h"
 #include "tech_renaissance/utils/tr_exception.h"
 #include "tech_renaissance/backend/cpu/cpu_backend.h"
+#include "tech_renaissance/backend/backend_manager.h"
 
 namespace tr {
 
-// 构造函数1：只有label_smoothing参数
-CrossEntropyLoss::CrossEntropyLoss(float label_smoothing)
+CrossEntropyLoss::CrossEntropyLoss(float label_smoothing, const std::shared_ptr<Backend>& backend)
     : Loss(), label_smoothing_(label_smoothing) {
     if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
         throw TRException("CrossEntropyLoss: label_smoothing must be between 0.0 and 1.0");
     }
-}
-
-// 构造函数2：backend + label_smoothing
-CrossEntropyLoss::CrossEntropyLoss(std::shared_ptr<Backend> backend, float label_smoothing)
-    : Loss(), label_smoothing_(label_smoothing) {
-    if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
-        throw TRException("CrossEntropyLoss: label_smoothing must be between 0.0 and 1.0");
+    if (!backend) {
+        Loss::set_backend(BackendManager::get_cpu_backend());
     }
-    set_backend(backend);
-}
-
-// 构造函数3：backend + training_mode + label_smoothing
-CrossEntropyLoss::CrossEntropyLoss(std::shared_ptr<Backend> backend, bool training_mode, float label_smoothing)
-    : Loss(training_mode), label_smoothing_(label_smoothing) {
-    if (label_smoothing < 0.0f || label_smoothing > 1.0f) {
-        throw TRException("CrossEntropyLoss: label_smoothing must be between 0.0 and 1.0");
+    else {
+        Loss::set_backend(backend);
     }
-    set_backend(backend);
 }
 
 float CrossEntropyLoss::criterion(Tensor& logits, const Tensor& target, const std::string& reduction) {

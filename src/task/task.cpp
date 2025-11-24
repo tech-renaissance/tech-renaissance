@@ -1,4 +1,7 @@
 #include "tech_renaissance/task/task.h"
+#include "tech_renaissance/backend/backend.h"
+#include "tech_renaissance/backend/cpu/cpu_backend.h"
+#include "tech_renaissance/backend/backend_manager.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -8,22 +11,36 @@ namespace tr {
 
 Task::Task(std::shared_ptr<Model> model,
            std::shared_ptr<Dataset> dataset,
-           std::shared_ptr<Trainer> trainer)
+           std::shared_ptr<Trainer> trainer,
+           const std::shared_ptr<Backend> &backend)
     : model_(std::move(model)), dataset_(std::move(dataset)), trainer_(std::move(trainer)),
       use_shared_ptrs_(true) {
     if (!model_ || !dataset_ || !trainer_) {
         throw std::invalid_argument("Null pointer provided to Task constructor");
+    }
+    if (!backend) {
+        set_backend(BackendManager::get_cpu_backend());
+    }
+    else {
+        set_backend(backend);
     }
 }
 
 // 构造函数（使用引用）
 Task::Task(Model& model,
            Dataset& dataset,
-           Trainer& trainer)
+           Trainer& trainer,
+           const std::shared_ptr<Backend> &backend)
     : model_(&model, [](Model*) {}),
       dataset_(&dataset, [](Dataset*) {}),
       trainer_(&trainer, [](Trainer*) {}),
-      use_shared_ptrs_(false) {
+    use_shared_ptrs_(false) {
+    if (!backend) {
+        set_backend(BackendManager::get_cpu_backend());
+    }
+    else {
+        set_backend(backend);
+    }
 }
 
 Task::~Task() = default;

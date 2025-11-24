@@ -15,6 +15,7 @@
 #include "tech_renaissance/backend/backend.h"
 #include <string>
 #include <memory>
+#include <utility>
 
 namespace tr {
 
@@ -45,7 +46,7 @@ public:
      * @param backend 后端智能指针
      */
     virtual void set_backend(std::shared_ptr<Backend> backend) {
-        backend_ = backend;
+        backend_ = std::move(backend);
     }
 
     /**

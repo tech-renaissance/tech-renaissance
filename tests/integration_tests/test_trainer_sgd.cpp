@@ -86,7 +86,7 @@ float calculate_accuracy(const Tensor& logits, const Tensor& labels) {
 std::shared_ptr<Model> create_mlp_model(std::shared_ptr<Backend> backend) {
     std::cout << "Creating MLP model..." << std::endl;
 
-    auto model = Model::create("MNIST_MLP",
+    auto model = Model::create_ptr("MNIST_MLP",
         std::make_shared<Flatten>(),                    // flatten: (N,1,28,28) -> (N,784)
         std::make_shared<Linear>(784, 512, "fc1", false), // fc1: 784 -> 512 (bias=False)
         std::make_shared<Tanh>(),                       // tanh1
@@ -132,7 +132,7 @@ int main() {
 
         // 4. 创建Trainer组件（使用新的统一API）
         std::cout << "\n=== Trainer Component Setup (New Unified API) ===" << std::endl;
-        auto loss_fn = CrossEntropyLoss(backend, LABEL_SMOOTHING);
+        auto loss_fn = CrossEntropyLoss(LABEL_SMOOTHING);
         auto optimizer = SGD(LEARNING_RATE, MOMENTUM, WEIGHT_DECAY, NESTEROV, backend);
         auto scheduler = ConstantLR(LEARNING_RATE);
         Trainer trainer(*model, loss_fn, optimizer, scheduler);
