@@ -21,14 +21,13 @@ namespace tr {
  * @brief Adam（自适应矩估计）优化器类
  * @details 实现Adam优化算法，包含一阶矩估计(m)和二阶矩估计(v)
  *
- * Adam算法更新规则：
- * 1. m = beta1 * m + (1 - beta1) * grad
- * 2. v = beta2 * v + (1 - beta2) * grad^2
+ * Adam算法更新规则（修正版本，按Algorithm.md）：
+ * 1. grad = grad + weight_decay * weight (权重衰减在梯度更新前执行)
+ * 2. m = beta1 * m + (1 - beta1) * grad
  * 3. m_hat = m / (1 - beta1^t)
- * 4. v_hat = v / (1 - beta2^t)
- * 5. param = param - lr * m_hat / (sqrt(v_hat) + eps)
- *
- * 6. 如果启用权重衰减：param = param * (1 - lr * weight_decay)
+ * 4. v = beta2 * v + (1 - beta2) * grad^2
+ * 5. v_hat = v / (1 - beta2^t)
+ * 6. param = param - lr * m_hat / (sqrt(v_hat) + eps)
  */
 class Adam : public Optimizer {
 private:
@@ -37,15 +36,9 @@ private:
     float eps_;                // 数值稳定性常数，通常1e-8
     float weight_decay_;       // 权重衰减系数，默认0.0
 
-    // 【P0级优化】优化临时缓冲区分配，减少内存使用
-    std::vector<Tensor> temp_m_hat_buffers_;  // m_hat缓冲区（也用作临时计算缓冲区）
-    std::vector<Tensor> temp_update_buffers_; // 更新量缓冲区（也用作v_hat缓冲区）
-    // 移除temp_v_hat_buffers_和temp_scratch_buffers_，通过重用减少内存开销
-
-    // 【P0级优化】预计算的bias_correction缓存，避免重复pow运算
-    std::vector<float> cached_bias_correction1_;  // 预计算的bias_correction1缓存
-    std::vector<float> cached_bias_correction2_;  // 预计算的bias_correction2缓存
-    int last_time_step_;                          // 上次计算的时间步
+    // 【P0级优化】按照Algorithm.md重新设计缓冲区，使用temp1和temp2命名
+    std::vector<Tensor> temp1_buffers_;  // 临时缓冲区1（Algorithm.md命名）
+    std::vector<Tensor> temp2_buffers_;  // 临时缓冲区2（Algorithm.md命名）
 
 public:
     /**
@@ -96,53 +89,6 @@ protected:
      */
     void update_parameter(Tensor& param, const Tensor& grad, OptimizerState& state, size_t param_index) override;
 
-private:
-    // ===== Adam算法具体实现 =====
-
-    /**
-     * @brief 应用权重衰减
-     * @details param = param * (1 - lr * weight_decay)
-     * @param param 参数张量引用
-     */
-    void apply_weight_decay(Tensor& param);
-
-    /**
-     * @brief 更新一阶矩和二阶矩估计
-     * @details
-     * m = beta1 * m + (1 - beta1) * grad
-     * v = beta2 * v + (1 - beta2) * grad^2
-     * @param m 一阶矩估计引用
-     * @param v 二阶矩估计引用
-     * @param grad 梯度张量引用
-     * @param param_index 参数索引
-     */
-    void update_moments(Tensor& m, Tensor& v, const Tensor& grad, size_t param_index);
-
-    /**
-     * @brief 计算偏置修正后的矩估计
-     * @details
-     * m_hat = m / (1 - beta1^t)
-     * v_hat = v / (1 - beta2^t)
-     * @param m_hat 输出的一阶矩偏置修正引用
-     * @param v_hat 输出的二阶矩偏置修正引用
-     * @param m 原始一阶矩估计引用
-     * @param v 原始二阶矩估计引用
-     * @param time_step 时间步
-     * @param param_index 参数索引
-     */
-    void compute_bias_corrected_moments(Tensor& m_hat, Tensor& v_hat,
-                                       const Tensor& m, const Tensor& v,
-                                       int time_step, size_t param_index);
-
-    /**
-     * @brief 执行Adam参数更新
-     * @details param = param - lr * m_hat / (sqrt(v_hat) + eps)
-     * @param param 参数张量引用
-     * @param m_hat 偏置修正后的一阶矩估计引用
-     * @param v_hat 偏置修正后的二阶矩估计引用
-     * @param param_index 参数索引
-     */
-    void apply_adam_update(Tensor& param, const Tensor& m_hat, const Tensor& v_hat, size_t param_index);
 
 public:
     // ===== 访问器和信息获取 =====

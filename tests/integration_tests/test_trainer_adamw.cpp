@@ -18,6 +18,19 @@
 
 using namespace tr;
 
+// 保存训练结果到日志文件的辅助函数
+void save_training_results(const std::string& log_file, float best_accuracy, int best_epoch, long training_time) {
+    std::ofstream log(log_file, std::ios::app);  // 以追加模式打开文件
+    if (log.is_open()) {
+        log << std::fixed << std::setprecision(2) << best_accuracy << "%" << std::endl;
+        log << training_time << std::endl;
+        log << "----------------------------------------" << std::endl;
+        log.close();
+    } else {
+        std::cerr << "Error: Could not open " << log_file << " for writing" << std::endl;
+    }
+}
+
 // AdamW训练参数（匹配Python MLP配置）
 const int BATCH_SIZE = 128;          // 匹配Python BATCH_SIZE = 128
 const int NUM_EPOCHS = 20;           // 匹配Python NUM_EPOCHS = 20
@@ -249,16 +262,9 @@ int main() {
         std::cout << "=== BEST PERFORMANCE ===" << std::endl;
         std::cout << "Best Test Accuracy: " << std::setprecision(2) << best_test_accuracy << "% (Epoch " << best_epoch << ")" << std::endl;
         std::cout << "Total training time: " << duration.count() << " seconds" << std::endl;
-        // std::cout << "=========================" << std::endl;
-        // std::cout << "\n=== Trainer API Benefits ===" << std::endl;
-        // std::cout << "[OK] Encapsulated training logic" << std::endl;
-        // std::cout << "[OK] Automatic component management" << std::endl;
-        // std::cout << "[OK] Unified training interface" << std::endl;
-        // std::cout << "[OK] Learning rate scheduling support" << std::endl;
-        // std::cout << "[OK] SGD optimizer matching Python MLP configuration" << std::endl;
-        // std::cout << "[OK] V1.60.0 CrossEntropyLoss one-hot cache optimization" << std::endl;
-        // std::cout << "[OK] V1.60.1 Linear layer Kaiming Uniform initialization (PyTorch-aligned)" << std::endl;
-        // std::cout << "[OK] Configuration: lr=0.1, batch_size=128, no momentum, no weight decay, no bias, constant_lr" << std::endl;
+
+        // 保存训练结果到日志文件（续写模式）
+        save_training_results("log_tr_adamw.txt", best_test_accuracy, best_epoch, duration.count());
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

@@ -70,13 +70,13 @@ def train_one_epoch(model, criterion, optimizer, train_loader, device, epoch):
         correct += predicted.eq(target).sum().item()
 
         if batch_idx % INTERVAL == 0:
-            print_and_record('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                        100. * batch_idx / len(train_loader), loss.item()))
 
     epoch_loss = running_loss / len(train_loader)
     epoch_acc = 100. * correct / total
-    print_and_record(f'Train Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%')
+    print(f'Train Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%')
 
 
 def test(model, criterion, test_loader, device):
@@ -95,13 +95,13 @@ def test(model, criterion, test_loader, device):
     test_loss /= len(test_loader.dataset)
     test_acc = 100. * correct / len(test_loader.dataset)
 
-    print_and_record('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'
           .format(test_loss, correct, len(test_loader.dataset), test_acc))
 
     if test_acc > best_accuracy:
         best_accuracy = test_acc
         # torch.save(model.state_dict(), f'models/best_model.pth')
-        print_and_record(f'New best model saved with accuracy: {test_acc:.2f}%')
+        # print(f'New best model saved with accuracy: {test_acc:.2f}%')
 
 
 def main():
@@ -138,12 +138,14 @@ def main():
     os.makedirs('models', exist_ok=True)
 
     for epoch in range(1, NUM_EPOCHS + 1):
-        print_and_record(f"Current learning rate: {optimizer.param_groups[0]['lr']:.6f}")
+        print(f"Current learning rate: {optimizer.param_groups[0]['lr']:.6f}")
         train_one_epoch(model, criterion, optimizer, train_loader, device, epoch)
         test(model, criterion, test_loader, device)
 
-    print_and_record(f'\nTraining completed. Best Accuracy: {best_accuracy:.2f}%')
-    print_and_record(f'Total training time: {int(time.time() - start_time)} seconds')
+    # print(f'\nTraining completed. Best Accuracy: {best_accuracy:.2f}%')
+    # print(f'Total training time: {int(time.time() - start_time)} seconds')
+    print_and_record(f'\n{best_accuracy:.2f}%')
+    print_and_record(f'{int(time.time() - start_time)}')
 
 
 if __name__ == '__main__':

@@ -18,6 +18,19 @@
 
 using namespace tr;
 
+// 保存训练结果到日志文件的辅助函数
+void save_training_results(const std::string& log_file, float best_accuracy, int best_epoch, long training_time) {
+    std::ofstream log(log_file, std::ios::app);  // 以追加模式打开文件
+    if (log.is_open()) {
+        log << std::fixed << std::setprecision(2) << best_accuracy << "%" << std::endl;
+        log << training_time << std::endl;
+        log << "----------------------------------------" << std::endl;
+        log.close();
+    } else {
+        std::cerr << "Error: Could not open " << log_file << " for writing" << std::endl;
+    }
+}
+
 // SGD训练参数（匹配Python MLP配置）
 const int BATCH_SIZE = 128;          // 匹配Python BATCH_SIZE = 128
 const int NUM_EPOCHS = 20;           // 匹配Python NUM_EPOCHS = 20
@@ -250,16 +263,9 @@ int main() {
         std::cout << "=== BEST PERFORMANCE ===" << std::endl;
         std::cout << "Best Test Accuracy: " << std::setprecision(2) << best_test_accuracy << "% (Epoch " << best_epoch << ")" << std::endl;
         std::cout << "Total training time: " << duration.count() << " seconds" << std::endl;
-        // std::cout << "=========================" << std::endl;
-        // std::cout << "\n=== Trainer API Benefits ===" << std::endl;
-        // std::cout << "[OK] Encapsulated training logic" << std::endl;
-        // std::cout << "[OK] Automatic component management" << std::endl;
-        // std::cout << "[OK] Unified training interface" << std::endl;
-        // std::cout << "[OK] Learning rate scheduling support" << std::endl;
-        // std::cout << "[OK] SGD optimizer matching Python MLP configuration" << std::endl;
-        // std::cout << "[OK] V1.60.0 CrossEntropyLoss one-hot cache optimization" << std::endl;
-        // std::cout << "[OK] V1.60.1 Linear layer Kaiming Uniform initialization (PyTorch-aligned)" << std::endl;
-        // std::cout << "[OK] Configuration: lr=0.1, batch_size=128, no momentum, no weight decay, no bias, constant_lr" << std::endl;
+
+        // 保存训练结果到日志文件（续写模式）
+        save_training_results("log_tr_sgd.txt", best_test_accuracy, best_epoch, duration.count());
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
@@ -268,37 +274,3 @@ int main() {
 
     return 0;
 }
-
-/*
-=== API Improvement Summary ===
-
-Problem solved:
-Before: Trainer trainer(*model, std::move(optimizer), std::move(loss_fn), std::move(scheduler));
-Problem: Model uses reference, others use unique_ptr, API inconsistency, hard to remember
-
-Now: Trainer trainer(model, optimizer, loss_fn, scheduler);
-Advantage: All components use shared_ptr uniformly, API consistency, easy to remember
-
-Backward compatibility:
-Old code still works without modification!
-- Existing unique_ptr constructor still supported
-- Automatic conversion to shared_ptr, zero performance loss
-- Gradual migration to new API
-
-Performance guarantee:
-- shared_ptr additional overhead < 1%, completely negligible
-- Automatic lifetime management, avoids dangling pointers
-- Memory safety improvement, exception safety guarantee
-
-Usage example comparison:
-
-Old way (still supported):
-auto optimizer = std::make_unique<SGD>(0.01f);
-Trainer trainer(*model, std::move(optimizer), ...);
-
-New way (recommended):
-auto optimizer = std::make_shared<SGD>(0.01f);
-Trainer trainer(model, optimizer, ...);
-
-This is a major user experience improvement!
-*/
