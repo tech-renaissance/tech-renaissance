@@ -419,6 +419,16 @@ public:
     virtual void dtanh_inplace(Tensor& tensor_a);
     virtual void dtanh_into(const Tensor& tensor_a, Tensor& result);
 
+    // 激活函数操作
+    virtual Tensor relu(const Tensor& tensor_a);
+    virtual void relu_inplace(Tensor& tensor_a);
+    virtual void relu_into(const Tensor& tensor_a, Tensor& result);
+
+    // 激活函数导数操作
+    virtual Tensor drelu(const Tensor& tensor_a);
+    virtual void drelu_inplace(Tensor& tensor_a);
+    virtual void drelu_into(const Tensor& tensor_a, Tensor& result);
+
     // 数学函数操作
     virtual Tensor sqrt(const Tensor& input);
     virtual void sqrt_inplace(Tensor& input);

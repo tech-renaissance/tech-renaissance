@@ -1773,4 +1773,253 @@ void CpuBackend::dtanh_into(const Tensor& tensor_a, Tensor& result) {
 #endif
 }
 
+// ===== relu方法实现 =====
+
+Tensor CpuBackend::relu(const Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::relu] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::relu] Cannot compute relu of empty tensor");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor_a.shape(), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：relu(x) = max(0, x)
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen的cwiseMax实现ReLU
+    result_vec = input_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现：直接循环处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        result_data[i] = (input_data[i] > 0.0f) ? input_data[i] : 0.0f;
+    }
+#endif
+
+    return result;
+}
+
+void CpuBackend::relu_inplace(Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::relu_inplace] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::relu_inplace] Cannot compute relu of empty tensor");
+    }
+
+    float* data = static_cast<float*>(tensor_a.data_ptr());
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：原地计算relu
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+
+    // 使用Eigen的cwiseMax实现ReLU
+    eigen_vec = eigen_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现：原地处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        if (data[i] < 0.0f) {
+            data[i] = 0.0f;
+        }
+    }
+#endif
+}
+
+void CpuBackend::relu_into(const Tensor& tensor_a, Tensor& result) {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::relu_into] Only FP32 tensors are supported");
+    }
+
+#if TR_ENABLE_INTO_FUNC_SHAPE_CHECK == 1
+    if (tensor_a.shape() != result.shape()) {
+        throw TRException("[CpuBackend::relu_into] Shape mismatch: input shape " +
+                         tensor_a.shape().to_string() + " != output shape " +
+                         result.shape().to_string());
+    }
+#endif
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::relu_into] Cannot compute relu of empty tensor");
+    }
+
+    // 检查输出张量是否为空
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::relu_into] Output tensor is empty");
+    }
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：relu(x) = max(0, x)
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen的cwiseMax实现ReLU
+    result_vec = input_vec.cwiseMax(0.0f);
+#else
+    // 朴素实现：直接循环处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        result_data[i] = (input_data[i] > 0.0f) ? input_data[i] : 0.0f;
+    }
+#endif
+}
+
+// ===== drelu方法实现 =====
+
+Tensor CpuBackend::drelu(const Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::drelu] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::drelu] Cannot compute drelu of empty tensor");
+    }
+
+    // 创建结果张量
+    Tensor result = Tensor::empty(tensor_a.shape(), DType::FP32, tr::CPU);
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：drelu(x) = x > 0 ? 1 : 0
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen向量化操作实现条件判断
+    result_vec = (input_vec.array() > 0.0f).select(
+        MatrixType::Ones(num_elements),
+        MatrixType::Zero(num_elements)
+    );
+#else
+    // 朴素实现：直接循环处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        result_data[i] = (input_data[i] > 0.0f) ? 1.0f : 0.0f;
+    }
+#endif
+
+    return result;
+}
+
+void CpuBackend::drelu_inplace(Tensor& tensor_a) {
+    validate_same_device(tensor_a.device());
+
+    // 检查数据类型必须是FP32
+    if (tensor_a.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::drelu_inplace] Only FP32 tensors are supported");
+    }
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::drelu_inplace] Cannot compute drelu of empty tensor");
+    }
+
+    float* data = static_cast<float*>(tensor_a.data_ptr());
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：原地计算drelu
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<MatrixType> eigen_vec(data, num_elements);
+
+    // 使用Eigen向量化操作实现条件判断
+    eigen_vec = (eigen_vec.array() > 0.0f).select(
+        MatrixType::Ones(num_elements),
+        MatrixType::Zero(num_elements)
+    );
+#else
+    // 朴素实现：原地处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        data[i] = (data[i] > 0.0f) ? 1.0f : 0.0f;
+    }
+#endif
+}
+
+void CpuBackend::drelu_into(const Tensor& tensor_a, Tensor& result) {
+    validate_same_device(tensor_a.device());
+    validate_same_device(result.device());
+
+    if (tensor_a.dtype() != DType::FP32 || result.dtype() != DType::FP32) {
+        throw TRException("[CpuBackend::drelu_into] Only FP32 tensors are supported");
+    }
+
+#if TR_ENABLE_INTO_FUNC_SHAPE_CHECK == 1
+    if (tensor_a.shape() != result.shape()) {
+        throw TRException("[CpuBackend::drelu_into] Shape mismatch: input shape " +
+                         tensor_a.shape().to_string() + " != output shape " +
+                         result.shape().to_string());
+    }
+#endif
+
+    // 检查输入张量是否为空
+    if (tensor_a.is_empty()) {
+        throw TRException("[CpuBackend::drelu_into] Cannot compute drelu of empty tensor");
+    }
+
+    // 检查输出张量是否为空
+    if (result.is_empty()) {
+        throw TRException("[CpuBackend::drelu_into] Output tensor is empty");
+    }
+
+    const float* input_data = static_cast<const float*>(tensor_a.data_ptr());
+    float* result_data = static_cast<float*>(result.data_ptr());
+
+    size_t num_elements = tensor_a.numel();
+
+#ifdef TR_USE_EIGEN
+    // Eigen优化实现：drelu(x) = x > 0 ? 1 : 0
+    using MatrixType = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+    Eigen::Map<const MatrixType> input_vec(input_data, num_elements);
+    Eigen::Map<MatrixType> result_vec(result_data, num_elements);
+
+    // 使用Eigen向量化操作实现条件判断
+    result_vec = (input_vec.array() > 0.0f).select(
+        MatrixType::Ones(num_elements),
+        MatrixType::Zero(num_elements)
+    );
+#else
+    // 朴素实现：直接循环处理每个元素
+    for (size_t i = 0; i < num_elements; ++i) {
+        result_data[i] = (input_data[i] > 0.0f) ? 1.0f : 0.0f;
+    }
+#endif
+}
+
 } // namespace tr

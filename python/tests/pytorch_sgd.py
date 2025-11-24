@@ -44,9 +44,9 @@ class MLP(nn.Module):
     def make_layers(self):
         classifier_layers = list()
         classifier_layers += [nn.Linear(784, 512, bias=False)]
-        classifier_layers += [nn.Tanh()]
+        classifier_layers += [nn.ReLU()]
         classifier_layers += [nn.Linear(512, 256, bias=False)]
-        classifier_layers += [nn.Tanh()]
+        classifier_layers += [nn.ReLU()]
         classifier_layers += [nn.Linear(256, 10, bias=False)]
         self.classifier = nn.Sequential(*classifier_layers)
 

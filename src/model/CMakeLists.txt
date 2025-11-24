@@ -11,6 +11,7 @@ add_library(model STATIC
     linear.cpp
     flatten.cpp
     tanh.cpp
+    relu.cpp
     model.cpp
 )
 

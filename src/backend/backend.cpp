@@ -59,6 +59,16 @@ DEFINE_NOT_IMPLEMENTED_METHOD(dtanh, Tensor, (const Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(dtanh_inplace, (Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(dtanh_into, (const Tensor& tensor_a, Tensor& result), )
 
+// 激活函数操作
+DEFINE_NOT_IMPLEMENTED_METHOD(relu, Tensor, (const Tensor& tensor_a), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(relu_inplace, (Tensor& tensor_a), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(relu_into, (const Tensor& tensor_a, Tensor& result), )
+
+// 激活函数导数操作
+DEFINE_NOT_IMPLEMENTED_METHOD(drelu, Tensor, (const Tensor& tensor_a), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(drelu_inplace, (Tensor& tensor_a), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(drelu_into, (const Tensor& tensor_a, Tensor& result), )
+
 DEFINE_NOT_IMPLEMENTED_METHOD(sqrt, Tensor, (const Tensor& input), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_inplace, (Tensor& input), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_into, (const Tensor& input, Tensor& output), )

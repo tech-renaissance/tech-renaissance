@@ -8,9 +8,9 @@ int main() {
     auto model = Model::create("MLP",
         std::make_shared<Flatten>(),
         std::make_shared<Linear>(784, 512),
-        std::make_shared<Tanh>(),
+        std::make_shared<ReLU>(),
         std::make_shared<Linear>(512, 256),
-        std::make_shared<Tanh>(),
+        std::make_shared<ReLU>(),
         std::make_shared<Linear>(256, 10)
     );
     auto loss_fn = CrossEntropyLoss();

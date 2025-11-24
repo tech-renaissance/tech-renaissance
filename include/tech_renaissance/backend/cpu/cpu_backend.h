@@ -283,6 +283,16 @@ public:
     void dtanh_inplace(Tensor& tensor_a) override;
     void dtanh_into(const Tensor& tensor_a, Tensor& result) override;
 
+    // relu激活函数
+    Tensor relu(const Tensor& input) override;
+    void relu_inplace(Tensor& input) override;
+    void relu_into(const Tensor& input, Tensor& output) override;
+
+    // drelu激活函数导数
+    Tensor drelu(const Tensor& tensor_a) override;
+    void drelu_inplace(Tensor& tensor_a) override;
+    void drelu_into(const Tensor& tensor_a, Tensor& result) override;
+
     // INT32张量比较操作（V1.42.4新增）
     // 比较两个INT32张量的每个元素是否相等
     void eq_into(const Tensor& tensor_a, const Tensor& tensor_b, Tensor& result) const;

@@ -136,6 +136,13 @@ int main() {
             [](CpuBackend& backend, Tensor& input) { backend.dtanh_inplace(input); },
             [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.dtanh_into(input, output); },
             false  // 不需要PyTorch验证
+        },
+        {
+            "drelu", "drelu",
+            [](CpuBackend& backend, const Tensor& input) { return backend.drelu(input); },
+            [](CpuBackend& backend, Tensor& input) { backend.drelu_inplace(input); },
+            [](CpuBackend& backend, const Tensor& input, Tensor& output) { backend.drelu_into(input, output); },
+            false  // 不需要PyTorch验证
         }
     };
 
@@ -159,8 +166,8 @@ int main() {
             } else if (test_case.name == "transpose") {
                 // 生成2D张量用于转置测试，范围[-1.0, 1.0]
                 input = cpu_backend->uniform(Shape(3, 4), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i);
-            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh") {
-                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh变化
+            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh" || test_case.name == "drelu") {
+                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh/drelu变化
                 input = cpu_backend->uniform(Shape(2, 3, 4, 5), -2.0f, 2.0f, static_cast<int>(time(nullptr)) + i);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
@@ -230,8 +237,8 @@ int main() {
             } else if (test_case.name == "transpose") {
                 // 生成3x4矩阵用于原地转置测试，范围[-1.0, 1.0]
                 input = cpu_backend->uniform(Shape(3, 4), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 1000);
-            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh") {
-                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh变化
+            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh" || test_case.name == "drelu") {
+                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh/drelu变化
                 input = cpu_backend->uniform(Shape(2, 3, 4, 5), -2.0f, 2.0f, static_cast<int>(time(nullptr)) + i + 1000);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
@@ -307,8 +314,8 @@ int main() {
             } else if (test_case.name == "transpose") {
                 // 生成2D张量用于转置测试，范围[-1.0, 1.0]
                 input = cpu_backend->uniform(Shape(2, 3), -1.0f, 1.0f, static_cast<int>(time(nullptr)) + i + 2000);
-            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh") {
-                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh变化
+            } else if (test_case.name == "reshape" || test_case.name == "tanh" || test_case.name == "dtanh" || test_case.name == "drelu") {
+                // 生成4维张量用于新函数测试，范围[-2.0, 2.0]以涵盖更多tanh/drelu变化
                 input = cpu_backend->uniform(Shape(2, 3, 4, 5), -2.0f, 2.0f, static_cast<int>(time(nullptr)) + i + 2000);
             } else {
                 // 生成普通4维张量，范围[-1.0, 1.0]
