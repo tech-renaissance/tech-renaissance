@@ -23,6 +23,9 @@ add_subdirectory(model)
 # 添加Trainer模块子目录
 add_subdirectory(trainer)
 
+# 添加Task模块子目录
+add_subdirectory(task)
+
 # 创建主库目标（聚合所有模块）
 add_library(tech_renaissance INTERFACE)
 
@@ -35,6 +38,7 @@ target_link_libraries(tech_renaissance INTERFACE
     tech_renaissance_utils_backend  # 需要backend依赖的utils组件
     model
     trainer
+    task
 )
 
 # 设置包含目录

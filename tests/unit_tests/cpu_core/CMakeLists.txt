@@ -126,6 +126,9 @@ configure_cpu_core_test(test_lr_schedulers test_lr_schedulers.cpp)
 configure_cpu_core_test(test_performance test_performance.cpp)
 configure_cpu_core_test(test_memory_occupation test_memory_occupation.cpp)
 
+# Task系统测试 - 移至集成测试
+# configure_cpu_core_test(test_task_unit test_task_unit.cpp)
+
 # =============================================================================
 # 注册测试到CTest
 # =============================================================================
@@ -158,6 +161,8 @@ register_cpu_core_test(test_mlp_module "MLP Module Test")
 register_cpu_core_test(test_lr_schedulers "Learning Rate Schedulers Test")
 register_cpu_core_test(test_performance "Performance Test")
 register_cpu_core_test(test_memory_occupation "Memory Occupation Test")
+# Task系统测试已移至集成测试
+# register_cpu_core_test(test_task_unit "Task System Test")
 
 message(STATUS "CPU Core tests configured successfully - ${CMAKE_CURRENT_LIST_DIR}")
 message(STATUS "Total CPU Core tests: 20")

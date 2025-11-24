@@ -41,6 +41,8 @@ endfunction()
 configure_integration_test(test_trainer_sgd test_trainer_sgd.cpp)
 configure_integration_test(test_trainer_adam test_trainer_adam.cpp)
 configure_integration_test(test_trainer_adamw test_trainer_adamw.cpp)
+configure_integration_test(test_task_sgd test_task_sgd.cpp)
+configure_integration_test(test_task_adamw test_task_adamw.cpp)
 
 # =============================================================================
 # 注册测试到CTest
@@ -59,6 +61,8 @@ endfunction()
 register_integration_test(test_trainer_sgd "Trainer SGD Integration Test")
 register_integration_test(test_trainer_adam "Trainer Adam Integration Test")
 register_integration_test(test_trainer_adamw "Trainer AdamW Integration Test")
+register_integration_test(test_task_sgd "Task SGD Integration Test")
+register_integration_test(test_task_adamw "Task AdamW Integration Test")
 
 message(STATUS "Integration tests configured successfully - CPU Core Module only")
-message(STATUS "Total integration tests: 3")
+message(STATUS "Total integration tests: 5")

@@ -14,6 +14,7 @@ set(DATA_SOURCES
     strides.cpp
     storage.cpp
     tensor.cpp
+    # mnist_dataset.cpp - 已移至task模块
 )
 
 # 创建数据库静态库
