@@ -11,6 +11,7 @@ int main() {
         std::make_shared<ReLU>(),
         std::make_shared<Linear>(512, 256),
         std::make_shared<ReLU>(),
+        std::make_shared<Dropout>(0.5f),
         std::make_shared<Linear>(256, 10)
     );
     auto loss_fn = CrossEntropyLoss();

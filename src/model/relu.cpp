@@ -18,27 +18,16 @@ ReLU::ReLU(const std::string& name)
 }
 
 void ReLU::forward_into(const Tensor& input, Tensor& output) {
-    cache_input(input);
-
     auto backend = get_backend();
+    cache_input(input);
     backend->relu_into(input, output);
 }
 
 void ReLU::backward_into(const Tensor& grad_output, Tensor& grad_input) {
     auto backend = get_backend();
-
-    // ReLU的导数：d/dx ReLU(x) = x > 0 ? 1 : 0
-    // 使用链式法则：grad_input = grad_output * drelu(cached_input_)
-    // 其中drelu(x) = x > 0 ? 1 : 0
-
-    // 使用drelu_into方法直接计算导数
     Tensor drelu_output = backend->zeros(cached_input_.shape(), DType::FP32);
     backend->drelu_into(cached_input_, drelu_output);
-
-    // 应用链式法则：grad_input = grad_output * drelu_output
-    // 使用逐元素乘法
     backend->mul_broadcast_into(grad_output, drelu_output, grad_input);
-
     clear_cache();
 }
 

@@ -338,6 +338,24 @@ public:
      */
     virtual Tensor uniform(const Shape& shape, float min_val = 0.0f, float max_val = 1.0f, unsigned int seed = 0);
 
+    /**
+     * @brief 创建布尔随机张量（0或1）
+     * @param shape 张量形状
+     * @param rate_of_zeros 生成0的概率（0.0到1.0之间）
+     * @param seed 随机种子
+     * @param dtype 数据类型（仅支持FP32）
+     * @return 布尔随机张量
+     */
+    virtual Tensor randbool(const Shape& shape, float rate_of_zeros, unsigned int seed = 0, DType dtype = DType::FP32);
+
+    /**
+     * @brief 原地生成布尔随机张量（0或1）
+     * @param tensor_a 目标张量
+     * @param rate_of_zeros 生成0的概率（0.0到1.0之间）
+     * @param seed 随机种子
+     */
+    virtual void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0);
+
     // ===== 张量复制操作 =====
 
     /**
@@ -428,6 +446,10 @@ public:
     virtual Tensor drelu(const Tensor& tensor_a);
     virtual void drelu_inplace(Tensor& tensor_a);
     virtual void drelu_into(const Tensor& tensor_a, Tensor& result);
+
+    // Dropout操作
+    virtual void dropout_into(const Tensor& input, Tensor& mask, Tensor& result, float p);
+    virtual void ddropout_into(const Tensor& input, const Tensor& mask, Tensor& result, float p);
 
     // 数学函数操作
     virtual Tensor sqrt(const Tensor& input);

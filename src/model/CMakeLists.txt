@@ -12,6 +12,7 @@ add_library(model STATIC
     flatten.cpp
     tanh.cpp
     relu.cpp
+    dropout.cpp
     model.cpp
 )
 

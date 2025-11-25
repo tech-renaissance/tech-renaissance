@@ -103,7 +103,7 @@ public:
     Tensor randint(const Shape& shape, int low, int high, DType dtype, unsigned int seed = 0);
     static void randint_inplace(Tensor& tensor_a, int low, int high, DType dtype, unsigned int seed = 0);
     Tensor randbool(const Shape& shape, float rate_of_zeros, unsigned int seed = 0, DType dtype = DType::FP32);
-    static void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0);
+    void randbool_inplace(Tensor& tensor_a, float rate_of_zeros, unsigned int seed = 0) override;
 
     // 类型转换函数（V1.31.2新增）
     Tensor cast(const Tensor& tensor_a, DType target_dtype);
@@ -292,6 +292,10 @@ public:
     Tensor drelu(const Tensor& tensor_a) override;
     void drelu_inplace(Tensor& tensor_a) override;
     void drelu_into(const Tensor& tensor_a, Tensor& result) override;
+
+    // Dropout操作
+    void dropout_into(const Tensor& input, Tensor& mask, Tensor& result, float p) override;
+    void ddropout_into(const Tensor& input, const Tensor& mask, Tensor& result, float p) override;
 
     // INT32张量比较操作（V1.42.4新增）
     // 比较两个INT32张量的每个元素是否相等

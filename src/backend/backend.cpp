@@ -69,6 +69,10 @@ DEFINE_NOT_IMPLEMENTED_METHOD(drelu, Tensor, (const Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(drelu_inplace, (Tensor& tensor_a), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(drelu_into, (const Tensor& tensor_a, Tensor& result), )
 
+// Dropout操作
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(dropout_into, (const Tensor& input, Tensor& mask, Tensor& result, float p), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(ddropout_into, (const Tensor& input, const Tensor& mask, Tensor& result, float p), )
+
 DEFINE_NOT_IMPLEMENTED_METHOD(sqrt, Tensor, (const Tensor& input), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_inplace, (Tensor& input), )
 DEFINE_NOT_IMPLEMENTED_VOID_METHOD(sqrt_into, (const Tensor& input, Tensor& output), )
@@ -140,6 +144,10 @@ DEFINE_NOT_IMPLEMENTED_METHOD(empty, Tensor, (const Shape& shape, DType dtype), 
 
 // 均匀分布随机张量创建方法
 DEFINE_NOT_IMPLEMENTED_METHOD(uniform, Tensor, (const Shape& shape, float min_val, float max_val, unsigned int seed), )
+
+// 布尔随机张量创建方法
+DEFINE_NOT_IMPLEMENTED_METHOD(randbool, Tensor, (const Shape& shape, float rate_of_zeros, unsigned int seed, DType dtype), )
+DEFINE_NOT_IMPLEMENTED_VOID_METHOD(randbool_inplace, (Tensor& tensor_a, float rate_of_zeros, unsigned int seed), )
 
 // 张量复制操作
 DEFINE_NOT_IMPLEMENTED_METHOD(copy, Tensor, (const Tensor& tensor), const)

@@ -35,6 +35,7 @@
 #include "tech_renaissance/model/flatten.h"
 #include "tech_renaissance/model/tanh.h"
 #include "tech_renaissance/model/relu.h"
+#include "tech_renaissance/model/dropout.h"
 #include "tech_renaissance/model/model.h"
 #include "tech_renaissance/trainer/trainer.h"
 #include "tech_renaissance/trainer/loss.h"
