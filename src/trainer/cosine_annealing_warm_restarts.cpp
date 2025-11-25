@@ -40,24 +40,27 @@ float CosineAnnealingWarmRestarts::get_lr(int epoch) {
                          std::to_string(epoch));
     }
 
-    // 动态计算当前周期长度和位置
-    // 基于测试期望：T_0=10意味着第一个周期是epoch 0-10，长度为T_0+1
-    double T_i = T_0_;
-    int t_cur = epoch;
-    int period_start = 0;
+    // 计算当前在哪个重启周期，以及周期内位置
+    int T_cur = T_0_;          // 当前周期长度
+    int epoch_in_period = epoch;
 
-    while (true) {
-        int period_length = static_cast<int>(T_i) + 1;
-        if (t_cur < period_length) {
-            break;
+    // 找到当前周期
+    while (epoch_in_period >= T_cur) {
+        epoch_in_period -= T_cur;
+        T_cur *= T_mult_;
+
+        // 防止整数溢出
+        if (T_cur <= 0) {
+            throw TRException("CosineAnnealingWarmRestarts: Period length overflow");
         }
-        t_cur -= period_length;
-        period_start += period_length;
-        T_i *= T_mult_;
     }
 
-    // 余弦退火公式: lr = eta_min + (lr0 - eta_min) * (1 + cos(π * t_cur / T_i)) / 2
-    double progress = static_cast<double>(t_cur) / T_i;
+    // 余弦退火公式
+    if (T_cur == 0) {
+        return initial_lr_;  // 边界情况保护
+    }
+
+    double progress = static_cast<double>(epoch_in_period) / static_cast<double>(T_cur);
     double cosine_value = std::cos(M_PI * progress);
 
     return eta_min_ + (initial_lr_ - eta_min_) * (1.0 + cosine_value) / 2.0;

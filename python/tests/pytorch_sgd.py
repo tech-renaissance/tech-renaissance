@@ -1,5 +1,4 @@
 import os
-import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,9 +8,11 @@ import logging
 
 
 BATCH_SIZE = 128
-NUM_EPOCHS = 20
+NUM_EPOCHS = 60
 NUM_WORKERS = 0
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.001
+WEIGHT_DECAY = 1e-4
+LABEL_SMOOTHING = 0.1
 INTERVAL = 100
 LOG_FILE = 'log.txt'
 
@@ -21,8 +22,8 @@ best_accuracy = 0.0
 
 def print_and_record(*args):
     print(*args)
-    text = ' '.join(map(str, args))
-    logging.info(text)
+    # text = ' '.join(map(str, args))
+    # logging.info(text)
 
 
 class MLP(nn.Module):
@@ -70,13 +71,13 @@ def train_one_epoch(model, criterion, optimizer, train_loader, device, epoch):
         correct += predicted.eq(target).sum().item()
 
         if batch_idx % INTERVAL == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            print_and_record('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                        100. * batch_idx / len(train_loader), loss.item()))
 
     epoch_loss = running_loss / len(train_loader)
     epoch_acc = 100. * correct / total
-    print(f'Train Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%')
+    print_and_record(f'Train Epoch: {epoch} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%')
 
 
 def test(model, criterion, test_loader, device):
@@ -95,57 +96,54 @@ def test(model, criterion, test_loader, device):
     test_loss /= len(test_loader.dataset)
     test_acc = 100. * correct / len(test_loader.dataset)
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'
+    print_and_record('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'
           .format(test_loss, correct, len(test_loader.dataset), test_acc))
 
     if test_acc > best_accuracy:
         best_accuracy = test_acc
-        # torch.save(model.state_dict(), f'models/best_model.pth')
-        # print(f'New best model saved with accuracy: {test_acc:.2f}%')
+        torch.save(model.state_dict(), f'models/best_model.pth')
+        print_and_record(f'New best model saved with accuracy: {test_acc:.2f}%')
 
 
 def main():
-    # 记录开始时间
-    start_time = time.time()
-
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
 
-    device = torch.device("cpu")
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_transform = transforms.Compose([
+        transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=0.1),
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.RandomErasing(p=0.7, scale=(0.02, 0.33), ratio=(0.3, 3.3), value=0),
     ])
     test_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='../../..', train=True, download=True, transform=train_transform),
-        batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
+    train_loader = torch.utils.data.DataLoader(
+        datasets.MNIST(root='../../workspace', train=True, download=True, transform=train_transform),
+        batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST(root='../../..', train=False, transform=test_transform),
+        datasets.MNIST(root='../../workspace', train=False, transform=test_transform),
         batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS)
 
     model = MLP().to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
+    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY, amsgrad=True)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=NUM_EPOCHS//4, T_mult=1)
 
     os.makedirs('models', exist_ok=True)
 
     for epoch in range(1, NUM_EPOCHS + 1):
-        print(f"Current learning rate: {optimizer.param_groups[0]['lr']:.6f}")
+        print_and_record(f"Current learning rate: {optimizer.param_groups[0]['lr']:.6f}")
         train_one_epoch(model, criterion, optimizer, train_loader, device, epoch)
         test(model, criterion, test_loader, device)
+        scheduler.step()
 
-    # print(f'\nTraining completed. Best Accuracy: {best_accuracy:.2f}%')
-    # print(f'Total training time: {int(time.time() - start_time)} seconds')
-    print_and_record(f'\n{best_accuracy:.2f}%')
-    print_and_record(f'{int(time.time() - start_time)}')
+    print_and_record(f'\nTraining completed. Best Accuracy: {best_accuracy:.2f}%')
 
 
 if __name__ == '__main__':
