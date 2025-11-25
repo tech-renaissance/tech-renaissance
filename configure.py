@@ -1957,17 +1957,32 @@ class SmartConfigurator:
 
     def _try_find_curl_auto(self) -> bool:
         """Try to find libcurl automatically"""
-        # Method 1: Check through vcpkg
-        if self._find_curl_in_vcpkg():
-            return True
+        if self.system == "Linux":
+            # For Linux, prioritize system installation over vcpkg
+            # Method 1: Check system PATH environment variable
+            if self._find_curl_in_path():
+                return True
 
-        # Method 2: Check system PATH environment variable
-        if self._find_curl_in_path():
-            return True
+            # Method 2: Check common system locations
+            if self._find_curl_in_system_paths():
+                return True
 
-        # Method 3: Check common system locations
-        if self._find_curl_in_system_paths():
-            return True
+            # Method 3: Check through vcpkg (last resort for Linux)
+            if self._find_curl_in_vcpkg():
+                return True
+        else:
+            # For Windows/macOS, prioritize vcpkg
+            # Method 1: Check through vcpkg
+            if self._find_curl_in_vcpkg():
+                return True
+
+            # Method 2: Check system PATH environment variable
+            if self._find_curl_in_path():
+                return True
+
+            # Method 3: Check common system locations
+            if self._find_curl_in_system_paths():
+                return True
 
         return False
 
@@ -2066,8 +2081,8 @@ class SmartConfigurator:
             ]
         else:
             search_paths = [
+                "/usr",                              # apt installs to /usr/include and /usr/lib
                 "/usr/local",
-                "/usr",
                 "/opt/curl",
                 "/opt/libcurl",
                 "/home/$USER/.local",
@@ -2086,9 +2101,11 @@ class SmartConfigurator:
 
             # Check for libcurl installation
             curl_locations = [
-                base_path / "include" / "curl",
+                base_path / "include" / "curl",                    # Standard location
+                base_path / "include" / "x86_64-linux-gnu" / "curl",  # Ubuntu/Debian architecture-specific
                 base_path / "lib",
                 base_path / "lib64",
+                base_path / "lib" / "x86_64-linux-gnu",           # Ubuntu/Debian library location
                 base_path / "bin",
             ]
 
@@ -2117,7 +2134,7 @@ class SmartConfigurator:
                     return len(dll_files) > 0
                 return len(lib_files) > 0
             else:
-                # Check for .so, .a files on Linux
+                # Check for .so, .a files on Linux/macOS
                 lib_files = (list(location.glob("libcurl*.so*")) or
                            list(location.glob("libcurl*.a")) or
                            list(location.glob("libcurl*.dylib")))  # macOS
@@ -2127,6 +2144,31 @@ class SmartConfigurator:
         include_curl = location / "include" / "curl"
         if include_curl.exists():
             return self._is_valid_curl_location(include_curl, base_path)
+
+        # For Linux base directories (like /usr), check typical structure
+        if self.system == "Linux" and location.name in ["usr", "usr/local"]:
+            # Check both possible include directories for headers
+            include_dirs = [
+                location / "include" / "curl",
+                location / "include" / "x86_64-linux-gnu" / "curl"  # Ubuntu/Debian architecture-specific
+            ]
+
+            for include_dir in include_dirs:
+                if include_dir.exists() and (include_dir / "curl.h").exists():
+                    # Check lib directories for library files
+                    lib_dirs = [
+                        location / "lib",
+                        location / "lib64",
+                        location / "lib" / "x86_64-linux-gnu",  # Ubuntu/Debian structure
+                        location / "lib/x86_64-linux-gnu"
+                    ]
+                    for lib_dir in lib_dirs:
+                        if lib_dir.exists():
+                            lib_files = (list(lib_dir.glob("libcurl*.so*")) or
+                                       list(lib_dir.glob("libcurl*.a")))
+                            if lib_files:
+                                return True
+            return False
 
         return False
 
@@ -2160,24 +2202,31 @@ class SmartConfigurator:
         return True
 
     def suggest_curl_installation(self):
-        """Suggest libcurl installation via vcpkg"""
+        """Suggest libcurl installation"""
         print(f"\n{Colors.CYAN}libcurl installation suggestions:{Colors.ENDC}")
-        vcpkg_root = self.config.get('vcpkg_root')
 
-        if vcpkg_root:
-            print(f"  Install libcurl with vcpkg:")
-            print(f"    cd \"{vcpkg_root}\"")
-            if self.system == "Windows":
-                print(f"    .\\vcpkg install curl")
-            else:
-                print(f"    ./vcpkg install curl")
+        if self.system == "Linux":
+            print(f"  For Linux systems, install using apt package manager:")
+            print(f"    sudo apt install libcurl4-openssl-dev")
             print(f"    Note: libcurl provides HTTP/HTTPS client functionality")
+            print(f"    This is the recommended approach for Linux systems.")
         else:
-            print(f"  vcpkg is not configured. Install vcpkg first, then:")
-            if self.system == "Windows":
-                print(f"    .\\vcpkg install curl")
+            # Windows/macOS: Use vcpkg
+            vcpkg_root = self.config.get('vcpkg_root')
+            if vcpkg_root:
+                print(f"  Install libcurl with vcpkg:")
+                print(f"    cd \"{vcpkg_root}\"")
+                if self.system == "Windows":
+                    print(f"    .\\vcpkg install curl")
+                else:
+                    print(f"    ./vcpkg install curl")
+                print(f"    Note: libcurl provides HTTP/HTTPS client functionality")
             else:
-                print(f"    ./vcpkg install curl")
+                print(f"  vcpkg is not configured. Install vcpkg first, then:")
+                if self.system == "Windows":
+                    print(f"    .\\vcpkg install curl")
+                else:
+                    print(f"    ./vcpkg install curl")
 
     def check_zlib(self) -> bool:
         """Check if zlib is installed"""
@@ -2220,17 +2269,32 @@ class SmartConfigurator:
 
     def _try_find_zlib_auto(self) -> bool:
         """Try to find zlib automatically"""
-        # Method 1: Check through vcpkg
-        if self._find_zlib_in_vcpkg():
-            return True
+        if self.system == "Linux":
+            # For Linux, prioritize system installation over vcpkg
+            # Method 1: Check system PATH environment variable
+            if self._find_zlib_in_path():
+                return True
 
-        # Method 2: Check system PATH environment variable
-        if self._find_zlib_in_path():
-            return True
+            # Method 2: Check common system locations
+            if self._find_zlib_in_system_paths():
+                return True
 
-        # Method 3: Check common system locations
-        if self._find_zlib_in_system_paths():
-            return True
+            # Method 3: Check through vcpkg (last resort for Linux)
+            if self._find_zlib_in_vcpkg():
+                return True
+        else:
+            # For Windows/macOS, prioritize vcpkg
+            # Method 1: Check through vcpkg
+            if self._find_zlib_in_vcpkg():
+                return True
+
+            # Method 2: Check system PATH environment variable
+            if self._find_zlib_in_path():
+                return True
+
+            # Method 3: Check common system locations
+            if self._find_zlib_in_system_paths():
+                return True
 
         return False
 
@@ -2400,6 +2464,26 @@ class SmartConfigurator:
         if include_dir.exists():
             return self._is_valid_zlib_location(include_dir, base_path)
 
+        # For Linux base directories (like /usr), check typical structure
+        if self.system == "Linux" and location.name in ["usr", "usr/local"]:
+            # Check include directory for headers
+            include_dir = location / "include"
+            if include_dir.exists() and (include_dir / "zlib.h").exists() and (include_dir / "zconf.h").exists():
+                # Check lib directories for library files
+                lib_dirs = [
+                    location / "lib",
+                    location / "lib64",
+                    location / "lib" / "x86_64-linux-gnu",  # Ubuntu/Debian structure
+                    location / "lib/x86_64-linux-gnu"
+                ]
+                for lib_dir in lib_dirs:
+                    if lib_dir.exists():
+                        lib_files = (list(lib_dir.glob("libz*.so*")) or
+                                   list(lib_dir.glob("libz*.a")))
+                        if lib_files:
+                            return True
+            return False
+
         return False
 
     def _validate_zlib_path(self, zlib_path: Path) -> bool:
@@ -2432,24 +2516,31 @@ class SmartConfigurator:
         return True
 
     def suggest_zlib_installation(self):
-        """Suggest zlib installation via vcpkg"""
+        """Suggest zlib installation"""
         print(f"\n{Colors.CYAN}zlib installation suggestions:{Colors.ENDC}")
-        vcpkg_root = self.config.get('vcpkg_root')
 
-        if vcpkg_root:
-            print(f"  Install zlib with vcpkg:")
-            print(f"    cd \"{vcpkg_root}\"")
-            if self.system == "Windows":
-                print(f"    .\\vcpkg install zlib")
-            else:
-                print(f"    ./vcpkg install zlib")
+        if self.system == "Linux":
+            print(f"  For Linux systems, install using apt package manager:")
+            print(f"    sudo apt install zlib1g-dev")
             print(f"    Note: zlib provides compression functionality")
+            print(f"    This is the recommended approach for Linux systems.")
         else:
-            print(f"  vcpkg is not configured. Install vcpkg first, then:")
-            if self.system == "Windows":
-                print(f"    .\\vcpkg install zlib")
+            # Windows/macOS: Use vcpkg
+            vcpkg_root = self.config.get('vcpkg_root')
+            if vcpkg_root:
+                print(f"  Install zlib with vcpkg:")
+                print(f"    cd \"{vcpkg_root}\"")
+                if self.system == "Windows":
+                    print(f"    .\\vcpkg install zlib")
+                else:
+                    print(f"    ./vcpkg install zlib")
+                print(f"    Note: zlib provides compression functionality")
             else:
-                print(f"    ./vcpkg install zlib")
+                print(f"  vcpkg is not configured. Install vcpkg first, then:")
+                if self.system == "Windows":
+                    print(f"    .\\vcpkg install zlib")
+                else:
+                    print(f"    ./vcpkg install zlib")
 
     def suggest_simd_installation(self):
         """Suggest SIMD library installation via vcpkg"""
