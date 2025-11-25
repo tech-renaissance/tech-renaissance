@@ -68,6 +68,21 @@ function(configure_simple_test test_name source_file)
         ${CMAKE_SOURCE_DIR}/third_party/stb  # STB库头文件
     )
 
+    # 特殊处理MNIST测试 - 需要链接libcurl和zlib
+    if(test_name STREQUAL "test_mnist_prepare")
+        # 查找并链接libcurl和zlib
+        find_package(CURL REQUIRED)
+        find_package(ZLIB REQUIRED)
+        target_link_libraries(${test_name} PRIVATE CURL::libcurl ZLIB::ZLIB)
+
+        # 在Windows上需要额外的网络库
+        if(WIN32)
+            target_link_libraries(${test_name} PRIVATE ws2_32)
+        endif()
+
+        message(STATUS "Configuring MNIST test with CURL and ZLIB")
+    endif()
+
     # SIMD库配置
     if(SIMD_FOUND)
         target_include_directories(${test_name} PRIVATE ${SIMD_INCLUDE_DIR})
@@ -136,6 +151,9 @@ endfunction()
 # SIMD图像处理测试
 configure_simple_test(test_simd test_simd.cpp)
 
+# MNIST数据集准备测试
+configure_simple_test(test_mnist_prepare test_mnist_prepare.cpp)
+
 # =============================================================================
 # 注册测试到CTest
 # =============================================================================
@@ -151,5 +169,8 @@ endfunction()
 # 注册所有Simple测试
 register_simple_test(test_simd "SIMD Image Rotation Test")
 
+# MNIST测试不需要使用register_simple_test，因为它需要网络连接且运行时间较长
+# 可以直接运行二进制文件进行测试
+
 message(STATUS "Simple tests configured successfully - ${CMAKE_CURRENT_LIST_DIR}")
-message(STATUS "Total Simple tests: 1")
+message(STATUS "Total Simple tests: 2 (SIMD + MNIST)")

@@ -1372,6 +1372,16 @@ class SmartConfigurator:
         if not simd_found:
             self.suggest_simd_installation()
 
+        # Check libcurl library through vcpkg
+        curl_found = self.check_libcurl()
+        if not curl_found:
+            self.suggest_curl_installation()
+
+        # Check zlib library through vcpkg
+        zlib_found = self.check_zlib()
+        if not zlib_found:
+            self.suggest_zlib_installation()
+
     def check_eigen3(self) -> bool:
         """Check if Eigen is installed"""
         print(f"  [INFO] Checking Eigen...")
@@ -1906,6 +1916,541 @@ class SmartConfigurator:
             self.config['simd_share'] = str(location)
             return True
 
+    def check_libcurl(self) -> bool:
+        """Check if libcurl is installed"""
+        print(f"  [INFO] Checking libcurl...")
+
+        # First, try to find libcurl automatically
+        if self._try_find_curl_auto():
+            return True
+
+        # If not found automatically, ask user for manual path
+        print(f"  {Colors.CYAN}libcurl not found automatically{Colors.ENDC}")
+        print(f"  {Colors.INFO}Please provide the path to libcurl installation{Colors.ENDC}")
+        print(f"  {Colors.INFO}Common locations:{Colors.ENDC}")
+
+        if self.system == "Windows":
+            print(f"    - <vcpkg-root>\\installed\\x64-windows")
+            print(f"    - C:\\curl")
+            print(f"    - C:\\libs\\curl")
+        else:
+            print(f"    - <vcpkg-root>/installed/x64-linux")
+            print(f"    - /usr/local")
+            print(f"    - /opt/curl")
+
+        while True:
+            curl_path_input = input(f"  {Colors.CYAN}Enter libcurl path (or press Enter to skip): {Colors.ENDC}").strip()
+
+            if not curl_path_input:
+                # User skipped, will show download suggestions
+                return False
+
+            curl_path = Path(curl_path_input)
+
+            if self._validate_curl_path(curl_path):
+                return True
+            else:
+                print(f"  {Colors.WARN}[ERROR] Invalid libcurl path or libcurl not found at: {curl_path}{Colors.ENDC}")
+                retry = input(f"  {Colors.CYAN}Try again? (y/n): {Colors.ENDC}").strip().lower()
+                if retry != 'y':
+                    return False
+
+    def _try_find_curl_auto(self) -> bool:
+        """Try to find libcurl automatically"""
+        # Method 1: Check through vcpkg
+        if self._find_curl_in_vcpkg():
+            return True
+
+        # Method 2: Check system PATH environment variable
+        if self._find_curl_in_path():
+            return True
+
+        # Method 3: Check common system locations
+        if self._find_curl_in_system_paths():
+            return True
+
+        return False
+
+    def _find_curl_in_vcpkg(self) -> bool:
+        """Find libcurl through vcpkg"""
+        vcpkg_root = self.config.get('vcpkg_root')
+        if not vcpkg_root:
+            return False
+
+        vcpkg_installed = Path(vcpkg_root) / "installed"
+        if not vcpkg_installed.exists():
+            return False
+
+        # Check platform-specific vcpkg directories
+        if self.system == "Windows":
+            vcpkg_dirs = ["x64-windows"]
+        else:
+            vcpkg_dirs = ["x64-linux", "x64-osx"]
+
+        for vcpkg_dir in vcpkg_dirs:
+            base_path = vcpkg_installed / vcpkg_dir
+            # Check for libcurl installation
+            curl_locations = [
+                base_path / "include" / "curl",                    # Header files
+                base_path / "share" / "curl",                      # CMake config files
+                base_path / "share" / "libcurl",                   # CMake config files (alternative)
+                base_path / "lib",                                 # Library files
+                base_path / "bin",                                 # DLL files (Windows)
+            ]
+
+            for location in curl_locations:
+                if location.exists():
+                    # Check if this is a valid libcurl installation
+                    if self._is_valid_curl_location(location, base_path):
+                        return self._save_curl_location(base_path)
+
+        return False
+
+    def _find_curl_in_path(self) -> bool:
+        """Find libcurl by searching system PATH environment variable"""
+        print(f"    {Colors.INFO}Searching system PATH for libcurl...{Colors.ENDC}")
+
+        # Get current project directory and check for third_party first
+        current_dir = Path(__file__).parent
+        project_third_party_paths = [
+            current_dir / "third_party" / "curl",
+            current_dir / "vendor" / "curl",
+            current_dir / "external" / "curl",
+            current_dir / "deps" / "curl",
+        ]
+
+        # Check project-specific paths first (highest priority)
+        for check_path in project_third_party_paths:
+            if check_path.exists() and self._is_valid_curl_location(check_path, check_path):
+                print(f"    {Colors.OK}Found libcurl in project: {check_path}{Colors.ENDC}")
+                return self._save_curl_location(check_path)
+
+        # Get system PATH
+        path_env = os.environ.get('PATH', '')
+        path_dirs = path_env.split(os.pathsep)
+
+        for path_dir in path_dirs:
+            if not path_dir.strip():
+                continue
+
+            try:
+                path_path = Path(path_dir.strip())
+
+                # Check if this directory contains libcurl
+                curl_check_paths = [
+                    path_path / "include" / "curl",     # include/curl
+                    path_path.parent / "include" / "curl",  # sibling include dir
+                ]
+
+                for check_path in curl_check_paths:
+                    if check_path.exists() and self._is_valid_curl_location(check_path, path_path.parent):
+                        print(f"    {Colors.OK}Found libcurl in PATH: {check_path}{Colors.ENDC}")
+                        return self._save_curl_location(path_path.parent)
+
+            except Exception:
+                continue  # Skip invalid paths
+
+        return False
+
+    def _find_curl_in_system_paths(self) -> bool:
+        """Find libcurl in common system installation paths"""
+        print(f"    {Colors.INFO}Searching common system paths for libcurl...{Colors.ENDC}")
+
+        if self.system == "Windows":
+            search_paths = [
+                "C:/curl",
+                "C:/libs/curl",
+                "C:/Program Files/curl",
+                "C:/msys64/mingw64",
+                "C:/msys64/ucrt64",
+            ]
+        else:
+            search_paths = [
+                "/usr/local",
+                "/usr",
+                "/opt/curl",
+                "/opt/libcurl",
+                "/home/$USER/.local",
+            ]
+
+        for search_path in search_paths:
+            # Expand environment variables
+            try:
+                expanded_path = os.path.expandvars(search_path)
+                base_path = Path(expanded_path)
+            except Exception:
+                continue
+
+            if not base_path.exists():
+                continue
+
+            # Check for libcurl installation
+            curl_locations = [
+                base_path / "include" / "curl",
+                base_path / "lib",
+                base_path / "lib64",
+                base_path / "bin",
+            ]
+
+            for location in curl_locations:
+                if location.exists() and self._is_valid_curl_location(location, base_path):
+                    print(f"    {Colors.OK}Found libcurl in system path: {base_path}{Colors.ENDC}")
+                    return self._save_curl_location(base_path)
+
+        return False
+
+    def _is_valid_curl_location(self, location: Path, base_path: Path) -> bool:
+        """Check if the location contains valid libcurl installation"""
+        # If we're checking the include/curl directory, look for header files
+        if location.name == "curl":
+            curl_header = location / "curl.h"
+            return curl_header.exists() and curl_header.is_file()
+
+        # If we're checking lib or bin directories, look for library files
+        if location.name in ["lib", "lib64", "bin"]:
+            if self.system == "Windows":
+                # Check for .lib files
+                lib_files = list(location.glob("libcurl*.lib")) or list(location.glob("curl*.lib"))
+                if not lib_files:
+                    # Check for .dll files as well
+                    dll_files = list(location.glob("libcurl*.dll")) or list(location.glob("curl*.dll"))
+                    return len(dll_files) > 0
+                return len(lib_files) > 0
+            else:
+                # Check for .so, .a files on Linux
+                lib_files = (list(location.glob("libcurl*.so*")) or
+                           list(location.glob("libcurl*.a")) or
+                           list(location.glob("libcurl*.dylib")))  # macOS
+                return len(lib_files) > 0
+
+        # For other locations, try to find include/curl subdirectory
+        include_curl = location / "include" / "curl"
+        if include_curl.exists():
+            return self._is_valid_curl_location(include_curl, base_path)
+
+        return False
+
+    def _validate_curl_path(self, curl_path: Path) -> bool:
+        """Validate user-provided libcurl path"""
+        if not curl_path.exists():
+            print(f"    {Colors.WARN}Path does not exist: {curl_path}{Colors.ENDC}")
+            return False
+
+        # Check if this is a valid libcurl installation
+        if self._is_valid_curl_location(curl_path, curl_path):
+            return self._save_curl_location(curl_path)
+
+        # Check if parent directories contain libcurl
+        parent_path = curl_path.parent
+        if self._is_valid_curl_location(curl_path, parent_path):
+            return self._save_curl_location(parent_path)
+
+        # Check if we need to look in subdirectories
+        for subdir in ["include", "lib", "lib64", "bin"]:
+            subdir_path = curl_path / subdir
+            if self._is_valid_curl_location(subdir_path, curl_path):
+                return self._save_curl_location(curl_path)
+
+        return False
+
+    def _save_curl_location(self, location: Path) -> bool:
+        """Save the found libcurl location"""
+        print(f"  {Colors.GREEN}[OK] libcurl found: {location}{Colors.ENDC}")
+        self.config['curl_root'] = str(location)
+        return True
+
+    def suggest_curl_installation(self):
+        """Suggest libcurl installation via vcpkg"""
+        print(f"\n{Colors.CYAN}libcurl installation suggestions:{Colors.ENDC}")
+        vcpkg_root = self.config.get('vcpkg_root')
+
+        if vcpkg_root:
+            print(f"  Install libcurl with vcpkg:")
+            print(f"    cd \"{vcpkg_root}\"")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install curl")
+            else:
+                print(f"    ./vcpkg install curl")
+            print(f"    Note: libcurl provides HTTP/HTTPS client functionality")
+        else:
+            print(f"  vcpkg is not configured. Install vcpkg first, then:")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install curl")
+            else:
+                print(f"    ./vcpkg install curl")
+
+    def check_zlib(self) -> bool:
+        """Check if zlib is installed"""
+        print(f"  [INFO] Checking zlib...")
+
+        # First, try to find zlib automatically
+        if self._try_find_zlib_auto():
+            return True
+
+        # If not found automatically, ask user for manual path
+        print(f"  {Colors.CYAN}zlib not found automatically{Colors.ENDC}")
+        print(f"  {Colors.INFO}Please provide the path to zlib installation{Colors.ENDC}")
+        print(f"  {Colors.INFO}Common locations:{Colors.ENDC}")
+
+        if self.system == "Windows":
+            print(f"    - <vcpkg-root>\\installed\\x64-windows")
+            print(f"    - C:\\zlib")
+            print(f"    - C:\\libs\\zlib")
+        else:
+            print(f"    - <vcpkg-root>/installed/x64-linux")
+            print(f"    - /usr/local")
+            print(f"    - /opt/zlib")
+
+        while True:
+            zlib_path_input = input(f"  {Colors.CYAN}Enter zlib path (or press Enter to skip): {Colors.ENDC}").strip()
+
+            if not zlib_path_input:
+                # User skipped, will show download suggestions
+                return False
+
+            zlib_path = Path(zlib_path_input)
+
+            if self._validate_zlib_path(zlib_path):
+                return True
+            else:
+                print(f"  {Colors.WARN}[ERROR] Invalid zlib path or zlib not found at: {zlib_path}{Colors.ENDC}")
+                retry = input(f"  {Colors.CYAN}Try again? (y/n): {Colors.ENDC}").strip().lower()
+                if retry != 'y':
+                    return False
+
+    def _try_find_zlib_auto(self) -> bool:
+        """Try to find zlib automatically"""
+        # Method 1: Check through vcpkg
+        if self._find_zlib_in_vcpkg():
+            return True
+
+        # Method 2: Check system PATH environment variable
+        if self._find_zlib_in_path():
+            return True
+
+        # Method 3: Check common system locations
+        if self._find_zlib_in_system_paths():
+            return True
+
+        return False
+
+    def _find_zlib_in_vcpkg(self) -> bool:
+        """Find zlib through vcpkg"""
+        vcpkg_root = self.config.get('vcpkg_root')
+        if not vcpkg_root:
+            return False
+
+        vcpkg_installed = Path(vcpkg_root) / "installed"
+        if not vcpkg_installed.exists():
+            return False
+
+        # Check platform-specific vcpkg directories
+        if self.system == "Windows":
+            vcpkg_dirs = ["x64-windows"]
+        else:
+            vcpkg_dirs = ["x64-linux", "x64-osx"]
+
+        for vcpkg_dir in vcpkg_dirs:
+            base_path = vcpkg_installed / vcpkg_dir
+            # Check for zlib installation
+            zlib_locations = [
+                base_path / "include" / "zlib.h",                   # Header file
+                base_path / "include" / "zconf.h",                   # Config header file
+                base_path / "share" / "zlib",                        # CMake config files
+                base_path / "lib",                                   # Library files
+                base_path / "bin",                                   # DLL files (Windows)
+            ]
+
+            for location in zlib_locations:
+                if location.exists():
+                    # Check if this is a valid zlib installation
+                    if self._is_valid_zlib_location(location, base_path):
+                        return self._save_zlib_location(base_path)
+
+        return False
+
+    def _find_zlib_in_path(self) -> bool:
+        """Find zlib by searching system PATH environment variable"""
+        print(f"    {Colors.INFO}Searching system PATH for zlib...{Colors.ENDC}")
+
+        # Get current project directory and check for third_party first
+        current_dir = Path(__file__).parent
+        project_third_party_paths = [
+            current_dir / "third_party" / "zlib",
+            current_dir / "vendor" / "zlib",
+            current_dir / "external" / "zlib",
+            current_dir / "deps" / "zlib",
+        ]
+
+        # Check project-specific paths first (highest priority)
+        for check_path in project_third_party_paths:
+            if check_path.exists() and self._is_valid_zlib_location(check_path, check_path):
+                print(f"    {Colors.OK}Found zlib in project: {check_path}{Colors.ENDC}")
+                return self._save_zlib_location(check_path)
+
+        # Get system PATH
+        path_env = os.environ.get('PATH', '')
+        path_dirs = path_env.split(os.pathsep)
+
+        for path_dir in path_dirs:
+            if not path_dir.strip():
+                continue
+
+            try:
+                path_path = Path(path_dir.strip())
+
+                # Check if this directory contains zlib
+                zlib_check_paths = [
+                    path_path / "include" / "zlib.h",     # include/zlib.h
+                    path_path.parent / "include" / "zlib.h",  # sibling include dir
+                ]
+
+                for check_path in zlib_check_paths:
+                    if check_path.exists() and check_path.is_file():
+                        # Found zlib.h, validate the full installation
+                        base_path = path_path.parent if check_path.name == "zlib.h" else path_path.parent.parent
+                        if self._is_valid_zlib_location(check_path, base_path):
+                            print(f"    {Colors.OK}Found zlib in PATH: {check_path}{Colors.ENDC}")
+                            return self._save_zlib_location(base_path)
+
+            except Exception:
+                continue  # Skip invalid paths
+
+        return False
+
+    def _find_zlib_in_system_paths(self) -> bool:
+        """Find zlib in common system installation paths"""
+        print(f"    {Colors.INFO}Searching common system paths for zlib...{Colors.ENDC}")
+
+        if self.system == "Windows":
+            search_paths = [
+                "C:/zlib",
+                "C:/libs/zlib",
+                "C:/Program Files/zlib",
+                "C:/msys64/mingw64",
+                "C:/msys64/ucrt64",
+            ]
+        else:
+            search_paths = [
+                "/usr/local",
+                "/usr",
+                "/opt/zlib",
+                "/home/$USER/.local",
+            ]
+
+        for search_path in search_paths:
+            # Expand environment variables
+            try:
+                expanded_path = os.path.expandvars(search_path)
+                base_path = Path(expanded_path)
+            except Exception:
+                continue
+
+            if not base_path.exists():
+                continue
+
+            # Check for zlib installation
+            zlib_locations = [
+                base_path / "include" / "zlib.h",
+                base_path / "include" / "zconf.h",
+                base_path / "lib",
+                base_path / "lib64",
+                base_path / "bin",
+            ]
+
+            for location in zlib_locations:
+                if location.exists() and self._is_valid_zlib_location(location, base_path):
+                    print(f"    {Colors.OK}Found zlib in system path: {base_path}{Colors.ENDC}")
+                    return self._save_zlib_location(base_path)
+
+        return False
+
+    def _is_valid_zlib_location(self, location: Path, base_path: Path) -> bool:
+        """Check if the location contains valid zlib installation"""
+        # If we're checking zlib.h file directly
+        if location.name == "zlib.h":
+            zconf_header = location.parent / "zconf.h"
+            return location.exists() and location.is_file() and zconf_header.exists()
+
+        # If we're checking include directory, look for header files
+        if location.name == "include":
+            zlib_header = location / "zlib.h"
+            zconf_header = location / "zconf.h"
+            return zlib_header.exists() and zlib_header.is_file() and zconf_header.exists()
+
+        # If we're checking lib or bin directories, look for library files
+        if location.name in ["lib", "lib64", "bin"]:
+            if self.system == "Windows":
+                # Check for .lib files
+                lib_files = list(location.glob("zlib*.lib")) or list(location.glob("z*.lib"))
+                if not lib_files:
+                    # Check for .dll files as well
+                    dll_files = list(location.glob("zlib*.dll")) or list(location.glob("z*.dll"))
+                    return len(dll_files) > 0
+                return len(lib_files) > 0
+            else:
+                # Check for .so, .a files on Linux
+                lib_files = (list(location.glob("libz*.so*")) or
+                           list(location.glob("libz*.a")) or
+                           list(location.glob("libz*.dylib")))  # macOS
+                return len(lib_files) > 0
+
+        # For other locations, try to find include subdirectory with zlib.h
+        include_dir = location / "include"
+        if include_dir.exists():
+            return self._is_valid_zlib_location(include_dir, base_path)
+
+        return False
+
+    def _validate_zlib_path(self, zlib_path: Path) -> bool:
+        """Validate user-provided zlib path"""
+        if not zlib_path.exists():
+            print(f"    {Colors.WARN}Path does not exist: {zlib_path}{Colors.ENDC}")
+            return False
+
+        # Check if this is a valid zlib installation
+        if self._is_valid_zlib_location(zlib_path, zlib_path):
+            return self._save_zlib_location(zlib_path)
+
+        # Check if parent directories contain zlib
+        parent_path = zlib_path.parent
+        if self._is_valid_zlib_location(zlib_path, parent_path):
+            return self._save_zlib_location(parent_path)
+
+        # Check if we need to look in subdirectories
+        for subdir in ["include", "lib", "lib64", "bin"]:
+            subdir_path = zlib_path / subdir
+            if self._is_valid_zlib_location(subdir_path, zlib_path):
+                return self._save_zlib_location(zlib_path)
+
+        return False
+
+    def _save_zlib_location(self, location: Path) -> bool:
+        """Save the found zlib location"""
+        print(f"  {Colors.GREEN}[OK] zlib found: {location}{Colors.ENDC}")
+        self.config['zlib_root'] = str(location)
+        return True
+
+    def suggest_zlib_installation(self):
+        """Suggest zlib installation via vcpkg"""
+        print(f"\n{Colors.CYAN}zlib installation suggestions:{Colors.ENDC}")
+        vcpkg_root = self.config.get('vcpkg_root')
+
+        if vcpkg_root:
+            print(f"  Install zlib with vcpkg:")
+            print(f"    cd \"{vcpkg_root}\"")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install zlib")
+            else:
+                print(f"    ./vcpkg install zlib")
+            print(f"    Note: zlib provides compression functionality")
+        else:
+            print(f"  vcpkg is not configured. Install vcpkg first, then:")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install zlib")
+            else:
+                print(f"    ./vcpkg install zlib")
+
     def suggest_simd_installation(self):
         """Suggest SIMD library installation via vcpkg"""
         print(f"\n{Colors.CYAN}SIMD library installation suggestions:{Colors.ENDC}")
@@ -2103,6 +2648,18 @@ class SmartConfigurator:
             if 'simd_config' in self.config:
                 simd_config = self.config['simd_config'].replace('\\', '/')
                 f.write(f'set(SIMD_DIR "{simd_config}")\n')
+
+            # libcurl configuration
+            if 'curl_root' in self.config:
+                curl_root = self.config['curl_root'].replace('\\', '/')
+                f.write(f'\n# libcurl configuration\n')
+                f.write(f'set(CURL_ROOT "{curl_root}")\n')
+
+            # zlib configuration
+            if 'zlib_root' in self.config:
+                zlib_root = self.config['zlib_root'].replace('\\', '/')
+                f.write(f'\n# zlib configuration\n')
+                f.write(f'set(ZLIB_ROOT "{zlib_root}")\n')
 
         print(f"  {Colors.GREEN}[OK] Generated {self.cmake_cache}{Colors.ENDC}")
 
