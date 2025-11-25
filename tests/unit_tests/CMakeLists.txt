@@ -12,6 +12,9 @@ enable_testing()
 # 添加CPU Core模块测试
 add_subdirectory(cpu_core)
 
+# 添加Simple模块测试（图像处理测试）
+add_subdirectory(simple)
+
 # 添加CUDA Core模块测试（当启用CUDA时）
 if(TR_USE_CUDA)
     add_subdirectory(cuda_core)
