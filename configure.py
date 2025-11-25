@@ -1195,6 +1195,109 @@ class SmartConfigurator:
         # 4. Prompt user for Python path
         return self.prompt_python_path()
 
+    def prompt_python_confirmation(self, python_path, version, numpy_version):
+        """Prompt user to confirm using the detected Python installation"""
+        print(f"  {Colors.CYAN}Use this Python installation?{Colors.ENDC}")
+        print(f"    Path: {python_path}")
+        print(f"    Version: Python {version}")
+        if numpy_version:
+            print(f"    NumPy: {numpy_version}")
+        else:
+            print(f"    NumPy: Not found or incompatible")
+
+        while True:
+            choice = input(f"  {Colors.CYAN}Use this Python? (y/n): {Colors.ENDC}").strip().lower()
+            if choice == 'y' or choice == 'yes':
+                # User confirmed, save configuration
+                self.config['python'] = python_path
+                self.config['python_version'] = version
+                if numpy_version:
+                    self.config['numpy_version'] = numpy_version
+                else:
+                    self.config['numpy_version'] = Requirements.NUMPY_VERSION
+                    print(f"  {Colors.INFO}NumPy not found, using required version: {Requirements.NUMPY_VERSION}{Colors.ENDC}")
+                return True
+            elif choice == 'n' or choice == 'no':
+                # User rejected, prompt for custom path
+                return self.prompt_custom_python_path()
+            else:
+                print(f"  {Colors.WARN}Please enter 'y' for yes or 'n' for no{Colors.ENDC}")
+
+    def prompt_custom_python_path(self):
+        """Prompt user to provide custom Python path"""
+        print(f"  {Colors.INFO}Please provide the path to your Python installation{Colors.ENDC}")
+        print(f"  {Colors.INFO}Common locations:{Colors.ENDC}")
+
+        if self.system == "Windows":
+            print(f"    - C:\\Python314\\python.exe")
+            print(f"    - C:\\Python313\\python.exe")
+            print(f"    - <venv-path>\\Scripts\\python.exe")
+            print(f"    - <conda-env-path>\\python.exe")
+        else:
+            print(f"    - /usr/bin/python3")
+            print(f"    - /usr/local/bin/python3")
+            print(f"    - <venv-path>/bin/python3")
+            print(f"    - <conda-env-path>/bin/python3")
+
+        while True:
+            path_input = input(f"  {Colors.CYAN}Enter Python path (or press Enter to skip): {Colors.ENDC}").strip().replace('"', '')
+            if not path_input:
+                print(f"  {Colors.WARN}Skipping Python configuration{Colors.ENDC}")
+                return False
+
+            python_path = Path(path_input)
+
+            # Adjust for Windows
+            if self.system == "Windows" and python_path.suffix != '.exe':
+                python_path = python_path / 'python.exe'
+
+            if python_path.exists():
+                # Validate the custom Python path
+                try:
+                    result = subprocess.run([str(python_path), '--version'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        version_str = result.stderr.strip() if result.stderr else result.stdout.strip()
+                        version_match = re.search(r'Python (\d+\.\d+\.\d+)', version_str)
+                        if version_match:
+                            version = version_match.group(1)
+                            if Requirements.version_compare(version, Requirements.PYTHON_MIN) >= 0:
+                                # Check NumPy for custom path
+                                numpy_version = None
+                                try:
+                                    numpy_result = subprocess.run([str(python_path), '-c', 'import numpy; print(numpy.__version__)'],
+                                                                  capture_output=True, text=True, timeout=10)
+                                    if numpy_result.returncode == 0:
+                                        numpy_version = numpy_result.stdout.strip()
+                                except:
+                                    numpy_version = None
+
+                                print(f"  {Colors.GREEN}[OK] Using Python {version}: {python_path}{Colors.ENDC}")
+                                if numpy_version:
+                                    print(f"  {Colors.GREEN}[OK] NumPy {numpy_version}{Colors.ENDC}")
+                                    self.config['numpy_version'] = numpy_version
+                                else:
+                                    print(f"  {Colors.INFO}NumPy not found, using required version: {Requirements.NUMPY_VERSION}{Colors.ENDC}")
+                                    self.config['numpy_version'] = Requirements.NUMPY_VERSION
+
+                                self.config['python'] = str(python_path)
+                                self.config['python_version'] = version
+                                return True
+                            else:
+                                print(f"  {Colors.WARN}[ERROR] Python version too low: {version} < {Requirements.PYTHON_MIN}{Colors.ENDC}")
+                        else:
+                            print(f"  {Colors.WARN}[ERROR] Unable to parse Python version{Colors.ENDC}")
+                    else:
+                        print(f"  {Colors.WARN}[ERROR] Not a valid Python executable: {python_path}{Colors.ENDC}")
+                except Exception as e:
+                    print(f"  {Colors.WARN}[ERROR] Failed to validate Python: {e}{Colors.ENDC}")
+            else:
+                print(f"  {Colors.WARN}[ERROR] File not found: {python_path}{Colors.ENDC}")
+
+            retry = input(f"  {Colors.CYAN}Try again? (y/n): {Colors.ENDC}").strip().lower()
+            if retry != 'y':
+                print(f"  {Colors.WARN}Skipping Python configuration{Colors.ENDC}")
+                return False
+
     def validate_python(self, python_path):
         """Validate Python installation and check version"""
         try:
@@ -1209,26 +1312,25 @@ class SmartConfigurator:
             if version_match:
                 version = version_match.group(1)
                 if Requirements.version_compare(version, Requirements.PYTHON_MIN) >= 0:
-                    print(f"  {Colors.GREEN}[OK] Python {version}: {python_path}{Colors.ENDC}")
-                    self.config['python'] = python_path
-                    self.config['python_version'] = version
-
-                    # Try to import NumPy and get version
+                    # Check NumPy first before asking for confirmation
+                    numpy_version = None
                     try:
                         numpy_result = subprocess.run([python_path, '-c', 'import numpy; print(numpy.__version__)'],
                                                       capture_output=True, text=True, timeout=10)
                         if numpy_result.returncode == 0:
                             numpy_version = numpy_result.stdout.strip()
-                            print(f"  {Colors.GREEN}[OK] NumPy {numpy_version}{Colors.ENDC}")
-                            self.config['numpy_version'] = numpy_version
                         else:
-                            print(f"  {Colors.INFO}NumPy not found or incompatible{Colors.ENDC}")
-                            self.config['numpy_version'] = Requirements.NUMPY_VERSION
+                            numpy_version = None
                     except:
-                        print(f"  {Colors.INFO}NumPy check failed, using required version: {Requirements.NUMPY_VERSION}{Colors.ENDC}")
-                        self.config['numpy_version'] = Requirements.NUMPY_VERSION
+                        numpy_version = None
 
-                    return True
+                    # Show detected Python information
+                    print(f"  {Colors.GREEN}[OK] Found Python {version}: {python_path}{Colors.ENDC}")
+                    if numpy_version:
+                        print(f"  {Colors.GREEN}[OK] NumPy {numpy_version}{Colors.ENDC}")
+
+                    # Ask user if they want to use this Python installation
+                    return self.prompt_python_confirmation(python_path, version, numpy_version)
                 else:
                     print(f"  {Colors.WARN}[ERROR] Python version too low: {version} < {Requirements.PYTHON_MIN}{Colors.ENDC}")
             else:
@@ -1257,13 +1359,18 @@ class SmartConfigurator:
                 print(f"  {Colors.FAIL}[ERROR] Invalid Python executable: {python_path}{Colors.ENDC}")
 
     def check_other_dependencies(self):
-        """Check other dependencies like Eigen3"""
+        """Check other dependencies like Eigen3 and SIMD"""
         print(f"\n{Colors.BLUE}[Step 5/7] Checking other dependencies...{Colors.ENDC}")
 
         # Check Eigen3 through vcpkg
         eigen3_found = self.check_eigen3()
         if not eigen3_found:
             self.suggest_eigen3_installation()
+
+        # Check SIMD library through vcpkg
+        simd_found = self.check_simd()
+        if not simd_found:
+            self.suggest_simd_installation()
 
     def check_eigen3(self) -> bool:
         """Check if Eigen is installed"""
@@ -1546,6 +1653,276 @@ class SmartConfigurator:
             else:
                 print(f"    ./vcpkg install eigen3")
 
+    def check_simd(self) -> bool:
+        """Check if SIMD library is installed"""
+        print(f"  [INFO] Checking SIMD library...")
+
+        # First, try to find SIMD automatically
+        if self._try_find_simd_auto():
+            return True
+
+        # If not found automatically, ask user for manual path
+        print(f"  {Colors.CYAN}SIMD library not found automatically{Colors.ENDC}")
+        print(f"  {Colors.INFO}Please provide the path to SIMD library installation{Colors.ENDC}")
+        print(f"  {Colors.INFO}Common locations:{Colors.ENDC}")
+
+        if self.system == "Windows":
+            print(f"    - .\\third_party\\Simd")
+            print(f"    - .\\vendor\\Simd")
+            print(f"    - C:\\Simd")
+            print(f"    - C:\\libs\\Simd")
+            print(f"    - <vcpkg-root>\\installed\\x64-windows\\include\\Simd")
+        else:
+            print(f"    - ./third_party/Simd")
+            print(f"    - ./vendor/Simd")
+            print(f"    - /usr/local/include/Simd")
+            print(f"    - /opt/Simd")
+            print(f"    - <vcpkg-root>/installed/x64-linux/include/Simd")
+
+        while True:
+            simd_path_input = input(f"  {Colors.CYAN}Enter SIMD path (or press Enter to skip): {Colors.ENDC}").strip()
+
+            if not simd_path_input:
+                # User skipped, will show download suggestions
+                return False
+
+            simd_path = Path(simd_path_input)
+
+            if self._validate_simd_path(simd_path):
+                return True
+            else:
+                print(f"  {Colors.WARN}[ERROR] Invalid SIMD path or SIMD library not found at: {simd_path}{Colors.ENDC}")
+                retry = input(f"  {Colors.CYAN}Try again? (y/n): {Colors.ENDC}").strip().lower()
+                if retry != 'y':
+                    return False
+
+    def _try_find_simd_auto(self) -> bool:
+        """Try to find SIMD library automatically"""
+        # Method 1: Check through vcpkg
+        if self._find_simd_in_vcpkg():
+            return True
+
+        # Method 2: Check system PATH environment variable
+        if self._find_simd_in_path():
+            return True
+
+        # Method 3: Check common system locations
+        if self._find_simd_in_system_paths():
+            return True
+
+        return False
+
+    def _find_simd_in_vcpkg(self) -> bool:
+        """Find SIMD library through vcpkg"""
+        vcpkg_root = self.config.get('vcpkg_root')
+        if not vcpkg_root:
+            return False
+
+        vcpkg_installed = Path(vcpkg_root) / "installed"
+        if not vcpkg_installed.exists():
+            return False
+
+        # Check platform-specific vcpkg directories
+        if self.system == "Windows":
+            vcpkg_dirs = ["x64-windows"]
+        else:
+            vcpkg_dirs = ["x64-linux", "x64-osx"]
+
+        for vcpkg_dir in vcpkg_dirs:
+            base_path = vcpkg_installed / vcpkg_dir
+            simd_locations = [
+                base_path / "include" / "Simd",
+                base_path / "share" / "simd",
+                base_path / "share" / "simd-config.cmake"
+            ]
+
+            for location in simd_locations:
+                if location.exists():
+                    return self._save_simd_location(location)
+
+        return False
+
+    def _find_simd_in_path(self) -> bool:
+        """Find SIMD library by searching system PATH environment variable"""
+        print(f"    {Colors.INFO}Searching system PATH for SIMD library...{Colors.ENDC}")
+
+        # Get current project directory and check for third_party first
+        current_dir = Path(__file__).parent
+        project_third_party_paths = [
+            current_dir / "third_party" / "Simd",
+            current_dir / "third_party" / "simd",
+            current_dir / "vendor" / "Simd",
+            current_dir / "vendor" / "simd",
+            current_dir / "external" / "Simd",
+            current_dir / "external" / "simd",
+            current_dir / "deps" / "Simd",
+            current_dir / "deps" / "simd",
+        ]
+
+        # Check project-specific paths first (highest priority)
+        for check_path in project_third_party_paths:
+            if check_path.exists() and self._is_valid_simd_location(check_path):
+                print(f"    {Colors.OK}Found SIMD library in project: {check_path}{Colors.ENDC}")
+                return self._save_simd_location(check_path)
+
+        # Get system PATH
+        path_env = os.environ.get('PATH', '')
+        path_dirs = path_env.split(os.pathsep)
+
+        for path_dir in path_dirs:
+            if not path_dir.strip():
+                continue
+
+            try:
+                path_path = Path(path_dir.strip())
+
+                # Check if this directory contains SIMD
+                if path_path.name.lower() in ['simd', 'simd-library']:
+                    if self._is_valid_simd_location(path_path):
+                        print(f"    {Colors.OK}Found SIMD library in PATH: {path_path}{Colors.ENDC}")
+                        return self._save_simd_location(path_path)
+
+                # Check for include subdirectories
+                include_subdirs = ['include', 'includes', 'inc']
+                for subdir in include_subdirs:
+                    simd_subdir = path_path / subdir / "Simd"
+                    if simd_subdir.exists() and self._is_valid_simd_location(simd_subdir):
+                        print(f"    {Colors.OK}Found SIMD library in PATH: {simd_subdir}{Colors.ENDC}")
+                        return self._save_simd_location(simd_subdir)
+
+            except (OSError, PermissionError):
+                # Skip invalid paths
+                continue
+
+        return False
+
+    def _find_simd_in_system_paths(self) -> bool:
+        """Find SIMD library in common system installation locations"""
+        print(f"    {Colors.INFO}Searching common system locations for SIMD library...{Colors.ENDC}")
+
+        system_paths = []
+
+        # Get current project directory (where configure.py is located)
+        current_dir = Path(__file__).parent
+
+        # Add project-specific paths first
+        project_paths = [
+            current_dir / "third_party" / "Simd",
+            current_dir / "third_party" / "simd",
+            current_dir / "vendor" / "Simd",
+            current_dir / "vendor" / "simd",
+            current_dir / "external" / "Simd",
+            current_dir / "external" / "simd",
+            current_dir / "deps" / "Simd",
+            current_dir / "deps" / "simd",
+            current_dir / "Simd",
+            current_dir / "simd",
+        ]
+        system_paths.extend(project_paths)
+
+        # Add system-wide paths
+        if self.system == "Linux":
+            system_paths.extend([
+                Path("/usr/local/include/Simd"),
+                Path("/usr/include/Simd"),
+                Path("/opt/Simd"),
+                Path.home() / ".local" / "include" / "Simd",
+                Path.home() / "Simd",
+            ])
+        elif self.system == "Windows":
+            system_paths.extend([
+                Path("C:/Simd"),
+                Path("C:/libs/Simd"),
+                Path.home() / "Simd",
+                Path.home() / "libs" / "Simd",
+                Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Simd",
+                Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Simd",
+            ])
+
+        for location in system_paths:
+            if location.exists() and self._is_valid_simd_location(location):
+                return self._save_simd_location(location)
+
+        return False
+
+    def _is_valid_simd_location(self, location: Path) -> bool:
+        """Check if a location contains a valid SIMD library installation"""
+        # Check for SIMD signature files
+        signature_files = [
+            "Simd/Simd.h",
+            "Simd.h",  # direct Simd directory
+            "SimdLib.h",  # alternative header name
+        ]
+
+        for sig_file in signature_files:
+            if (location / sig_file).exists():
+                return True
+
+        # Also check for key SIMD headers
+        simd_headers = ["Simd.h", "SimdLib.h", "SimdParallel.h"]
+        found_headers = 0
+        for header in simd_headers:
+            if (location / header).exists() or (location / "Simd" / header).exists():
+                found_headers += 1
+
+        return found_headers >= 1  # At least 1 key header should exist
+
+    def _validate_simd_path(self, simd_path: Path) -> bool:
+        """Validate user-provided SIMD library path"""
+        if not simd_path.exists():
+            return False
+
+        # Check for SIMD signature files
+        simd_signature_files = [
+            "Simd/Simd.h",
+            "Simd.h",  # direct Simd directory
+            "SimdLib.h",  # alternative header name
+        ]
+
+        for sig_file in simd_signature_files:
+            if (simd_path / sig_file).exists():
+                return self._save_simd_location(simd_path)
+
+        return False
+
+    def _save_simd_location(self, location: Path) -> bool:
+        """Save the found SIMD library location"""
+        if location.name in ["Simd", "simd"]:
+            print(f"  {Colors.GREEN}[OK] SIMD library found: {location}{Colors.ENDC}")
+            # Save SIMD include path (parent of Simd directory)
+            self.config['simd_include'] = str(location.parent)
+            return True
+        elif location.name.endswith("-config.cmake"):
+            print(f"  {Colors.GREEN}[OK] SIMD library found via CMake config: {location}{Colors.ENDC}")
+            # Save SIMD config path
+            self.config['simd_config'] = str(location)
+            return True
+        else:
+            print(f"  {Colors.GREEN}[OK] SIMD library found: {location}{Colors.ENDC}")
+            # Save SIMD share directory
+            self.config['simd_share'] = str(location)
+            return True
+
+    def suggest_simd_installation(self):
+        """Suggest SIMD library installation via vcpkg"""
+        print(f"\n{Colors.CYAN}SIMD library installation suggestions:{Colors.ENDC}")
+        vcpkg_root = self.config.get('vcpkg_root')
+
+        if vcpkg_root:
+            print(f"  Install SIMD library with vcpkg:")
+            print(f"    cd \"{vcpkg_root}\"")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install simd")
+            else:
+                print(f"    ./vcpkg install simd")
+            print(f"    Note: SIMD library provides optimized image processing functions")
+        else:
+            print(f"  vcpkg is not configured. Install vcpkg first, then:")
+            if self.system == "Windows":
+                print(f"    .\\vcpkg install simd")
+            else:
+                print(f"    ./vcpkg install simd")
+
     def prompt_cuda_path(self):
         """Prompt user for CUDA path"""
         print(f"  {Colors.WARN}[ERROR] CUDA not found{Colors.ENDC}")
@@ -1714,6 +2091,15 @@ class SmartConfigurator:
             if 'eigen3_config' in self.config:
                 eigen3_config = self.config['eigen3_config'].replace('\\', '/')
                 f.write(f'set(EIGEN3_DIR "{eigen3_config}")\n')
+
+            # SIMD library configuration
+            if 'simd_include' in self.config:
+                simd_include = self.config['simd_include'].replace('\\', '/')
+                f.write(f'\n# SIMD library configuration\n')
+                f.write(f'set(SIMD_INCLUDE_DIR "{simd_include}")\n')
+            if 'simd_config' in self.config:
+                simd_config = self.config['simd_config'].replace('\\', '/')
+                f.write(f'set(SIMD_DIR "{simd_config}")\n')
 
         print(f"  {Colors.GREEN}[OK] Generated {self.cmake_cache}{Colors.ENDC}")
 
