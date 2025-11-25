@@ -1449,10 +1449,13 @@ class SmartConfigurator:
 
         for vcpkg_dir in vcpkg_dirs:
             base_path = vcpkg_installed / vcpkg_dir
+            # Prioritize header file paths over config file paths
             eigen_locations = [
-                base_path / "include" / "Eigen",
-                base_path / "share" / "eigen3",
-                base_path / "share" / "eigen3-config.cmake"
+                base_path / "include" / "eigen3" / "Eigen",    # Standard vcpkg eigen3 installation
+                base_path / "include" / "Eigen",              # Alternative eigen installation
+                base_path / "include" / "eigen3",             # eigen3 directory (for include path)
+                base_path / "share" / "eigen3",               # CMake config files
+                base_path / "share" / "eigen3-config.cmake"    # CMake config file
             ]
 
             for location in eigen_locations:

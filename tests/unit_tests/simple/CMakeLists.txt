@@ -33,10 +33,18 @@ if(DEFINED SIMD_INCLUDE_DIR)
         endif()
     else()
         find_library(SIMD_LIBRARY
-            NAMES simd
+            NAMES simd Simd
             PATHS ${SIMD_INCLUDE_DIR}/../..
             PATH_SUFFIXES lib x64-linux/lib
         )
+        # Also check vcpkg package directories if not found
+        if(NOT SIMD_LIBRARY)
+            find_library(SIMD_LIBRARY
+                NAMES Simd
+                PATHS /root/R/vcpkg-install-project/packages/simd_x64-linux/lib
+                NO_DEFAULT_PATH
+            )
+        endif()
     endif()
 
     if(SIMD_LIBRARY)
